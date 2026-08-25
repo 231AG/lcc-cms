@@ -17,7 +17,7 @@ All nine blocking decisions (DEC-01 through DEC-09 lineage, see plan §34) and a
 | DEC-12 | Prerequisite override window and expiry date | Stage 9 (recommend: end of first live semester) | College / Super Admin |
 | DEC-14 | Add/drop workflow after plan approval — confirm design suits office | UAT (Stage 9/11) | Admin office |
 | DEC-26 | Who adjudicates a conflicting/unreadable historical paper record | Before first real conflict (days after Stage 6 go-live use begins) | Registrar's office |
-| DEC-29 | Synthetic internal identity (non-deliverable auth identifier) — acknowledgement | Before Stage 2 ships | VPAA / Project Owner |
+| DEC-29 | Synthetic internal identity (non-deliverable auth identifier) | **Acknowledged and approved** — proceeding with `<studentId>@students.<domain>.invalid` resolution | Approved by project owner |
 | DEC-30 | Hosting/data-residency region for Supabase project | Before production data exists | **Chosen: West EU (London/Ireland region)** — recorded 25 Aug 2026 |
 | DEC-31 | Production database tier (must include point-in-time recovery; no free tier in prod) | Before go-live (Stage 11) | Current project is **free tier**, used as the development environment. Production must move to a paid tier with daily backup + PITR before go-live — not yet provisioned. |
 
