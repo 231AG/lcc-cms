@@ -41,11 +41,23 @@ afterAll(async () => {
   await sql.end();
 });
 
+const FIXTURE_IDS = [SUPER_ADMIN_ID, ADMIN_ID, STUDENT_ID];
+
+// Scoped to this suite's own fixture rows: with a real shared database (not
+// a disposable one per test file), other suites' rows are also live at the
+// same time, and RLS correctly makes some of them visible too. What this
+// suite verifies is "which of MY rows can this actor see", not "is the
+// table's total row count exactly 3" -- the latter isn't a meaningful
+// assertion once more than one test suite touches app_user.
 async function selectAs(actingUserId: string) {
   return sql.begin(async (tx) => {
     await tx`SELECT set_config('request.jwt.claim.sub', ${actingUserId}, true)`;
     await tx`SET LOCAL ROLE authenticated`;
-    return tx`SELECT display_name, role FROM app.app_user ORDER BY display_name`;
+    return tx`
+      SELECT display_name, role FROM app.app_user
+      WHERE id = ANY(${FIXTURE_IDS})
+      ORDER BY display_name
+    `;
   });
 }
 
@@ -57,8 +69,18 @@ describe("app_user invariants", () => {
   });
 
   it("refuses to disable the only active Super Admin", async () => {
+    // Runs inside one transaction that never commits: real data (e.g. the
+    // bootstrap Super Admin) coexists in this shared table, so "the only
+    // active Super Admin" has to be made true for the duration of this
+    // check, without permanently touching anything outside this fixture.
     await expect(
-      sql`UPDATE app.app_user SET status = 'DISABLED' WHERE id = ${SUPER_ADMIN_ID}`,
+      sql.begin(async (tx) => {
+        await tx`ALTER TABLE app.app_user DISABLE TRIGGER app_user_min_super_admin`;
+        await tx`UPDATE app.app_user SET status = 'DISABLED' WHERE role = 'SUPER_ADMIN' AND id != ${SUPER_ADMIN_ID}`;
+        await tx`ALTER TABLE app.app_user ENABLE TRIGGER app_user_min_super_admin`;
+
+        await tx`UPDATE app.app_user SET status = 'DISABLED' WHERE id = ${SUPER_ADMIN_ID}`;
+      }),
     ).rejects.toThrow(/at least one active super admin/i);
   });
 });
