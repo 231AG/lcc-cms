@@ -94,6 +94,31 @@ const PERMISSIONS_STAGE_3: Array<{
   { role: "SUPER_ADMIN", action: "structure.managePrerequisite", allowed: false, note: "REQ-R04 explicit denial" },
 ];
 
+/** Stage 4: calendar actions. transitionSemester is allowed for BOTH Admin
+ * and Super Admin at this coarse-grained level -- the transition table
+ * itself (semesterStateMachine.ts) enforces which role may perform which
+ * SPECIFIC from/to pair, matching Section 11.4's "separation of duties
+ * re-checked in-transaction" pattern rather than the permission table
+ * trying to encode per-transition role logic. */
+const PERMISSIONS_STAGE_4: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "calendar.manageAcademicYear", allowed: false, note: "" },
+  { role: "ADMIN", action: "calendar.manageAcademicYear", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "calendar.manageAcademicYear", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "calendar.manageSemester", allowed: false, note: "" },
+  { role: "ADMIN", action: "calendar.manageSemester", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "calendar.manageSemester", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "calendar.transitionSemester", allowed: false, note: "" },
+  { role: "ADMIN", action: "calendar.transitionSemester", allowed: true, note: "Forward transitions only -- see semesterStateMachine.ts" },
+  { role: "SUPER_ADMIN", action: "calendar.transitionSemester", allowed: true, note: "Backward/reopen only -- see semesterStateMachine.ts" },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -134,8 +159,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 + 3 actions)...");
-  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3]) {
+  console.log("Seeding permission (Stage 2 + 3 + 4 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4]) {
     await db
       .insert(schema.permission)
       .values(row)

@@ -68,3 +68,24 @@ still open), (3) never let synthetic/test data and real academic records coexist
 Local development in the meantime continues to default to Docker Postgres (`docker-compose.yml`)
 unless the team decides to point `DATABASE_URL` at the shared Supabase project directly.
 **Approval status:** Approved by project owner.
+
+### DEV-03 — Super Admin's backward semester transition runs through the superuser DB connection, not `asUser()` (Stage 4)
+
+**Date:** Stage 4.
+**Decision:** RLS on `app.semester` (migration `0007_calendar_constraints_rls.sql`) only grants UPDATE
+to the ADMIN role. Postgres row-level security cannot express "Super Admin may update this row, but
+only for these specific from/to state pairs" -- that check belongs in the pure transition table
+(`semesterStateMachine.ts`), not in a policy. `transitionSemester` in `src/lib/academic/calendar.ts`
+therefore branches: an Admin's forward move runs through `asUser()` as before (RLS genuinely applies);
+a Super Admin's backward/reopen move runs through `db.transaction()` directly (the superuser
+connection), after `assertCan()` and the transition-rule role/reason checks have already gated it.
+**Rationale given:** This is Section 10.5's own documented exception ("except the semester-state
+backward transition, which the service performs under an explicitly elevated, audited path"), not an
+RLS bypass discovered by accident -- role and transition-legality checks happen in the service layer
+before a single row is touched, and the transition is still written to `audit_log` with old/new state
+and the mandatory reason in the same transaction.
+**Consequence:** Any future write path that needs "this role, but only under these conditions" should
+follow the same pattern (service-layer gate + superuser write + audit) rather than trying to encode
+conditional logic into an RLS policy.
+**Approval status:** Not a deviation requiring approval -- implements the plan's own stated exception.
+Recorded so the RLS-bypass path doesn't get mistaken for an oversight in a future audit.

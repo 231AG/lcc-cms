@@ -17,6 +17,10 @@ export const AUDIT_ACTIONS = [
   "GRADE_CORRECTION_APPROVED",
   "GRADE_CORRECTION_REJECTED",
 
+  // Calendar (Stage 4)
+  "ACADEMIC_YEAR_CREATED",
+  "SEMESTER_CREATED",
+
   // Academic structure (Stage 3)
   "COLLEGE_CREATED",
   "COLLEGE_UPDATED",
