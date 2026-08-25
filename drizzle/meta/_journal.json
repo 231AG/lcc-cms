@@ -15,6 +15,20 @@
       "when": 1787665248835,
       "tag": "0001_audit_privileges",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787667178527,
+      "tag": "0002_glossy_junta",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787667195365,
+      "tag": "0003_identity_constraints_rls",
+      "breakpoints": true
     }
   ]
 }

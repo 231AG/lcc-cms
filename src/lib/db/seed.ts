@@ -34,6 +34,42 @@ const GRADE_SCALE_V1 = [
   { letter: "I", minScore: null, maxScore: null, gradePoint: null, isPassing: false, displayOrder: 10 },
 ] as const;
 
+/**
+ * The permission matrix as data (plan Section 11.3), grown one action at a
+ * time as each stage's real services are built. Stage 2 adds only the
+ * identity/account rows -- no row exists yet for anything not built.
+ */
+const PERMISSIONS_STAGE_2: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "identity.changePassword", allowed: true, note: "Forced on first login and after any reset." },
+  { role: "ADMIN", action: "identity.changePassword", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "identity.changePassword", allowed: true, note: "" },
+
+  { role: "STUDENT", action: "identity.createStudentAccount", allowed: false, note: "" },
+  { role: "ADMIN", action: "identity.createStudentAccount", allowed: true, note: "REQ-A02" },
+  { role: "SUPER_ADMIN", action: "identity.createStudentAccount", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "identity.resetStudentPassword", allowed: false, note: "" },
+  { role: "ADMIN", action: "identity.resetStudentPassword", allowed: true, note: "REQ-A02" },
+  { role: "SUPER_ADMIN", action: "identity.resetStudentPassword", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "identity.createStaffAccount", allowed: false, note: "" },
+  { role: "ADMIN", action: "identity.createStaffAccount", allowed: false, note: "" },
+  { role: "SUPER_ADMIN", action: "identity.createStaffAccount", allowed: true, note: "REQ-A06" },
+
+  { role: "STUDENT", action: "identity.disableAccount", allowed: false, note: "" },
+  { role: "ADMIN", action: "identity.disableAccount", allowed: false, note: "" },
+  { role: "SUPER_ADMIN", action: "identity.disableAccount", allowed: true, note: "Cannot disable the last active Super Admin (I-11)." },
+
+  { role: "STUDENT", action: "identity.enableAccount", allowed: false, note: "" },
+  { role: "ADMIN", action: "identity.enableAccount", allowed: false, note: "" },
+  { role: "SUPER_ADMIN", action: "identity.enableAccount", allowed: true, note: "" },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -72,6 +108,17 @@ async function main() {
         displayOrder: entry.displayOrder,
       })
       .onConflictDoNothing();
+  }
+
+  console.log("Seeding permission (Stage 2 actions)...");
+  for (const row of PERMISSIONS_STAGE_2) {
+    await db
+      .insert(schema.permission)
+      .values(row)
+      .onConflictDoUpdate({
+        target: [schema.permission.role, schema.permission.action],
+        set: { allowed: row.allowed, note: row.note },
+      });
   }
 
   console.log("Seeding institution_setting...");
