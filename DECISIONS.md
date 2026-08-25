@@ -40,4 +40,20 @@ All nine blocking decisions (DEC-01 through DEC-09 lineage, see plan §34) and a
 
 (New entries added here as Stage 1+ work proceeds, per format: ID | Date | Stage | Decision | Alternatives | Rationale | Approval status)
 
-None yet — repository is pre-Stage-1.
+### DEV-01 — Single Supabase project used for development, staging, and production (deviates from plan Section 8.5)
+
+**Date:** Stage 1, during initial build.
+**Decision:** The plan's hard rule is three separate Supabase projects (dev/staging/prod), never
+shared, because "a copied student record in a test environment is a data breach waiting for a
+misconfiguration" (Section 8.5). The project owner has explicitly approved using the **one** existing
+free-tier Supabase project for all three purposes for now, and will separate them before real
+institutional data or real end-user testing begins.
+**Rationale given:** No live/production data exists yet; live testing will happen once production is
+otherwise ready, at which point proper separation will be introduced.
+**Consequence / what must still happen before go-live:** Before Stage 11 (or before any real student
+data enters the system, whichever comes first), this must be revisited: (1) split into separate dev/
+staging/prod Supabase projects, (2) confirm the production tier has point-in-time recovery (DEC-31,
+still open), (3) never let synthetic/test data and real academic records coexist in the same project.
+Local development in the meantime continues to default to Docker Postgres (`docker-compose.yml`)
+unless the team decides to point `DATABASE_URL` at the shared Supabase project directly.
+**Approval status:** Approved by project owner.
