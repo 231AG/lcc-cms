@@ -70,6 +70,30 @@ const PERMISSIONS_STAGE_2: Array<{
   { role: "SUPER_ADMIN", action: "identity.enableAccount", allowed: true, note: "" },
 ];
 
+/** Stage 3: academic structure actions (Section 11.3 "Academic structure" group). */
+const PERMISSIONS_STAGE_3: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "structure.manageCollege", allowed: false, note: "" },
+  { role: "ADMIN", action: "structure.manageCollege", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "structure.manageCollege", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "structure.manageDepartment", allowed: false, note: "" },
+  { role: "ADMIN", action: "structure.manageDepartment", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "structure.manageDepartment", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "structure.manageCourse", allowed: false, note: "" },
+  { role: "ADMIN", action: "structure.manageCourse", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "structure.manageCourse", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "structure.managePrerequisite", allowed: false, note: "" },
+  { role: "ADMIN", action: "structure.managePrerequisite", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "structure.managePrerequisite", allowed: false, note: "REQ-R04 explicit denial" },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -110,8 +134,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 actions)...");
-  for (const row of PERMISSIONS_STAGE_2) {
+  console.log("Seeding permission (Stage 2 + 3 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3]) {
     await db
       .insert(schema.permission)
       .values(row)

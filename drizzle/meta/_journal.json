@@ -29,6 +29,20 @@
       "when": 1787667195365,
       "tag": "0003_identity_constraints_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787676897584,
+      "tag": "0004_jazzy_madelyne_pryor",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787676914912,
+      "tag": "0005_structure_constraints_rls",
+      "breakpoints": true
     }
   ]
 }

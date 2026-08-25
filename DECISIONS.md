@@ -36,6 +36,17 @@ All nine blocking decisions (DEC-01 through DEC-09 lineage, see plan §34) and a
 | ASM-21 | "Two inactive semesters" = two consecutive semesters with no approved registration | Stage 5 (Students) |
 | ASM-19 | "Most recent attempt" counts in CGPA even if worse than an earlier attempt (carried from source doc) | Stage 7 (Registrar to glance at fixture F-13) |
 
+### DEV-02 — Department deactivation does not yet check for active students (Stage 3, deferred to Stage 5)
+
+**Decision:** `setDepartmentActive(false)` currently blocks only on active *courses* in the department. The
+plan's own Section 9.4.3 constraint ("a department cannot be deactivated while it has ACTIVE students")
+can't be implemented yet because the `student` table doesn't exist until Stage 5.
+**Consequence:** When Stage 5 adds the student table, `setDepartmentActive` must be extended to also
+check for active students before allowing deactivation, with the same "name the blockers" error style
+already used for courses.
+**Approval status:** Not a deviation requiring approval — this is the plan's own stage-dependency
+ordering (Stage 3 before Stage 5) surfacing directly in the code. Recorded so it isn't forgotten.
+
 ## Engineering decisions made during implementation
 
 (New entries added here as Stage 1+ work proceeds, per format: ID | Date | Stage | Decision | Alternatives | Rationale | Approval status)

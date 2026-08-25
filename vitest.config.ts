@@ -15,8 +15,10 @@ export default defineConfig({
     // per-file database to isolate against here.
     fileParallelism: false,
     // Real network round-trips to a hosted Postgres/Auth service, not a
-    // local mock -- the default 5s budget is too tight under load.
-    testTimeout: 20_000,
+    // local mock -- the default 5s budget is too tight under load, and a
+    // few structure tests chain 10+ sequential writes (college, dept,
+    // multiple courses, prerequisites, cleanup).
+    testTimeout: 40_000,
   },
   resolve: {
     alias: {
