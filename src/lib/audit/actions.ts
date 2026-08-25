@@ -1,0 +1,58 @@
+/**
+ * The typed audit action vocabulary (plan Section 19.3). A new action must
+ * be registered here before any code can log it — this is what forces the
+ * question "should this be audited?" at the moment the action is written,
+ * rather than leaving audit coverage to convention.
+ */
+export const AUDIT_ACTIONS = [
+  // Grades
+  "GRADE_ENTERED",
+  "GRADE_DRAFT_EDITED",
+  "GRADE_DRAFT_CLEARED",
+  "GRADE_SUBMISSION_CREATED",
+  "GRADE_SUBMISSION_APPROVED",
+  "GRADE_SUBMISSION_REJECTED",
+  "GRADE_PUBLISHED",
+  "GRADE_CORRECTION_REQUESTED",
+  "GRADE_CORRECTION_APPROVED",
+  "GRADE_CORRECTION_REJECTED",
+
+  // Academic records and historical import
+  "HISTORICAL_RECORD_ENTERED",
+  "HISTORICAL_RECORD_CORRECTED",
+  "IMPORT_STATUS_CHANGED",
+  "ACADEMIC_RECORD_VOIDED",
+
+  // Semester and planning
+  "SEMESTER_STATE_CHANGED",
+  "COURSE_PLAN_SUBMITTED",
+  "COURSE_PLAN_APPROVED",
+  "COURSE_PLAN_REJECTED",
+  "PREREQUISITE_OVERRIDDEN",
+  "REGISTRATION_CREATED",
+  "REGISTRATION_DROPPED",
+
+  // Administration and configuration
+  "USER_CREATED",
+  "USER_DISABLED",
+  "USER_ENABLED",
+  "PASSWORD_RESET_BY_ADMIN",
+  "PASSWORD_CHANGED_BY_SELF",
+  "LOGIN_SUCCEEDED",
+  "LOGIN_FAILED",
+  "STUDENT_CREATED",
+  "STUDENT_UPDATED",
+  "COURSE_CREDIT_HOURS_CHANGED",
+  "PREREQUISITE_ADDED",
+  "PREREQUISITE_REMOVED",
+  "GRADE_SCALE_VERSION_CREATED",
+  "INSTITUTION_SETTING_CHANGED",
+  "CLASS_SHEET_PRINTED",
+  "ACADEMIC_EXPORT_RUN",
+  "AUDIT_LOG_VIEWED",
+
+  // Stage 1 internal/test use only
+  "TEST_ACTION",
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];

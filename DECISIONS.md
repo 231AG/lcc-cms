@@ -1,0 +1,43 @@
+# Decision Register — LCC E-Portal Phase 1
+
+Seeded from `LCC_EPortal_Phase1_Development_Plan_v2.1.pdf`, Section 34 (25 Aug 2026). All entries below are carried
+forward as-is from the planning document. This file is updated at every stage gate per the operating protocol
+(Master Instruction, Section 22).
+
+Format: `ID | Decision | Status | Stage | Note`
+
+## Closed — academic policy (no action needed)
+All nine blocking decisions (DEC-01 through DEC-09 lineage, see plan §34) and all academic-policy items are
+**closed**. See the plan document itself for the full table; nothing here is re-litigated.
+
+## Open — operational / configuration (non-blocking for coding, needed before the relevant stage/gate)
+
+| ID | Decision | Needed before | Owner |
+|---|---|---|---|
+| DEC-12 | Prerequisite override window and expiry date | Stage 9 (recommend: end of first live semester) | College / Super Admin |
+| DEC-14 | Add/drop workflow after plan approval — confirm design suits office | UAT (Stage 9/11) | Admin office |
+| DEC-26 | Who adjudicates a conflicting/unreadable historical paper record | Before first real conflict (days after Stage 6 go-live use begins) | Registrar's office |
+| DEC-29 | Synthetic internal identity (non-deliverable auth identifier) — acknowledgement | Before Stage 2 ships | VPAA / Project Owner |
+| DEC-30 | Hosting/data-residency region for Supabase project | Before production data exists | **Chosen: West EU (London/Ireland region)** — recorded 25 Aug 2026 |
+| DEC-31 | Production database tier (must include point-in-time recovery; no free tier in prod) | Before go-live (Stage 11) | Current project is **free tier**, used as the development environment. Production must move to a paid tier with daily backup + PITR before go-live — not yet provisioned. |
+
+## Open — pre-coding administrative (Section 38.1)
+
+| ID | Item | Status |
+|---|---|---|
+| — | This document (v2.1) countersigned as the Phase 1 engineering baseline | Pending — plan treats this as a project-owner/VPAA formality; proceeding on the project owner's instruction to build |
+| — | Confirmation that Admin and Super Admin roles will be held by different people | Pending — operational/policy, not blocking code |
+
+## Assumptions to confirm before specific stages (see ASSUMPTIONS.md for full list)
+
+| ID | Assumption | Confirm before |
+|---|---|---|
+| ASM-20 | "Major course" = course owned by the student's own department | Stage 7 (GPA engine) |
+| ASM-21 | "Two inactive semesters" = two consecutive semesters with no approved registration | Stage 5 (Students) |
+| ASM-19 | "Most recent attempt" counts in CGPA even if worse than an earlier attempt (carried from source doc) | Stage 7 (Registrar to glance at fixture F-13) |
+
+## Engineering decisions made during implementation
+
+(New entries added here as Stage 1+ work proceeds, per format: ID | Date | Stage | Decision | Alternatives | Rationale | Approval status)
+
+None yet — repository is pre-Stage-1.
