@@ -119,6 +119,21 @@ const PERMISSIONS_STAGE_4: Array<{
   { role: "SUPER_ADMIN", action: "calendar.transitionSemester", allowed: true, note: "Backward/reopen only -- see semesterStateMachine.ts" },
 ];
 
+/** Stage 5: student profile edits (name, department, enrolment year,
+ * contact, status -- including reactivation). identity.createStudentAccount
+ * and identity.resetStudentPassword were already seeded in Stage 2, per
+ * REQ-T02's traceability, ahead of the feature that uses them. */
+const PERMISSIONS_STAGE_5: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "identity.updateStudentProfile", allowed: false, note: "" },
+  { role: "ADMIN", action: "identity.updateStudentProfile", allowed: true, note: "" },
+  { role: "SUPER_ADMIN", action: "identity.updateStudentProfile", allowed: false, note: "REQ-R04 explicit denial (DEV-04 confirmed no exception for reactivation)" },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -159,8 +174,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 + 3 + 4 actions)...");
-  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4]) {
+  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5]) {
     await db
       .insert(schema.permission)
       .values(row)
