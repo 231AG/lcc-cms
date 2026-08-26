@@ -89,3 +89,25 @@ follow the same pattern (service-layer gate + superuser write + audit) rather th
 conditional logic into an RLS policy.
 **Approval status:** Not a deviation requiring approval -- implements the plan's own stated exception.
 Recorded so the RLS-bypass path doesn't get mistaken for an oversight in a future audit.
+
+### DEV-04 — Admission forfeiture (CR-09) scoped to newly-enrolled students who never register (narrows plan Section 12.6)
+
+**Date:** Stage 5, at kickoff.
+**Decision:** Plan Section 12.6 defines the forfeiture trigger as "no approved registration in either of the
+two most recently closed semesters, and their status is Active" -- read literally, this covers *any* Active
+student who later stops registering, not just a brand-new admit. The project owner clarified the intent is
+narrower: a student who is granted admission and never attends even one semester -- if they have no approved
+registration in the two consecutive semesters immediately after their account is created, the admission is
+the thing that's forfeited (not an in-progress academic career). Reactivation after due process stays
+**Admin-only** -- the owner confirmed Super Admin should not gain student-edit power, keeping REQ-R04's
+existing RBAC split (Super Admin: read students, never write) unchanged.
+**Rationale given:** Matches how the College actually thinks about the status -- "forfeiting an admission"
+describes someone who never showed up, not someone withdrawing partway through their studies (the latter is
+what the Inactive/Suspended statuses already cover per DEC-16).
+**Consequence:** When the forfeiture candidate report (A-21) is actually built, its query must be scoped to
+students whose *first two* semesters after enrolment (not *any* two consecutive closed semesters) had no
+approved registration -- this is a real logic difference from a literal reading of Section 12.6, not just a
+UI label. The report itself still cannot be built until the `registration` table exists (Stage 8+); Stage 5
+only needs to accommodate the `ADMISSION_FORFEITED` status value and Admin-only status-change/reactivation,
+not the report logic itself.
+**Approval status:** Confirmed by project owner, 2026-08-26.

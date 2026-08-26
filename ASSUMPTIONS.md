@@ -22,7 +22,7 @@ plan; this file tracks status and validation as implementation proceeds.
 | ASM-18 | No SMS/email in Phase 1, including password reset | Identity | Confirm with VPAA | Unvalidated |
 | ASM-19 | "Most recent attempt" counts even when worse (carried from source doc) | CGPA | Show Registrar fixture F-13 | Unvalidated |
 | ASM-20 | "Major course" = course owned by student's own department | Mandatory repeats | **Ask Registrar before Stage 7** | Unvalidated — flagged blocking-adjacent |
-| ASM-21 | "Two inactive semesters" = two consecutive with no approved registration | Student status / forfeiture | Confirm counting rule before Stage 5 | Unvalidated — mitigated by manual confirmation (DEC-39) |
+| ASM-21 | Admission forfeiture targets a newly-enrolled student who never registers for two consecutive semesters after account creation (not any Active student who later lapses); Admin (not Super Admin) reactivates after due process | Student status / forfeiture | Owner confirmed the trigger scope 2026-08-26 (see DECISIONS.md DEV-04); Admin-only reactivation matches existing REQ-R04 RBAC split, no change needed | Confirmed — narrower scope than plan's literal Section 12.6 wording; candidate-report feature itself still waits on `registration` data (Stage 8+) |
 | ASM-22 | 132-credit graduation total applies equally to every BSc programme | Graduation progress display | Ask Registrar whether any department differs | Unvalidated |
 
 Six assumptions from the original v1.0 plan (ASM-04, 05, 08) were retired by the College's 25 Aug 2026 decisions —
