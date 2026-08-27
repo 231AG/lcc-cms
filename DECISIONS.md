@@ -111,3 +111,42 @@ UI label. The report itself still cannot be built until the `registration` table
 only needs to accommodate the `ADMISSION_FORFEITED` status value and Admin-only status-change/reactivation,
 not the report logic itself.
 **Approval status:** Confirmed by project owner, 2026-08-26.
+
+### DEV-05 — Historical record correction is direct Admin-only for Stage 6, no two-key approval yet (narrows plan Section 11.3's recommendation)
+
+**Date:** Stage 6, at kickoff.
+**Decision:** Plan Section 11.3 recommends that correcting an already-entered historical record follow the
+same two-key path as a locked grade correction (Admin proposes, Super Admin approves) once a student's
+import status is Complete -- but this is stated as a RECOMMENDATION, not a hard requirement. The owner chose
+the simpler path for Stage 6: an Admin corrects a historical record directly, fully audited (actor, old
+value, new value, mandatory reason via `HISTORICAL_RECORD_CORRECTED`), no second-approver step. Super Admin
+remains refused from entering or correcting historical records either way (REQ-R04-style exclusion, matches
+every other academic-write boundary in this system).
+**Rationale given:** Avoids building a full two-person approval workflow twice (once here, once for real
+grade corrections in Stage 10) before there's operational experience with how often historical corrections
+actually happen.
+**Consequence:** If corrections turn out to need tighter control once real paper-record entry is underway,
+this can be upgraded to the two-key path later -- the audit trail already captures everything a future
+approval step would need (actor, old/new values, reason), so upgrading doesn't require redesigning the data
+model, just adding a gate in front of the existing write.
+**Approval status:** Confirmed by project owner, 2026-08-27.
+
+### DEV-06 — DEC-26 (conflict adjudication) scoped down for Stage 6: capture and flag, no adjudicator role enforced in software
+
+**Date:** Stage 6, at kickoff.
+**Decision:** DEC-26 (who adjudicates a conflicting/unreadable historical paper record) remains open in the
+operational sense -- the College hasn't named a role or person yet. The owner confirmed Stage 6 should build
+to REQ-H07's actual minimum bar without waiting on that answer: the system holds one authoritative
+`academic_record` row, captures the conflict in `source_note` and the audit log, and keeps the student's
+import status at IN_PROGRESS (never auto-advances to COMPLETE while an unresolved conflict exists). No
+specific role is enforced in code as "the adjudicator" -- any Admin may resolve a flagged conflict through
+the normal historical-correction path (DEV-05), the same way any Admin can correct any other historical
+record.
+**Rationale given:** The technical behavior (hold, flag, don't auto-resolve) doesn't actually depend on
+knowing which named person does the resolving -- that's an Admin-office staffing question, not a data model
+question.
+**Consequence:** DEC-26 stays open in DECISIONS.md's operational table; if the College later wants adjudication
+restricted to a specific person or sub-role, that would need a new permission action distinct from ordinary
+`identity.correctHistoricalRecord`-type Admin access, added when that requirement is real.
+**Approval status:** Confirmed by project owner, 2026-08-27 -- DEC-26 itself remains open pending the
+Registrar's office naming a role, tracked separately above.
