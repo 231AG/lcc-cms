@@ -85,6 +85,20 @@
       "when": 1787830291188,
       "tag": "0011_academic_record_constraints_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787835027743,
+      "tag": "0012_gpa_summaries",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787835040840,
+      "tag": "0013_gpa_summaries_rls",
+      "breakpoints": true
     }
   ]
 }

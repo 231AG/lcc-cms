@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { createAdminClient } from "../src/lib/supabase/admin";
 import { db } from "../src/lib/db/client";
-import { appUser, academicRecord, academicYear, course, semester, student, department } from "../src/lib/db/schema";
+import { appUser, academicRecord, academicYear, course, semester, student, department, studentSemesterSummary, studentCumulativeSummary } from "../src/lib/db/schema";
 import { resolveLoginIdentifierToEmail } from "../src/lib/identity/resolve";
 import { createAcademicYear } from "../src/lib/academic/calendar";
 import { createCourse } from "../src/lib/academic/structure";
@@ -50,6 +50,8 @@ test.afterAll(async ({}, testInfo) => {
   testInfo.setTimeout(60_000);
   for (const id of cleanupStudentUserIds) {
     await db.delete(academicRecord).where(eq(academicRecord.studentId, id)).catch(() => {});
+    await db.delete(studentSemesterSummary).where(eq(studentSemesterSummary.studentId, id)).catch(() => {});
+    await db.delete(studentCumulativeSummary).where(eq(studentCumulativeSummary.studentId, id)).catch(() => {});
     await db.delete(student).where(eq(student.id, id)).catch(() => {});
     await db.update(appUser).set({ status: "DISABLED" }).where(eq(appUser.id, id)).catch(() => {});
     await createAdminClient().auth.admin.deleteUser(id).catch(() => {});
@@ -88,10 +90,14 @@ test("Admin enters a full past semester for a student in one save, then marks th
   });
   cleanupCourseIds.push(courseRow.id);
 
+  // A unique past-year label per run -- "2017/2018" collided with the
+  // fixture label the Vitest GPA integration tests reuse across runs.
+  const yearBase = 1950 + (Date.now() % 60);
+  const yearLabel = `${yearBase}/${yearBase + 1}`;
   const year = await createAcademicYear(adminActor, {
-    label: "2017/2018",
-    startDate: "2017-08-01",
-    endDate: "2018-06-30",
+    label: yearLabel,
+    startDate: `${yearBase}-08-01`,
+    endDate: `${yearBase + 1}-06-30`,
   });
   cleanupAcademicYearIds.push(year.id);
 
@@ -99,17 +105,17 @@ test("Admin enters a full past semester for a student in one save, then marks th
     academicYearId: year.id,
     sequence: 1,
     name: "First Semester",
-    startDate: "2017-09-01",
-    endDate: "2018-01-15",
+    startDate: `${yearBase}-09-01`,
+    endDate: `${yearBase + 1}-01-15`,
   });
   cleanupSemesterIds.push(pastSemester.id);
 
   const enrolled = await enrollStudent(adminActor, {
-    studentNumber: `2017${Math.floor(1000 + Math.random() * 9000)}`,
+    studentNumber: `${yearBase}${Math.floor(1000 + Math.random() * 9000)}`,
     firstName: "E2E",
     lastName: "Historical",
     departmentId: dept.id,
-    enrolmentYear: 2017,
+    enrolmentYear: yearBase,
   });
   const studentRow = await db.query.appUser.findFirst({ where: eq(appUser.loginIdentifier, enrolled.studentNumber) });
   cleanupStudentUserIds.push(studentRow!.id);

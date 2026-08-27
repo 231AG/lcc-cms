@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { appUser, academicRecord, academicYear, semester, student, auditLog, department, course } from "@/lib/db/schema";
+import { appUser, academicRecord, academicYear, semester, student, auditLog, department, course, studentSemesterSummary, studentCumulativeSummary } from "@/lib/db/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createStaffAccount } from "@/lib/identity/accounts";
 import { enrollStudent } from "@/lib/students/students";
@@ -120,6 +120,12 @@ beforeAll(async () => {
 afterAll(async () => {
   for (const id of cleanupStudentUserIds) {
     await db.delete(academicRecord).where(eq(academicRecord.studentId, id)).catch(() => {});
+    // Stage 7 wired recomputation into every entry/correction/void/status
+    // action in this file, so every test student now has summary rows too
+    // -- both reference `semester` with a RESTRICT FK, so they must go
+    // before the semester cleanup below, not just before `student`.
+    await db.delete(studentSemesterSummary).where(eq(studentSemesterSummary.studentId, id)).catch(() => {});
+    await db.delete(studentCumulativeSummary).where(eq(studentCumulativeSummary.studentId, id)).catch(() => {});
     await db.delete(student).where(eq(student.id, id)).catch(() => {});
     await db.update(appUser).set({ status: "DISABLED" }).where(eq(appUser.id, id)).catch(() => {});
     await createAdminClient().auth.admin.deleteUser(id).catch(() => {});

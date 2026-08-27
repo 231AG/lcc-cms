@@ -5,3 +5,4 @@ export * from "./structure";
 export * from "./calendar";
 export * from "./student";
 export * from "./academicRecord";
+export * from "./gpa";

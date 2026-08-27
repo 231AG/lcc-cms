@@ -13,6 +13,7 @@ import {
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
+import { recomputeStudentSummaries } from "@/lib/gpa/recompute";
 
 function normalizeCode(code: string): string {
   return code.trim().toUpperCase().replace(/\s+/g, " ");
@@ -168,23 +169,21 @@ export async function enterHistoricalSemester(
   const activeScale = await getActiveGradeScale();
   const warnings: EnterHistoricalSemesterWarning[] = [];
 
-  // Fetched once, up front, rather than per-row: every row in this batch
-  // needs to be checked against every pre-existing record for this
-  // student/semester (a duplicate could match any of them, not just
-  // whichever one a per-row query happens to return first).
+  // Fetched once, up front, rather than per-row -- scoped to the STUDENT
+  // (every semester, not just this one): a repeat is, by definition, an
+  // earlier attempt in a *different* semester, so checking only the
+  // current semester would silently miss it and let two attempts of the
+  // same course both land on attempt_no 1 (a real bug caught while
+  // building Stage 7's recomputation tests -- attempt_no must be unique
+  // per course across the student's whole history, not per semester).
   const existingRecords = await db.query.academicRecord.findMany({
-    where: and(
-      eq(academicRecord.studentId, input.studentId),
-      eq(academicRecord.semesterId, input.semesterId),
-      eq(academicRecord.isVoid, false),
-    ),
+    where: and(eq(academicRecord.studentId, input.studentId), eq(academicRecord.isVoid, false)),
   });
-  // Highest attempt_no seen so far for a course code, across both the
-  // pre-existing rows and rows already prepared earlier in this same
-  // batch -- so two repeats of the same course submitted together (or a
-  // repeat of a course already on record) both get the correct next
-  // attempt number, and a plain duplicate within the batch is refused
-  // exactly like a duplicate against an existing row.
+  // Highest attempt_no seen so far for a course code, across every prior
+  // semester, the pre-existing rows, and rows already prepared earlier in
+  // this same batch -- so a repeat gets the correct next attempt number
+  // regardless of which semester it's entered against, and a duplicate is
+  // refused exactly like one within a single save.
   const attemptTracker = new Map<string, number>();
   for (const r of existingRecords) {
     const key = normalizeCode(r.courseCodeSnapshot);
@@ -248,7 +247,7 @@ export async function enterHistoricalSemester(
           ? `grade ${existingSameCourse.letter}, entered ${existingSameCourse.enteredAt.toISOString().slice(0, 10)}`
           : "already submitted earlier in this same save";
         throw new ValidationError(
-          `${code} already has a record for this student in this semester (${existingDescription}). Confirm as a genuine repeat to add another attempt, or remove this row if it's a duplicate.`,
+          `${code} already has a record for this student (${existingDescription}). Confirm as a genuine repeat to add another attempt, or remove this row if it's a duplicate.`,
         );
       }
       attemptNo = priorAttempt + 1;
@@ -316,6 +315,8 @@ export async function enterHistoricalSemester(
         requestId,
       });
     }
+
+    await recomputeStudentSummaries(tx, input.studentId);
 
     return rows;
   });
@@ -388,6 +389,8 @@ export async function correctHistoricalRecord(
       reason: input.reason,
     });
 
+    await recomputeStudentSummaries(tx, existing.studentId);
+
     return row;
   });
 }
@@ -417,6 +420,8 @@ export async function voidHistoricalRecord(actor: Actor, recordId: string, reaso
       oldValue: { isVoid: false },
       reason,
     });
+
+    await recomputeStudentSummaries(tx, existing.studentId);
 
     return row;
   });
@@ -453,6 +458,8 @@ export async function markImportComplete(actor: Actor, studentId: string) {
       newValue: { historicalImportStatus: "COMPLETE" },
     });
 
+    await recomputeStudentSummaries(tx, studentId);
+
     return row;
   });
 }
@@ -485,6 +492,8 @@ export async function reopenImportStatus(actor: Actor, studentId: string, reason
       newValue: { historicalImportStatus: "IN_PROGRESS" },
       reason,
     });
+
+    await recomputeStudentSummaries(tx, studentId);
 
     return row;
   });
