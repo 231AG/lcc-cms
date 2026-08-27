@@ -21,6 +21,16 @@ export const AUDIT_ACTIONS = [
   "ACADEMIC_YEAR_CREATED",
   "SEMESTER_CREATED",
 
+  // Course offerings and scheduling (Stage 8) -- not pre-named in the
+  // plan's own Section 19.3 vocabulary table (only what must be audited
+  // is specified, not the exact action names), so these follow the
+  // existing naming convention.
+  "OFFERING_CREATED",
+  "OFFERING_PUBLISHED",
+  "OFFERING_CANCELLED",
+  "OFFERING_UPDATED",
+  "OFFERING_MEETING_CHANGED",
+
   // Academic structure (Stage 3)
   "COLLEGE_CREATED",
   "COLLEGE_UPDATED",

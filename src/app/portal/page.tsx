@@ -18,6 +18,7 @@ const ADMIN_LINKS = [
   { href: "/admin/historical/progress", label: "Historical import progress" },
   { href: "/admin/structure", label: "Academic structure" },
   { href: "/admin/calendar", label: "Academic calendar" },
+  { href: "/admin/offerings", label: "Course offerings" },
 ];
 
 const SUPER_ADMIN_LINKS = [
@@ -25,6 +26,7 @@ const SUPER_ADMIN_LINKS = [
   { href: "/admin/students", label: "Students (read-only)" },
   { href: "/admin/historical/progress", label: "Historical import progress" },
   { href: "/admin/calendar", label: "Academic calendar (read-only)" },
+  { href: "/admin/offerings", label: "Course offerings (read-only)" },
 ];
 
 /**

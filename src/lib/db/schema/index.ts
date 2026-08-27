@@ -6,3 +6,4 @@ export * from "./calendar";
 export * from "./student";
 export * from "./academicRecord";
 export * from "./gpa";
+export * from "./offering";

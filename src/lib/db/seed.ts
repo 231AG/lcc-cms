@@ -164,6 +164,23 @@ const PERMISSIONS_STAGE_6: Array<{
   { role: "SUPER_ADMIN", action: "historical.createRetrospectiveSemester", allowed: false, note: "REQ-R04 explicit denial" },
 ];
 
+/** Stage 8: course offerings and scheduling. One permission covers
+ * offering CRUD, publish/cancel, and meeting-time management -- they're
+ * always performed by the same actor under the same rule (Admin only,
+ * Super Admin explicitly denied, REQ-R04), so there's nothing a finer
+ * split would buy here the way calendar.ts's three separate actions did
+ * (those needed to distinguish Admin-forward from Super-Admin-backward). */
+const PERMISSIONS_STAGE_8: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "offering.manage", allowed: false, note: "" },
+  { role: "ADMIN", action: "offering.manage", allowed: true, note: "Covers offering CRUD, publish/cancel, and meeting-time management" },
+  { role: "SUPER_ADMIN", action: "offering.manage", allowed: false, note: "REQ-R04 explicit denial" },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -204,8 +221,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 actions)...");
-  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6]) {
+  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8]) {
     await db
       .insert(schema.permission)
       .values(row)
