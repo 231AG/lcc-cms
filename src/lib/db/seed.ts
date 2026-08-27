@@ -134,6 +134,36 @@ const PERMISSIONS_STAGE_5: Array<{
   { role: "SUPER_ADMIN", action: "identity.updateStudentProfile", allowed: false, note: "REQ-R04 explicit denial (DEV-04 confirmed no exception for reactivation)" },
 ];
 
+/** Stage 6: historical import. Admin only throughout -- Super Admin
+ * refused entering, correcting, or voiding historical records (Section
+ * 11.2/11.3); Super Admin gets read-only access to the progress report. */
+const PERMISSIONS_STAGE_6: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "historical.enterRecord", allowed: false, note: "" },
+  { role: "ADMIN", action: "historical.enterRecord", allowed: true, note: "REQ-H01/H02" },
+  { role: "SUPER_ADMIN", action: "historical.enterRecord", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "historical.correctRecord", allowed: false, note: "" },
+  { role: "ADMIN", action: "historical.correctRecord", allowed: true, note: "DEV-05: direct correction, no two-key approval yet" },
+  { role: "SUPER_ADMIN", action: "historical.correctRecord", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "historical.voidRecord", allowed: false, note: "" },
+  { role: "ADMIN", action: "historical.voidRecord", allowed: true, note: "Wrong-student entry; row marked void, never deleted" },
+  { role: "SUPER_ADMIN", action: "historical.voidRecord", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "historical.setImportStatus", allowed: false, note: "" },
+  { role: "ADMIN", action: "historical.setImportStatus", allowed: true, note: "Mark Complete, or reopen with a mandatory reason" },
+  { role: "SUPER_ADMIN", action: "historical.setImportStatus", allowed: false, note: "REQ-R04 explicit denial" },
+
+  { role: "STUDENT", action: "historical.createRetrospectiveSemester", allowed: false, note: "" },
+  { role: "ADMIN", action: "historical.createRetrospectiveSemester", allowed: true, note: "Created directly Closed (ASM-15), bypasses the forward state machine" },
+  { role: "SUPER_ADMIN", action: "historical.createRetrospectiveSemester", allowed: false, note: "REQ-R04 explicit denial" },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -174,8 +204,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 actions)...");
-  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5]) {
+  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6]) {
     await db
       .insert(schema.permission)
       .values(row)

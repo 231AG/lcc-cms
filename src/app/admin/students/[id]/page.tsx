@@ -1,15 +1,16 @@
+import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
+import { getStudentHistory } from "@/lib/historical/historical";
 import { NotFoundError } from "@/lib/errors";
 import { updateStudentProfileAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
 
 /**
- * A-10 (plan Section 20.5), built in Stage 5 only as "structure, empty of
- * history" -- full academic history population comes with Stages 6, 7, 9,
- * 10. Admin edits every field here (name, department, enrolment year,
- * contact, status); Super Admin sees the same page read-only.
+ * A-10 (plan Section 20.5). Stage 5 built this as structure only; Stage 6
+ * extends it to show entered history (still frozen/empty until Stages 7,
+ * 9, 10 add GPA figures, plans, and grades on top of it).
  */
 export default async function StudentDetailPage({
   params,
@@ -49,9 +50,19 @@ export default async function StudentDetailPage({
     throw err;
   }
 
-  const departments = await asUser(actor.userId, (tx) =>
-    tx.query.department.findMany({ orderBy: (d, { asc }) => asc(d.code) }),
+  const [departments, history, semesters, academicYears] = await asUser(actor.userId, (tx) =>
+    Promise.all([
+      tx.query.department.findMany({ orderBy: (d, { asc }) => asc(d.code) }),
+      getStudentHistory(actor, record.id),
+      tx.query.semester.findMany(),
+      tx.query.academicYear.findMany(),
+    ]),
   );
+  const yearLabel = (semesterId: string) => {
+    const sem = semesters.find((s) => s.id === semesterId);
+    const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
+    return sem && year ? `${year.label} — ${sem.name}` : semesterId;
+  };
 
   const isAdmin = actor.role === "ADMIN";
 
@@ -182,10 +193,43 @@ export default async function StudentDetailPage({
       )}
 
       <section className="rounded border border-gray-200 p-4">
-        <h2 className="mb-1 font-medium">Academic history</h2>
-        <p className="text-sm text-gray-500">
-          Empty -- historical records are entered in a later stage; the import status above explains why nothing appears here yet.
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-medium">Academic history</h2>
+          {isAdmin && (
+            <Link href={`/admin/historical?studentId=${record.id}`} className="text-sm text-blue-700 underline">
+              Enter historical record
+            </Link>
+          )}
+        </div>
+        {history.length === 0 && (
+          <p className="text-sm text-gray-500">
+            Empty -- the import status above explains why nothing appears here yet.
+          </p>
+        )}
+        {history.length > 0 && (
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-1">Semester</th>
+                <th className="py-1">Course</th>
+                <th className="py-1">Credits</th>
+                <th className="py-1">Grade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((r) => (
+                <tr key={r.id} className="border-b">
+                  <td className="py-1">{yearLabel(r.semesterId)}</td>
+                  <td className="py-1">
+                    {r.courseCodeSnapshot} — {r.courseTitleSnapshot}
+                  </td>
+                  <td className="py-1">{r.creditHours}</td>
+                  <td className="py-1">{r.letter}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </main>
   );
