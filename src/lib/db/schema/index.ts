@@ -7,3 +7,4 @@ export * from "./student";
 export * from "./academicRecord";
 export * from "./gpa";
 export * from "./offering";
+export * from "./planning";

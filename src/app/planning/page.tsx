@@ -1,0 +1,223 @@
+import { redirect } from "next/navigation";
+import { getCurrentActor } from "@/lib/auth/session";
+import { asUser } from "@/lib/db/asUser";
+import { getOfferingMeetings, getOfferingsForSemester } from "@/lib/offerings/offerings";
+import { getMyPlan, getPlanItems, getRegistrationsForStudent } from "@/lib/planning/planning";
+import { startPlanAction, addPlanItemAction, removePlanItemAction, submitPlanAction, revisePlanAction, deleteDraftPlanAction } from "./actions";
+
+const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/**
+ * S-07/S-08 (plan Section 20.3/20.4, Stage 9), combined into one page --
+ * the same screen shows the build UI while DRAFT/REJECTED and the
+ * read-only status view while SUBMITTED/APPROVED, matching how the
+ * rejection path returns the student to the SAME row rather than a
+ * separate "history" view (Section 14.2's "editable until submitted, then
+ * again if rejected").
+ */
+export default async function PlanningPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ semesterId?: string; error?: string }>;
+}) {
+  const actor = await getCurrentActor();
+  if (!actor) redirect("/login");
+  if (actor.mustChangePassword) redirect("/change-password");
+
+  if (actor.role !== "STUDENT") {
+    return (
+      <main className="mx-auto max-w-lg p-8">
+        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+          Not available to your role.
+        </p>
+      </main>
+    );
+  }
+
+  const { error } = await searchParams;
+
+  const [semesters, academicYears] = await asUser(actor.userId, (tx) =>
+    Promise.all([tx.query.semester.findMany(), tx.query.academicYear.findMany()]),
+  );
+  const openSemester = semesters.find((s) => s.state === "REGISTRATION");
+  const yearLabel = (semId: string) => {
+    const sem = semesters.find((s) => s.id === semId);
+    const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
+    return sem && year ? `${year.label} — ${sem.name}` : semId;
+  };
+
+  if (!openSemester) {
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-12">
+        <h1 className="mb-4 text-xl font-semibold">Course planning</h1>
+        <p className="text-sm text-gray-500">Course planning is not currently open.</p>
+      </main>
+    );
+  }
+
+  const semesterId = openSemester.id;
+  const plan = await getMyPlan(actor, semesterId);
+  const items = plan ? await getPlanItems(actor, plan.id) : [];
+  const offerings = await getOfferingsForSemester(actor, semesterId);
+  const courses = await asUser(actor.userId, (tx) =>
+    tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true) }),
+  );
+  const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
+  const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
+  const meetingsByOffering = new Map<string, Awaited<ReturnType<typeof getOfferingMeetings>>>();
+  for (const o of offerings) {
+    meetingsByOffering.set(o.id, await getOfferingMeetings(actor, o.id));
+  }
+  const plannedOfferingIds = new Set(items.map((i) => i.offeringId));
+  const totalCredits = items.reduce((sum, i) => sum + (offeringFor(i.offeringId)?.frozenCreditHours ?? 0), 0);
+
+  const registrations = plan?.status === "APPROVED" ? await getRegistrationsForStudent(actor, actor.userId, semesterId) : [];
+
+  return (
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <h1 className="mb-1 text-xl font-semibold">Course planning</h1>
+      <p className="mb-6 text-sm text-gray-500">{yearLabel(semesterId)}</p>
+
+      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+
+      {!plan && (
+        <form action={startPlanAction}>
+          <input type="hidden" name="semesterId" value={semesterId} />
+          <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
+            Start building your plan
+          </button>
+        </form>
+      )}
+
+      {plan && (plan.status === "DRAFT" || plan.status === "REJECTED") && (
+        <>
+          {plan.status === "REJECTED" && (
+            <section className="mb-6 rounded border border-red-300 bg-red-50 p-4">
+              <h2 className="mb-1 font-medium text-red-900">Rejected</h2>
+              <p className="mb-3 text-sm text-red-800">{plan.rejectionReason}</p>
+              <form action={revisePlanAction}>
+                <input type="hidden" name="semesterId" value={semesterId} />
+                <input type="hidden" name="planId" value={plan.id} />
+                <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">
+                  Revise
+                </button>
+              </form>
+            </section>
+          )}
+
+          <section className="mb-6 rounded border border-gray-200 p-4">
+            <h2 className="mb-3 font-medium">Your plan -- {totalCredits} credit hours</h2>
+            {items.length === 0 && <p className="mb-3 text-sm text-gray-500">No courses added yet.</p>}
+            <ul className="mb-3 flex flex-col gap-2">
+              {items.map((i) => {
+                const c = courseFor(i.courseId);
+                const o = offeringFor(i.offeringId);
+                return (
+                  <li key={i.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm">
+                    <span>
+                      {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section}){i.isRetake && " — retake"}
+                    </span>
+                    <form action={removePlanItemAction}>
+                      <input type="hidden" name="semesterId" value={semesterId} />
+                      <input type="hidden" name="planItemId" value={i.id} />
+                      <button type="submit" className="text-xs text-red-700 underline">
+                        Remove
+                      </button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex items-center gap-3">
+              <form action={submitPlanAction}>
+                <input type="hidden" name="semesterId" value={semesterId} />
+                <input type="hidden" name="planId" value={plan.id} />
+                <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
+                  Submit
+                </button>
+              </form>
+              {plan.status === "DRAFT" && (
+                <form action={deleteDraftPlanAction}>
+                  <input type="hidden" name="semesterId" value={semesterId} />
+                  <input type="hidden" name="planId" value={plan.id} />
+                  <button type="submit" className="text-xs text-red-700 underline">
+                    Delete plan
+                  </button>
+                </form>
+              )}
+            </div>
+          </section>
+
+          <section>
+            <h2 className="mb-3 font-medium">Available offerings</h2>
+            <div className="flex flex-col gap-3">
+              {offerings.map((o) => {
+                const c = courseFor(o.courseId);
+                const meetings = meetingsByOffering.get(o.id) ?? [];
+                const already = plannedOfferingIds.has(o.id);
+                return (
+                  <div key={o.id} className="rounded border border-gray-200 p-3 text-sm">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-medium">
+                        {c ? `${c.code} — ${c.title}` : o.courseId} (Section {o.section})
+                      </span>
+                      <span className="text-xs text-gray-500">{o.frozenCreditHours}cr</span>
+                    </div>
+                    <p className="mb-2 text-xs text-gray-500">
+                      {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}${m.room ? ` (${m.room})` : ""}`).join(", ")}
+                      {o.instructorName ? ` — ${o.instructorName}` : ""}
+                    </p>
+                    {already ? (
+                      <span className="text-xs text-gray-400">Already in your plan</span>
+                    ) : (
+                      <form action={addPlanItemAction}>
+                        <input type="hidden" name="semesterId" value={semesterId} />
+                        <input type="hidden" name="planId" value={plan.id} />
+                        <input type="hidden" name="offeringId" value={o.id} />
+                        <button type="submit" className="text-xs text-blue-700 underline">
+                          Add
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
+
+      {plan && plan.status === "SUBMITTED" && (
+        <section className="rounded border border-gray-200 p-4">
+          <h2 className="mb-2 font-medium">Submitted -- awaiting a decision</h2>
+          <p className="mb-3 text-sm text-gray-500">{totalCredits} credit hours, submitted {plan.submittedAt?.toISOString().slice(0, 10)}.</p>
+          <ul className="flex flex-col gap-1 text-sm">
+            {items.map((i) => {
+              const c = courseFor(i.courseId);
+              return <li key={i.id}>{c ? `${c.code} — ${c.title}` : i.courseId}</li>;
+            })}
+          </ul>
+        </section>
+      )}
+
+      {plan && plan.status === "APPROVED" && (
+        <section className="rounded border border-green-300 bg-green-50 p-4">
+          <h2 className="mb-2 font-medium text-green-900">Approved</h2>
+          <p className="mb-3 text-sm text-green-800">{totalCredits} credit hours registered.</p>
+          <ul className="flex flex-col gap-1 text-sm">
+            {registrations.filter((r) => r.status === "REGISTERED").map((r) => {
+              const o = offeringFor(r.offeringId);
+              const c = o ? courseFor(o.courseId) : undefined;
+              return (
+                <li key={r.id}>
+                  {c ? `${c.code} — ${c.title}` : r.offeringId}
+                  {r.isRetake && " — retake"}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+    </main>
+  );
+}

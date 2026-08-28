@@ -150,3 +150,25 @@ restricted to a specific person or sub-role, that would need a new permission ac
 `identity.correctHistoricalRecord`-type Admin access, added when that requirement is real.
 **Approval status:** Confirmed by project owner, 2026-08-27 -- DEC-26 itself remains open pending the
 Registrar's office naming a role, tracked separately above.
+
+### DEV-07 — Prerequisite override is allowed on a DRAFT or REJECTED plan item, not only a SUBMITTED one (resolves an ordering gap in Section 14.5)
+
+**Date:** Stage 9, during implementation.
+**Decision:** Section 14.4 makes V1 (prerequisites) a BLOCKING check at submission itself, not only at
+approval -- yet Section 14.5's override is described only via A-11 ("Course plan review"), whose queue
+shows SUBMITTED plans exclusively (Section 14.2: a DRAFT plan is "invisible in the Admin approval
+queue"). Read literally, a student whose prerequisite genuinely cannot be verified -- explicitly called
+out as the overwhelmingly common case in year one, Section 17.8 -- could never reach SUBMITTED at all,
+so the override could never be reached either: a real ordering gap, not a design choice stated in the
+plan. `overridePrerequisite` in `src/lib/planning/planning.ts` resolves it by allowing the override on
+any non-terminal plan item (DRAFT, SUBMITTED, or REJECTED, refused only once APPROVED), so an Admin can
+apply it before the student's first submission attempt as well as during review.
+**Rationale given:** This is the only reading under which REQ-P11 (the override) and REQ-P03/Section
+14.4 (V1 blocking at submission) can both be true at once -- the alternative would have V1 make the
+override provision unreachable for exactly the population it exists to serve.
+**Consequence:** A-11 ("Course plan review") includes a "look up a specific plan" path in addition to
+the SUBMITTED-only queue, so an Admin can reach a DRAFT plan to apply an override before the student
+submits, not only plans already awaiting a decision.
+**Approval status:** Not a deviation requiring approval -- resolves an internal ordering gap using the
+plan's own stated rules (V1 blocking scope, override purpose) rather than introducing new policy.
+Recorded so the override's reachable scope doesn't get mistaken for an oversight in a future audit.

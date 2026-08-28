@@ -19,6 +19,8 @@ const ADMIN_LINKS = [
   { href: "/admin/structure", label: "Academic structure" },
   { href: "/admin/calendar", label: "Academic calendar" },
   { href: "/admin/offerings", label: "Course offerings" },
+  { href: "/admin/planning", label: "Course plan review" },
+  { href: "/admin/registrations", label: "Registrations" },
 ];
 
 const SUPER_ADMIN_LINKS = [
@@ -159,7 +161,10 @@ export default async function PortalPage() {
           })}
         </section>
 
-        <p className="mt-6 text-sm">
+        <p className="mt-6 flex gap-4 text-sm">
+          <Link href="/planning" className="text-blue-700 underline">
+            Course planning
+          </Link>
           <Link href="/change-password" className="text-blue-700 underline">
             Change password
           </Link>

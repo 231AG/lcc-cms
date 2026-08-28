@@ -181,6 +181,35 @@ const PERMISSIONS_STAGE_8: Array<{
   { role: "SUPER_ADMIN", action: "offering.manage", allowed: false, note: "REQ-R04 explicit denial" },
 ];
 
+/** Stage 9: course planning and approval. Split along "who does it" --
+ * a student manages only their own plan (create/edit/submit/delete/revise
+ * while DRAFT or REJECTED); an Admin reviews plans (approve, reject,
+ * override a failed prerequisite -- always the same actor and rule, one
+ * permission, same reasoning as Stage 8's offering.manage); and Admin
+ * direct registration/drop (DEC-14) is kept as its own permission since
+ * it's a materially different action (bypassing the plan entirely) even
+ * though the actor and allow/deny shape are identical. Super Admin is
+ * refused everywhere in this domain (Section 9.4.9: "Super Admin has no
+ * role here at all") -- not even read-only, unlike most other tables. */
+const PERMISSIONS_STAGE_9: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "planning.manageOwnPlan", allowed: true, note: "REQ-P01/P02. Own plan only, only while DRAFT or REJECTED, only during Registration." },
+  { role: "ADMIN", action: "planning.manageOwnPlan", allowed: false, note: "" },
+  { role: "SUPER_ADMIN", action: "planning.manageOwnPlan", allowed: false, note: "Section 9.4.9: Super Admin has no role in course planning at all." },
+
+  { role: "STUDENT", action: "planning.reviewPlan", allowed: false, note: "" },
+  { role: "ADMIN", action: "planning.reviewPlan", allowed: true, note: "REQ-P10/P11. Approve, reject with reason, override a failed prerequisite." },
+  { role: "SUPER_ADMIN", action: "planning.reviewPlan", allowed: false, note: "Section 9.4.9: Super Admin has no role in course planning at all." },
+
+  { role: "STUDENT", action: "planning.manageRegistration", allowed: false, note: "" },
+  { role: "ADMIN", action: "planning.manageRegistration", allowed: true, note: "DEC-14. Direct registration and drop, bypassing the plan." },
+  { role: "SUPER_ADMIN", action: "planning.manageRegistration", allowed: false, note: "Section 9.4.9: Super Admin has no role in course planning at all." },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -191,6 +220,11 @@ const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: st
   { key: "academic_standing_honours_at_or_above", value: "3.500", description: "REQ-C15, CR-14." },
   { key: "institution_display_timezone", value: "Africa/Monrovia", description: "DER-27." },
   { key: "prerequisite_override_enabled", value: false, description: "DEC-12 -- still open. Enable with an expiry date before Stage 9 UAT." },
+  // prerequisite_override_expiry (DEC-12) is deliberately NOT seeded: jsonb
+  // is NOT NULL on this table, and an absent key is exactly "no window
+  // configured" -- the same meaning a null value would carry, without
+  // needing a NOT NULL workaround. Set at go-live (Section 14.5/17.8), by
+  // inserting the key once a real date is chosen.
 ];
 
 async function main() {
@@ -221,8 +255,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 actions)...");
-  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8]) {
+  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 + 9 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8, ...PERMISSIONS_STAGE_9]) {
     await db
       .insert(schema.permission)
       .values(row)

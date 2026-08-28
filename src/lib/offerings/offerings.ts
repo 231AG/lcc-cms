@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
-import { course, courseOffering, offeringMeeting, semester } from "@/lib/db/schema";
+import { course, courseOffering, offeringMeeting, registration, semester } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
@@ -176,10 +176,14 @@ export async function cancelOffering(actor: Actor, offeringId: string) {
   await assertSemesterEditable(existing.semesterId);
   if (existing.status === "CANCELLED") throw new StateError("This offering is already cancelled.");
 
-  // TODO (Stage 9): refuse when any registration exists against this
-  // offering (Section 9.4.7: "Cannot be deleted once any registration
-  // exists" / Section 13.1's Registration-state restriction) -- the
-  // registration table doesn't exist yet, so there is nothing to check.
+  const activeRegistrations = await db.query.registration.findMany({
+    where: and(eq(registration.offeringId, offeringId), eq(registration.status, "REGISTERED")),
+  });
+  if (activeRegistrations.length > 0) {
+    throw new ValidationError(
+      `Cannot cancel: ${activeRegistrations.length} student(s) are registered for this offering. Drop them first (DEC-14).`,
+    );
+  }
 
   return asUser(actor.userId, async (tx) => {
     const [row] = await tx
