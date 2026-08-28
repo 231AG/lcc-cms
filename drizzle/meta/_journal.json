@@ -127,6 +127,20 @@
       "when": 1787860000000,
       "tag": "0017_course_planning_constraints_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787917833499,
+      "tag": "0018_grade_management",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787918000000,
+      "tag": "0019_grade_management_constraints_rls",
+      "breakpoints": true
     }
   ]
 }

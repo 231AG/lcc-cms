@@ -6,6 +6,7 @@ import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
+import PrintButton from "./PrintButton";
 
 const STANDING_LABEL: Record<string, string> = {
   HONOURS: "Honours",
@@ -21,6 +22,8 @@ const ADMIN_LINKS = [
   { href: "/admin/offerings", label: "Course offerings" },
   { href: "/admin/planning", label: "Course plan review" },
   { href: "/admin/registrations", label: "Registrations" },
+  { href: "/admin/grades", label: "Class grade entry" },
+  { href: "/admin/grade-corrections", label: "Grade corrections" },
 ];
 
 const SUPER_ADMIN_LINKS = [
@@ -29,6 +32,8 @@ const SUPER_ADMIN_LINKS = [
   { href: "/admin/historical/progress", label: "Historical import progress" },
   { href: "/admin/calendar", label: "Academic calendar (read-only)" },
   { href: "/admin/offerings", label: "Course offerings (read-only)" },
+  { href: "/admin/grade-review", label: "Grade submission review" },
+  { href: "/admin/grade-corrections", label: "Grade corrections" },
 ];
 
 /**
@@ -131,8 +136,9 @@ export default async function PortalPage() {
               <div key={semesterId} className="mb-4">
                 <div className="mb-1 flex items-baseline justify-between">
                   <h3 className="text-sm font-medium">{info?.label ?? semesterId}</h3>
-                  <span className="text-xs text-gray-500">
+                  <span className="flex items-center gap-2 text-xs text-gray-500">
                     GPA {summary?.gpa ?? "—"} {summary?.isProvisional && "(provisional)"}
+                    <PrintButton semesterId={semesterId} />
                   </span>
                 </div>
                 <table className="w-full border-collapse text-sm">

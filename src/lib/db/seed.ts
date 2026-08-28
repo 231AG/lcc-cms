@@ -210,6 +210,38 @@ const PERMISSIONS_STAGE_9: Array<{
   { role: "SUPER_ADMIN", action: "planning.manageRegistration", allowed: false, note: "Section 9.4.9: Super Admin has no role in course planning at all." },
 ];
 
+/** Stage 10: grade management lifecycle. Split along "who does it,"
+ * matching Stage 9's precedent -- draft entry and submission are the same
+ * Admin doing sequential steps on their own class (one permission,
+ * same reasoning as Stage 8 folding create/publish/cancel together);
+ * approval/rejection and correction decisions are Super Admin's alone;
+ * requesting a correction is Admin's. Unlike Stage 9, Super Admin is a
+ * genuine actor here (REQ-R04 does not blanket-refuse this domain) --
+ * the two-key grading control depends on Super Admin actually doing
+ * something, not being excluded. */
+const PERMISSIONS_STAGE_10: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "grade.manageClass", allowed: false, note: "" },
+  { role: "ADMIN", action: "grade.manageClass", allowed: true, note: "REQ-G05. Draft entry/edit/clear and submission of a class's grades. Cannot approve own submission." },
+  { role: "SUPER_ADMIN", action: "grade.manageClass", allowed: false, note: "Cannot enter or edit a grade (Section 15.1)." },
+
+  { role: "STUDENT", action: "grade.review", allowed: false, note: "" },
+  { role: "ADMIN", action: "grade.review", allowed: false, note: "Cannot approve or reject a submission (Section 15.1)." },
+  { role: "SUPER_ADMIN", action: "grade.review", allowed: true, note: "REQ-G06/CR-06. Approve or reject a submission, as a batch or individual grades within it." },
+
+  { role: "STUDENT", action: "grade.requestCorrection", allowed: false, note: "" },
+  { role: "ADMIN", action: "grade.requestCorrection", allowed: true, note: "REQ-R06/REQ-G08. Old value, new value and reason captured at request time." },
+  { role: "SUPER_ADMIN", action: "grade.requestCorrection", allowed: false, note: "" },
+
+  { role: "STUDENT", action: "grade.decideCorrection", allowed: false, note: "" },
+  { role: "ADMIN", action: "grade.decideCorrection", allowed: false, note: "" },
+  { role: "SUPER_ADMIN", action: "grade.decideCorrection", allowed: true, note: "Approver must not be the requester -- enforced again here even though the DB check constraint already guarantees it." },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -255,8 +287,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 + 9 actions)...");
-  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8, ...PERMISSIONS_STAGE_9]) {
+  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 + 9 + 10 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8, ...PERMISSIONS_STAGE_9, ...PERMISSIONS_STAGE_10]) {
     await db
       .insert(schema.permission)
       .values(row)

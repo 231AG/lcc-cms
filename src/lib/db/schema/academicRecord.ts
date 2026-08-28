@@ -5,16 +5,16 @@ import { appUser } from "./identity";
 import { student } from "./student";
 import { semester } from "./calendar";
 import { course } from "./structure";
+import { gradeRecord } from "./grade";
 
 /**
  * The single source of academic truth (Section 9.4.14). One row per
  * completed course result, whatever its origin -- every GPA, CGPA,
  * prerequisite decision and future transcript reads this table and
- * nothing else. Stage 6 only ever writes origin = 'IMPORTED' rows;
- * origin = 'SYSTEM' rows (grade publication) and the grade_record FK
- * they point to are Stage 10's work -- the columns exist now so this
- * table doesn't need a structural migration later, but grade_record_id
- * has no FK reference yet because that table doesn't exist yet.
+ * nothing else. Stage 6 only ever wrote origin = 'IMPORTED' rows;
+ * origin = 'SYSTEM' rows (grade publication, Stage 10) now reference the
+ * grade_record that produced them via a real FK, added once that table
+ * existed to reference.
  */
 export const academicRecord = appSchema.table(
   "academic_record",
@@ -40,7 +40,7 @@ export const academicRecord = appSchema.table(
     score: integer("score"),
     attemptNo: integer("attempt_no").notNull().default(1),
     origin: text("origin").notNull().default("IMPORTED"), // SYSTEM | IMPORTED
-    gradeRecordId: uuid("grade_record_id"),
+    gradeRecordId: uuid("grade_record_id").references(() => gradeRecord.id, { onDelete: "restrict" }),
     countsInGpa: boolean("counts_in_gpa").notNull(),
     countsInAttempted: boolean("counts_in_attempted").notNull(),
     countsInEarned: boolean("counts_in_earned").notNull(),

@@ -8,3 +8,4 @@ export * from "./academicRecord";
 export * from "./gpa";
 export * from "./offering";
 export * from "./planning";
+export * from "./grade";
