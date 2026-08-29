@@ -290,4 +290,36 @@ at least the fully-anonymous pages (e.g., a true static-HTML login page with no 
 all) -- larger than a Stage 11-sized change to attempt unprompted. Recorded here rather than either quietly
 passing or quietly fixing; needs a decision on whether to accept the number as measured, revise DER-25, or
 scope a follow-up change.
-**Approval status:** Open -- awaiting project owner decision.
+
+**Follow-up measurement (same day):** the project owner asked for the actual real-world requirement to be
+checked directly -- DER-25's other clause, "interactive within 3s on a 3G-class connection" -- rather than
+treating the KB figure as the thing that matters. Measured with a throwaway script (`scripts/measure-
+performance.mjs`, kept in-repo for reproducibility) driving Playwright/Chromium against the real production
+build (`next start`) of `/login`, under Chrome DevTools' "Slow 3G" profile (400 Kbps down/up, 400ms RTT) plus
+4x CPU throttling, averaged over 4 runs:
+
+| Metric | Measured |
+|---|---|
+| `domInteractive` (DOM parsed, page usable -- login's form has no client component, so this is genuinely when a user can act) | **~1.44s** |
+| Full `load` event (every JS chunk finished downloading, including framework code not required for this page's own interactivity) | **~5.1s** |
+
+**Reading:** under the plan's literal 3G-class/3s clause, `/login` is usable in ~1.4s -- inside budget, by a
+comfortable margin, because the page needs no client-side hydration to function (the form works via a server
+action whether or not any JS has finished loading). The 5.1s figure is real but measures something DER-25
+does not appear to be asking about for this page: full framework-runtime download, most of which this page
+has no functional need for. **The system does not fail the stated real-world requirement (interactive <3s on
+3G) for `/login`; it fails only the JS-transfer-size proxy for that requirement.** This could not be checked
+for an authenticated student page (`/portal`, `/planning`) without a live session in this environment -- flagged
+under "what requires local execution" below.
+**Recommendation:** treat DER-25's byte-count clause as a good early proxy that has been overtaken by React
+19/Next 16's baseline runtime size, not as evidence of a real problem in this specific case -- the thing the
+byte budget exists to protect (a slow-feeling page on a bad connection) is not actually occurring, per direct
+measurement. Suggest formally revising DER-25 to state the *outcome* (interactive within 3s on 3G-class) as
+the acceptance criterion, with the KB figures kept as a secondary early-warning guideline rather than a hard
+gate -- rather than either silently dropping the byte figure or blocking go-live on a proxy metric that the
+direct measurement shows is not predicting a real problem here. Re-run this same measurement against `/portal`
+and `/planning` once a real session is available (see local execution checklist) before finalizing, since
+those are the pages actual students use most and were not reachable from this environment.
+**Approval status:** Open -- awaiting project owner decision on the recommendation above. Left open on
+purpose, per explicit instruction: do not silently change the requirement or degrade the application to
+force the number under 150KB.
