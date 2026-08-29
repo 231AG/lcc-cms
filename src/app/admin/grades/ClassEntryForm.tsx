@@ -102,6 +102,7 @@ export default function ClassEntryForm({
                         inputRefs.current[r.registrationId] = el;
                       }}
                       name={`score_${r.registrationId}`}
+                      aria-label={`Score for ${r.studentName}`}
                       type="number"
                       min={0}
                       max={100}
@@ -122,6 +123,7 @@ export default function ClassEntryForm({
                     <input
                       type="checkbox"
                       name={`incomplete_${r.registrationId}`}
+                      aria-label={`Incomplete for ${r.studentName}`}
                       disabled={locked}
                       defaultChecked={r.currentLetter === "I"}
                       onChange={(e) => setIncomplete((p) => ({ ...p, [r.registrationId]: e.target.checked }))}

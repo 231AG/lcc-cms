@@ -235,22 +235,22 @@ export default async function HistoricalEntryPage({
                   {Array.from({ length: ROW_COUNT }).map((_, i) => (
                     <tr key={i} className="border-b">
                       <td className="py-1 pr-1">
-                        <input name={`courseCode-${i}`} className="w-28 rounded border border-gray-300 px-2 py-1 text-sm" />
+                        <input name={`courseCode-${i}`} aria-label={`Course code, row ${i + 1}`} className="w-28 rounded border border-gray-300 px-2 py-1 text-sm" />
                       </td>
                       <td className="py-1 pr-1">
-                        <input name={`creditHours-${i}`} type="number" step="0.5" className="w-20 rounded border border-gray-300 px-2 py-1 text-sm" />
+                        <input name={`creditHours-${i}`} aria-label={`Credit hours, row ${i + 1}`} type="number" step="0.5" className="w-20 rounded border border-gray-300 px-2 py-1 text-sm" />
                       </td>
                       <td className="py-1 pr-1">
-                        <input name={`letter-${i}`} className="w-16 rounded border border-gray-300 px-2 py-1 text-sm" />
+                        <input name={`letter-${i}`} aria-label={`Grade, row ${i + 1}`} className="w-16 rounded border border-gray-300 px-2 py-1 text-sm" />
                       </td>
                       <td className="py-1 pr-1">
-                        <input name={`score-${i}`} type="number" className="w-16 rounded border border-gray-300 px-2 py-1 text-sm" />
+                        <input name={`score-${i}`} aria-label={`Score, row ${i + 1}`} type="number" className="w-16 rounded border border-gray-300 px-2 py-1 text-sm" />
                       </td>
                       <td className="py-1 pr-1">
-                        <input name={`note-${i}`} className="w-32 rounded border border-gray-300 px-2 py-1 text-sm" />
+                        <input name={`note-${i}`} aria-label={`Note, row ${i + 1}`} className="w-32 rounded border border-gray-300 px-2 py-1 text-sm" />
                       </td>
                       <td className="py-1">
-                        <input name={`confirmAsRepeat-${i}`} type="checkbox" />
+                        <input name={`confirmAsRepeat-${i}`} aria-label={`Confirm as repeat, row ${i + 1}`} type="checkbox" />
                       </td>
                     </tr>
                   ))}

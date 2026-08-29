@@ -90,7 +90,15 @@ export default async function GradeReviewDetailPage({
               return (
                 <tr key={g.id} className="border-b">
                   <td className="py-1.5 pr-2">
-                    {g.status === "SUBMITTED" && <input type="checkbox" name="gradeRecordId" value={g.id} form="decision-form" />}
+                    {g.status === "SUBMITTED" && (
+                      <input
+                        type="checkbox"
+                        name="gradeRecordId"
+                        value={g.id}
+                        form="decision-form"
+                        aria-label={`Select ${s ? `${s.firstName} ${s.lastName}` : g.registrationId} for this decision`}
+                      />
+                    )}
                   </td>
                   <td className="py-1.5 pr-2">{s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : g.registrationId}</td>
                   <td className="py-1.5 pr-2">{g.letter}{g.score ? ` (${g.score})` : ""}</td>
