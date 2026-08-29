@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { academicRecord, semester } from "@/lib/db/schema";
+import { academicRecord, courseOffering, gradeRecord, registration, semester } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { ValidationError } from "@/lib/errors";
@@ -80,6 +80,33 @@ export async function runSemesterExport(actor: Actor, semesterId: string): Promi
   );
 
   return { semesterLabel: sem.name, rows };
+}
+
+/**
+ * A-20's warning clause: "Warns if any grade in scope is unpublished."
+ * `academic_record` structurally never holds an unpublished grade (see
+ * runSemesterExport's own doc comment), so this checks the other side of
+ * the same fact directly -- registered students in this semester whose
+ * grade_record has not yet reached PUBLISHED/LOCKED -- so the Admin knows
+ * the export they are about to download is not the semester's final word.
+ */
+export async function countUnpublishedGrades(semesterId: string): Promise<number> {
+  const offerings = await db.query.courseOffering.findMany({ where: eq(courseOffering.semesterId, semesterId) });
+  const offeringIds = offerings.map((o) => o.id);
+  if (offeringIds.length === 0) return 0;
+
+  const regs = await db.query.registration.findMany({
+    where: and(inArray(registration.offeringId, offeringIds), eq(registration.status, "REGISTERED")),
+  });
+  const regIds = regs.map((r) => r.id);
+  if (regIds.length === 0) return 0;
+
+  const publishedGrades = await db.query.gradeRecord.findMany({
+    where: and(inArray(gradeRecord.registrationId, regIds), inArray(gradeRecord.status, ["PUBLISHED", "LOCKED"])),
+  });
+  const publishedRegIds = new Set(publishedGrades.map((g) => g.registrationId));
+
+  return regIds.filter((id) => !publishedRegIds.has(id)).length;
 }
 
 const CSV_COLUMNS: Array<{ key: keyof ExportRow; header: string }> = [

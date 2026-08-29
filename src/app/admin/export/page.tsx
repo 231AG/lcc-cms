@@ -1,5 +1,6 @@
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
+import { countUnpublishedGrades } from "@/lib/export/academicExport";
 
 /**
  * Section 11.3's "Run the semester-end export" -- Admin and Super Admin
@@ -29,6 +30,7 @@ export default async function ExportPage() {
   });
 
   const yearLabel = (id: string) => years.find((y) => y.id === id)?.label ?? id;
+  const unpublishedCounts = await Promise.all(semesters.map((s) => countUnpublishedGrades(s.id)));
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
@@ -41,16 +43,27 @@ export default async function ExportPage() {
       {semesters.length === 0 && <p className="text-sm text-gray-500">No semesters exist yet.</p>}
 
       <ul className="flex flex-col gap-2">
-        {semesters.map((s) => (
-          <li key={s.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm">
-            <span>
-              {yearLabel(s.academicYearId)} — {s.name} <span className="text-xs text-gray-500">({s.state})</span>
-            </span>
-            <a href={`/admin/export/${s.id}`} className="text-blue-700 underline">
-              Download CSV
-            </a>
-          </li>
-        ))}
+        {semesters.map((s, i) => {
+          const unpublished = unpublishedCounts[i];
+          return (
+            <li key={s.id} className="flex flex-col gap-1 rounded border border-gray-200 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span>
+                  {yearLabel(s.academicYearId)} — {s.name} <span className="text-xs text-gray-500">({s.state})</span>
+                </span>
+                <a href={`/admin/export/${s.id}`} className="text-blue-700 underline">
+                  Download CSV
+                </a>
+              </div>
+              {unpublished > 0 && (
+                <p className="text-xs text-amber-700">
+                  {unpublished} registered student{unpublished === 1 ? "" : "s"} in this semester still {unpublished === 1 ? "has" : "have"} no
+                  published grade -- this export will not include a final result for them.
+                </p>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </main>
   );

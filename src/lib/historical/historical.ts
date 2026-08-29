@@ -516,6 +516,13 @@ export interface ImportProgressReport {
   byStatus: Record<string, number>;
   totalStudents: number;
   unknownCourseIssues: number;
+  /** A-16: "breakdown by College, Department and cohort" -- cohort = enrolment year. */
+  byDepartment: Array<{ collegeCode: string; departmentCode: string; departmentName: string; byStatus: Record<string, number>; total: number }>;
+  byCohort: Array<{ enrolmentYear: number; byStatus: Record<string, number>; total: number }>;
+  /** A-16: "flagged-issue queue" -- drillable, not just a count (Section 20.4). */
+  flaggedIssues: Array<{ studentId: string; studentNumber: string; studentName: string; courseCodeSnapshot: string; semesterId: string; enteredAt: Date }>;
+  /** A-16: "records entered per week -- the figure that reveals a stall." Last 12 weeks, oldest first. */
+  recordsEnteredPerWeek: Array<{ weekStart: string; count: number }>;
 }
 
 /**
@@ -535,10 +542,86 @@ export async function getImportProgressReport(actor: Actor): Promise<ImportProgr
       where: and(isNull(academicRecord.courseId), eq(academicRecord.isVoid, false)),
     });
 
+    const departments = await tx.query.department.findMany();
+    const colleges = await tx.query.college.findMany();
+    const departmentById = new Map(departments.map((d) => [d.id, d]));
+    const collegeById = new Map(colleges.map((c) => [c.id, c]));
+
+    const byDepartmentMap = new Map<string, { collegeCode: string; departmentCode: string; departmentName: string; byStatus: Record<string, number>; total: number }>();
+    const byCohortMap = new Map<number, { enrolmentYear: number; byStatus: Record<string, number>; total: number }>();
+
+    for (const s of students) {
+      const dept = departmentById.get(s.departmentId);
+      const deptKey = dept?.id ?? "unknown";
+      if (!byDepartmentMap.has(deptKey)) {
+        const coll = dept ? collegeById.get(dept.collegeId) : undefined;
+        byDepartmentMap.set(deptKey, {
+          collegeCode: coll?.code ?? "?",
+          departmentCode: dept?.code ?? "?",
+          departmentName: dept?.name ?? "Unknown department",
+          byStatus: { NOT_STARTED: 0, IN_PROGRESS: 0, COMPLETE: 0 },
+          total: 0,
+        });
+      }
+      const deptEntry = byDepartmentMap.get(deptKey)!;
+      deptEntry.byStatus[s.historicalImportStatus] = (deptEntry.byStatus[s.historicalImportStatus] ?? 0) + 1;
+      deptEntry.total += 1;
+
+      if (!byCohortMap.has(s.enrolmentYear)) {
+        byCohortMap.set(s.enrolmentYear, { enrolmentYear: s.enrolmentYear, byStatus: { NOT_STARTED: 0, IN_PROGRESS: 0, COMPLETE: 0 }, total: 0 });
+      }
+      const cohortEntry = byCohortMap.get(s.enrolmentYear)!;
+      cohortEntry.byStatus[s.historicalImportStatus] = (cohortEntry.byStatus[s.historicalImportStatus] ?? 0) + 1;
+      cohortEntry.total += 1;
+    }
+
+    const studentIds = students.map((s) => s.id);
+    const studentById = new Map(students.map((s) => [s.id, s]));
+    const importedRecords = studentIds.length
+      ? await tx.query.academicRecord.findMany({ where: and(eq(academicRecord.origin, "IMPORTED"), eq(academicRecord.isVoid, false)) })
+      : [];
+
+    const flaggedIssues = unknownCourseRows.map((r) => {
+      const s = studentById.get(r.studentId);
+      return {
+        studentId: r.studentId,
+        studentNumber: s?.studentNumber ?? r.studentId,
+        studentName: s ? `${s.lastName}, ${s.firstName}` : r.studentId,
+        courseCodeSnapshot: r.courseCodeSnapshot,
+        semesterId: r.semesterId,
+        enteredAt: r.enteredAt,
+      };
+    });
+
+    // Week buckets keyed by the Monday of the week (UTC), oldest first.
+    const weekStartOf = (d: Date) => {
+      const copy = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      const day = copy.getUTCDay();
+      const diff = (day + 6) % 7; // days since Monday
+      copy.setUTCDate(copy.getUTCDate() - diff);
+      return copy.toISOString().slice(0, 10);
+    };
+    const now = new Date();
+    const weeks: string[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now);
+      d.setUTCDate(d.getUTCDate() - i * 7);
+      weeks.push(weekStartOf(d));
+    }
+    const weekCounts = new Map<string, number>(weeks.map((w) => [w, 0]));
+    for (const r of importedRecords) {
+      const w = weekStartOf(new Date(r.enteredAt));
+      if (weekCounts.has(w)) weekCounts.set(w, (weekCounts.get(w) ?? 0) + 1);
+    }
+
     return {
       byStatus,
       totalStudents: students.length,
       unknownCourseIssues: unknownCourseRows.length,
+      byDepartment: [...byDepartmentMap.values()].sort((a, b) => a.departmentCode.localeCompare(b.departmentCode)),
+      byCohort: [...byCohortMap.values()].sort((a, b) => a.enrolmentYear - b.enrolmentYear),
+      flaggedIssues,
+      recordsEnteredPerWeek: weeks.map((w) => ({ weekStart: w, count: weekCounts.get(w) ?? 0 })),
     };
   });
 }
