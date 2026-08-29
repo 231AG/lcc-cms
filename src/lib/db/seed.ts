@@ -242,6 +242,31 @@ const PERMISSIONS_STAGE_10: Array<{
   { role: "SUPER_ADMIN", action: "grade.decideCorrection", allowed: true, note: "Approver must not be the requester -- enforced again here even though the DB check constraint already guarantees it." },
 ];
 
+/* Stage 11 (Hardening, Export, Backup and Go-Live). Matches the plan's own
+ * permission matrix (Section 11.3): the semester-end export may be run by
+ * either staff role, but the audit log itself is Super Admin-only (REQ-R08),
+ * and reading it is logged like any other action. The grading-policy view
+ * (X-08) is read-only for everyone who can already see grades in some form;
+ * changing the policy remains the existing grade-scale action, unchanged. */
+const PERMISSIONS_STAGE_11: Array<{
+  role: "STUDENT" | "ADMIN" | "SUPER_ADMIN";
+  action: string;
+  allowed: boolean;
+  note: string;
+}> = [
+  { role: "STUDENT", action: "export.runSemesterExport", allowed: false, note: "" },
+  { role: "ADMIN", action: "export.runSemesterExport", allowed: true, note: "Section 11.3. Full copy of a semester's academic data leaves the system; every run is audited (ACADEMIC_EXPORT_RUN)." },
+  { role: "SUPER_ADMIN", action: "export.runSemesterExport", allowed: true, note: "Section 11.3." },
+
+  { role: "STUDENT", action: "audit.view", allowed: false, note: "" },
+  { role: "ADMIN", action: "audit.view", allowed: false, note: "REQ-R08. Audit log is Super Admin-only (Section 11.3)." },
+  { role: "SUPER_ADMIN", action: "audit.view", allowed: true, note: "REQ-R08. Reading the log is itself logged (AUDIT_LOG_VIEWED)." },
+
+  { role: "STUDENT", action: "gradingPolicy.view", allowed: true, note: "X-08. Read-only view of the active grade scale." },
+  { role: "ADMIN", action: "gradingPolicy.view", allowed: true, note: "X-08." },
+  { role: "SUPER_ADMIN", action: "gradingPolicy.view", allowed: true, note: "X-08." },
+];
+
 const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: string }> = [
   { key: "max_credits_per_semester", value: 21, description: "REQ-C12, CR-04. Institution default; a department may set a lower ceiling, never higher." },
   { key: "credits_to_graduate", value: 132, description: "REQ-C12, CR-04. Displayed progress figure only; gates nothing in Phase 1." },
@@ -287,8 +312,8 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 + 9 + 10 actions)...");
-  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8, ...PERMISSIONS_STAGE_9, ...PERMISSIONS_STAGE_10]) {
+  console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 + 9 + 10 + 11 actions)...");
+  for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8, ...PERMISSIONS_STAGE_9, ...PERMISSIONS_STAGE_10, ...PERMISSIONS_STAGE_11]) {
     await db
       .insert(schema.permission)
       .values(row)

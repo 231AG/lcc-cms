@@ -1,14 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Tx } from "@/lib/db/client";
-import { academicRecord, studentCumulativeSummary, studentSemesterSummary } from "@/lib/db/schema";
+import { academicRecord, gradeRecord, studentCumulativeSummary, studentSemesterSummary } from "@/lib/db/schema";
 import { recomputeStudentSummaries } from "./recompute";
 
 /**
  * The reconciliation queries of Section 22.4, "run before every go-live
- * and at every semester end." Two of the three apply to Stage 7's own
- * data (I-15, I-16); the third ("published grades have records") checks
- * grade_record, which doesn't exist until Stage 10 -- there is nothing to
- * reconcile against yet, so it's omitted here rather than faked.
+ * and at every semester end." All three are implemented here: I-15 and
+ * I-16 date from Stage 7; I-05 ("published grades have records") needed
+ * Stage 10's grade_record table, which now exists.
  */
 
 export interface ReconciliationMismatch {
@@ -102,4 +101,47 @@ export async function reconcileRepeatResolutionCoherence(tx: Tx, studentIds: str
   }
 
   return issues;
+}
+
+export interface PublishedGradeRecordMismatch {
+  kind: "PUBLISHED_GRADE_WITHOUT_RECORD" | "SYSTEM_RECORD_NOT_PUBLISHED";
+  gradeRecordId: string;
+  academicRecordId: string | null;
+}
+
+/**
+ * Invariant I-05: every PUBLISHED/LOCKED grade_record has exactly one
+ * academic_record pointing back at it (origin SYSTEM), and every SYSTEM
+ * academic_record's source grade is still PUBLISHED or LOCKED. Read-only
+ * -- unlike the other two checks, there is nothing to self-heal here; a
+ * mismatch means the publish transaction was interrupted or a defect
+ * exists, and needs investigation, not an automatic fix.
+ */
+export async function reconcilePublishedGradesHaveRecords(tx: Tx): Promise<PublishedGradeRecordMismatch[]> {
+  const mismatches: PublishedGradeRecordMismatch[] = [];
+
+  const published = await tx.query.gradeRecord.findMany({
+    where: inArray(gradeRecord.status, ["PUBLISHED", "LOCKED"]),
+  });
+  const publishedIds = published.map((g) => g.id);
+  const systemRecords = publishedIds.length
+    ? await tx.query.academicRecord.findMany({ where: and(eq(academicRecord.origin, "SYSTEM"), inArray(academicRecord.gradeRecordId, publishedIds)) })
+    : [];
+  const recordByGradeId = new Map(systemRecords.map((r) => [r.gradeRecordId, r]));
+
+  for (const g of published) {
+    if (!recordByGradeId.has(g.id)) {
+      mismatches.push({ kind: "PUBLISHED_GRADE_WITHOUT_RECORD", gradeRecordId: g.id, academicRecordId: null });
+    }
+  }
+
+  const allSystemRecords = await tx.query.academicRecord.findMany({ where: eq(academicRecord.origin, "SYSTEM") });
+  const publishedIdSet = new Set(publishedIds);
+  for (const r of allSystemRecords) {
+    if (r.gradeRecordId && !publishedIdSet.has(r.gradeRecordId)) {
+      mismatches.push({ kind: "SYSTEM_RECORD_NOT_PUBLISHED", gradeRecordId: r.gradeRecordId, academicRecordId: r.id });
+    }
+  }
+
+  return mismatches;
 }
