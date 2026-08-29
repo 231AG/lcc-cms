@@ -4,9 +4,8 @@ import { changePasswordAction } from "./actions";
 
 /**
  * S-02 (plan Section 20.3). Reachable whether or not a change is forced --
- * REQ-A03's "unbypassable" requirement lives in the layout/session check
- * for other routes (Stage 11 will wire that guard onto every protected
- * route group), not in hiding this page.
+ * REQ-A03's "unbypassable" requirement is enforced centrally in
+ * src/proxy.ts (Stage 11), not by hiding this page.
  */
 export default async function ChangePasswordPage({
   searchParams,
@@ -32,6 +31,11 @@ export default async function ChangePasswordPage({
       {error === "1" && (
         <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           Passwords must match and be at least 10 characters.
+        </p>
+      )}
+      {error === "2" && (
+        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+          That password is too easy to guess. Choose something less common.
         </p>
       )}
 

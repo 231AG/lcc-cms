@@ -10,6 +10,26 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 const MIN_LENGTH = 10;
 
 /**
+ * §18 RECOMMENDED: "Password policy -- minimum length with a rejection
+ * list of obvious values." Small and deliberately so: the plan explicitly
+ * rules out forced periodic rotation ("reliably produces weaker passwords
+ * written on desks") and this app has no external breach-database check
+ * available -- this catches the obvious case (a temporary/reset password
+ * left unchanged in substance, or a keyboard-walk) without pretending to
+ * be a full password-strength library.
+ */
+const OBVIOUS_PASSWORDS = new Set([
+  "password", "password1", "password123", "passw0rd",
+  "12345678", "123456789", "1234567890", "qwertyuiop",
+  "letmein123", "changeme123", "welcome123", "admin1234",
+]);
+
+function isObviousPassword(password: string): boolean {
+  const normalized = password.toLowerCase().replace(/\s+/g, "");
+  return OBVIOUS_PASSWORDS.has(normalized);
+}
+
+/**
  * REQ-A03: forced first-login (and post-reset) password change.
  *
  * Clearing must_change_password is deliberately done via the superuser
@@ -34,6 +54,9 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
 
   if (newPassword.length < MIN_LENGTH || newPassword !== confirmPassword) {
     redirect("/change-password?error=1");
+  }
+  if (isObviousPassword(newPassword)) {
+    redirect("/change-password?error=2");
   }
 
   const { error } = await supabase.auth.updateUser({ password: newPassword });
