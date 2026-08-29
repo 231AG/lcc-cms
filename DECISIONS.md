@@ -15,7 +15,7 @@ All nine blocking decisions (DEC-01 through DEC-09 lineage, see plan §34) and a
 | ID | Decision | Needed before | Owner |
 |---|---|---|---|
 | DEC-12 | Prerequisite override window and expiry date | Stage 9 (recommend: end of first live semester) | College / Super Admin |
-| DEC-14 | Add/drop workflow after plan approval — confirm design suits office | UAT (Stage 9/11) | Admin office |
+| DEC-14 | Add/drop workflow after plan approval — confirm design suits office | UAT (Stage 9/11) | **Confirmed by project owner, 2026-08-29** — current design (Admin-performed, audited add/drop after approval) is acceptable. |
 | DEC-26 | Who adjudicates a conflicting/unreadable historical paper record | Before first real conflict (days after Stage 6 go-live use begins) | Registrar's office |
 | DEC-29 | Synthetic internal identity (non-deliverable auth identifier) | **Acknowledged and approved** — proceeding with `<studentId>@students.<domain>.invalid` resolution | Approved by project owner |
 | DEC-30 | Hosting/data-residency region for Supabase project | Before production data exists | **Chosen: West EU (London/Ireland region)** — recorded 25 Aug 2026 |
@@ -26,7 +26,7 @@ All nine blocking decisions (DEC-01 through DEC-09 lineage, see plan §34) and a
 | ID | Item | Status |
 |---|---|---|
 | — | This document (v2.1) countersigned as the Phase 1 engineering baseline | Pending — plan treats this as a project-owner/VPAA formality; proceeding on the project owner's instruction to build |
-| — | Confirmation that Admin and Super Admin roles will be held by different people | Pending — operational/policy, not blocking code |
+| — | Confirmation that Admin and Super Admin roles will be held by different people | **Confirmed by project owner, 2026-08-29** — different people will hold these roles, backing the real-world value of the segregation-of-duties design (ASM-13 closed accordingly). |
 
 ## Assumptions to confirm before specific stages (see ASSUMPTIONS.md for full list)
 
