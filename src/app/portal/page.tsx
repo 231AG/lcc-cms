@@ -5,7 +5,9 @@ import { getStudent } from "@/lib/students/students";
 import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
+import { getMyPlan } from "@/lib/planning/planning";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
+import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
 import PrintButton from "./PrintButton";
 
 const STANDING_LABEL: Record<string, string> = {
@@ -24,6 +26,8 @@ const ADMIN_LINKS = [
   { href: "/admin/registrations", label: "Registrations" },
   { href: "/admin/grades", label: "Class grade entry" },
   { href: "/admin/grade-corrections", label: "Grade corrections" },
+  { href: "/admin/export", label: "Semester export" },
+  { href: "/grading-policy", label: "Grading policy" },
 ];
 
 const SUPER_ADMIN_LINKS = [
@@ -33,6 +37,9 @@ const SUPER_ADMIN_LINKS = [
   { href: "/admin/calendar", label: "Academic calendar (read-only)" },
   { href: "/admin/offerings", label: "Course offerings (read-only)" },
   { href: "/admin/grade-review", label: "Grade submission review" },
+  { href: "/admin/export", label: "Semester export" },
+  { href: "/admin/audit", label: "Audit log" },
+  { href: "/grading-policy", label: "Grading policy" },
   { href: "/admin/grade-corrections", label: "Grade corrections" },
 ];
 
@@ -77,6 +84,25 @@ export default async function PortalPage() {
     const semesterSummaryFor = (semesterId: string) => semesterSummaries.find((s) => s.semesterId === semesterId);
     const isProvisional = cumulative?.isProvisional ?? record.historicalImportStatus !== "COMPLETE";
 
+    // S-03 (plan Section 20.3): "current semester and its state" -- the
+    // most recently started semester that is not DRAFT or CLOSED, if any.
+    const currentSemester = semesters
+      .filter((s) => s.state !== "DRAFT" && s.state !== "CLOSED")
+      .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
+    const currentSemesterLabel = currentSemester ? semesterInfo(currentSemester.id)?.label : null;
+
+    // S-03's "single status line if a course plan needs attention" --
+    // only fetched when there is a current semester to have a plan in.
+    const currentPlan = currentSemester ? await getMyPlan(actor, currentSemester.id) : null;
+    const planStatusLine =
+      currentSemester?.state === "REGISTRATION" && !currentPlan
+        ? "You have not started your course plan for this semester."
+        : currentPlan?.status === "REJECTED"
+          ? "Your course plan was returned and needs revision."
+          : currentPlan?.status === "SUBMITTED"
+            ? "Your course plan is awaiting approval."
+            : null;
+
     return (
       <main className="mx-auto max-w-2xl px-4 py-12">
         <h1 className="mb-2 text-xl font-semibold">
@@ -90,7 +116,13 @@ export default async function PortalPage() {
           <dd>{record.enrolmentYear}</dd>
           <dt className="text-gray-500">Status</dt>
           <dd>{record.status}</dd>
+          <dt className="text-gray-500">Current semester</dt>
+          <dd>{currentSemesterLabel ? `${currentSemesterLabel} (${currentSemester!.state})` : "No semester is currently open."}</dd>
         </dl>
+
+        {planStatusLine && (
+          <p className="mb-6 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">{planStatusLine}</p>
+        )}
 
         <section className="mb-6 rounded border border-gray-200 p-4">
           <h2 className="mb-2 font-medium">Academic record</h2>
@@ -167,9 +199,12 @@ export default async function PortalPage() {
           })}
         </section>
 
-        <p className="mt-6 flex gap-4 text-sm">
+        <p className="mt-6 flex flex-wrap gap-4 text-sm">
           <Link href="/planning" className="text-blue-700 underline">
             Course planning
+          </Link>
+          <Link href="/grading-policy" className="text-blue-700 underline">
+            Grading policy
           </Link>
           <Link href="/change-password" className="text-blue-700 underline">
             Change password
@@ -181,17 +216,123 @@ export default async function PortalPage() {
 
   const links = actor.role === "SUPER_ADMIN" ? SUPER_ADMIN_LINKS : ADMIN_LINKS;
 
+  if (actor.role === "SUPER_ADMIN") {
+    const summary = await getSuperAdminHomeSummary(actor);
+    const nothingWaiting = summary.submissionsAwaitingApproval === 0 && summary.correctionsAwaitingDecision === 0;
+
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-12">
+        <h1 className="mb-6 text-xl font-semibold">Super Admin home</h1>
+
+        <section className="mb-6 rounded border border-gray-200 p-4">
+          <h2 className="mb-2 font-medium">Awaiting your approval</h2>
+          {nothingWaiting ? (
+            <p className="text-sm text-gray-500">Nothing is awaiting your approval.</p>
+          ) : (
+            <ul className="flex flex-col gap-1 text-sm">
+              <li>
+                <Link href="/admin/grade-review" className="text-blue-700 underline">
+                  {summary.submissionsAwaitingApproval} grade submission(s) awaiting approval
+                </Link>
+              </li>
+              <li>
+                <Link href="/admin/grade-corrections" className="text-blue-700 underline">
+                  {summary.correctionsAwaitingDecision} correction(s) awaiting decision
+                </Link>
+              </li>
+            </ul>
+          )}
+        </section>
+
+        <section className="mb-6 rounded border border-gray-200 p-4">
+          <h2 className="mb-2 font-medium">Semester states</h2>
+          {summary.semesterStates.length === 0 ? (
+            <p className="text-sm text-gray-500">No semesters exist yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-1 text-sm">
+              {summary.semesterStates.map((s) => (
+                <li key={s.id} className="flex justify-between">
+                  <span>{s.label}</span>
+                  <span className="text-gray-500">{s.state}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <ul className="flex flex-col gap-2 text-sm">
+          {links.map((link) => (
+            <li key={link.href}>
+              <Link href={link.href} className="text-blue-700 underline">
+                {link.label}
+              </Link>
+            </li>
+          ))}
+          <li>
+            <Link href="/change-password" className="text-blue-700 underline">
+              Change password
+            </Link>
+          </li>
+        </ul>
+      </main>
+    );
+  }
+
+  // ADMIN
+  const summary = await getAdminHomeSummary(actor);
+  const nothingWaiting =
+    summary.plansAwaitingApproval === 0 && summary.classesNotYetSubmitted === 0 && summary.rejectedGradesNeedingRework === 0;
+
   return (
-    <main className="mx-auto max-w-lg px-4 py-12">
-      <h1 className="mb-2 text-xl font-semibold">Signed in</h1>
-      <dl className="mb-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-gray-500">Name</dt>
-        <dd>{actor.displayName}</dd>
-        <dt className="text-gray-500">Login identifier</dt>
-        <dd>{actor.loginIdentifier}</dd>
-        <dt className="text-gray-500">Role</dt>
-        <dd>{actor.role}</dd>
-      </dl>
+    <main className="mx-auto max-w-2xl px-4 py-12">
+      <h1 className="mb-6 text-xl font-semibold">Admin home</h1>
+
+      <section className="mb-6 rounded border border-gray-200 p-4">
+        <h2 className="mb-2 font-medium">Work queues</h2>
+        {nothingWaiting ? (
+          <p className="text-sm text-gray-500">Nothing is waiting for you.</p>
+        ) : (
+          <ul className="flex flex-col gap-1 text-sm">
+            {summary.plansAwaitingApproval > 0 && (
+              <li>
+                <Link href="/admin/planning" className="text-blue-700 underline">
+                  {summary.plansAwaitingApproval} plan(s) awaiting approval
+                </Link>
+              </li>
+            )}
+            {summary.classesNotYetSubmitted > 0 && (
+              <li>
+                <Link href="/admin/grades" className="text-blue-700 underline">
+                  {summary.classesNotYetSubmitted} class(es) with grades not yet submitted
+                </Link>
+              </li>
+            )}
+            {summary.rejectedGradesNeedingRework > 0 && (
+              <li>
+                <Link href="/admin/grades" className="text-blue-700 underline">
+                  {summary.rejectedGradesNeedingRework} grade(s) rejected and needing rework
+                </Link>
+              </li>
+            )}
+          </ul>
+        )}
+      </section>
+
+      <section className="mb-6 rounded border border-gray-200 p-4">
+        <h2 className="mb-2 font-medium">Historical import</h2>
+        <ul className="flex flex-col gap-1 text-sm">
+          {Object.entries(summary.importByStatus).map(([status, count]) => (
+            <li key={status} className="flex justify-between">
+              <span>{status}</span>
+              <span className="text-gray-500">{count}</span>
+            </li>
+          ))}
+        </ul>
+        <Link href="/admin/historical/progress" className="mt-2 inline-block text-blue-700 underline">
+          Full progress report
+        </Link>
+      </section>
+
       <ul className="flex flex-col gap-2 text-sm">
         {links.map((link) => (
           <li key={link.href}>
