@@ -16,12 +16,29 @@ Tailwind CSS · Vitest + Playwright · Vercel.
 
 See [`docs/SETUP.md`](docs/SETUP.md).
 
+## Using the system
+
+- [`docs/ADMIN_MANUAL.md`](docs/ADMIN_MANUAL.md) — for Admin and Super Admin staff
+- [`docs/STUDENT_GUIDE.md`](docs/STUDENT_GUIDE.md) — for students
+
+## Operations
+
+- [`docs/DEPLOYMENT_RUNBOOK.md`](docs/DEPLOYMENT_RUNBOOK.md)
+- [`docs/BACKUP_RESTORE_RUNBOOK.md`](docs/BACKUP_RESTORE_RUNBOOK.md) — **read this before calling anything
+  here "production"; there is currently no working backup**
+- [`docs/INCIDENT_RUNBOOK.md`](docs/INCIDENT_RUNBOOK.md)
+- [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md) — Stage 11's control-by-control self-review against plan §18
+
 ## Governance documents
 
 - `DECISIONS.md` — engineering and College decisions, open and closed
 - `ASSUMPTIONS.md` — assumptions still awaiting validation, and their cost if wrong
+- `AS_BUILT.md` — where this build departs from the plan, and what's still needed to reach Go-Live
 - Stage-by-stage build plan, gates, and acceptance criteria: plan document, Sections 24–27
 
 ## Status
 
-Stage 1 (Foundation and Platform) — in progress on branch `stage/01-foundation`.
+All eleven Phase 1 stages have working code (branch `stage/11-hardening-go-live`, built on
+`stage/10-grade-management`; not yet merged to `main`). **This is a functional pilot, not a
+plan-Go-Live-certified production system** — see `AS_BUILT.md` for exactly what remains (backup/restore,
+UAT, a few open College decisions) before it can be called that.
