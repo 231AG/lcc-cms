@@ -19,7 +19,7 @@ All nine blocking decisions (DEC-01 through DEC-09 lineage, see plan §34) and a
 | DEC-26 | Who adjudicates a conflicting/unreadable historical paper record | Before first real conflict (days after Stage 6 go-live use begins) | Registrar's office |
 | DEC-29 | Synthetic internal identity (non-deliverable auth identifier) | **Acknowledged and approved** — proceeding with `<studentId>@students.<domain>.invalid` resolution | Approved by project owner |
 | DEC-30 | Hosting/data-residency region for Supabase project | Before production data exists | **Chosen: West EU (London/Ireland region)** — recorded 25 Aug 2026 |
-| DEC-31 | Production database tier (must include point-in-time recovery; no free tier in prod) | Before go-live (Stage 11) | Current project is **free tier**, used as the development environment. Production must move to a paid tier with daily backup + PITR before go-live — not yet provisioned. |
+| DEC-31 | Production database tier (must include point-in-time recovery; no free tier in prod) | Before go-live (Stage 11) | **Still open — deliberately not addressed in Stage 11.** Project owner has decided to launch on the existing free-tier project with no backup/PITR for now (see DECISIONS.md DEV-09); upgrade deferred to a later phase. |
 
 ## Open — pre-coding administrative (Section 38.1)
 
@@ -172,3 +172,56 @@ submits, not only plans already awaiting a decision.
 **Approval status:** Not a deviation requiring approval -- resolves an internal ordering gap using the
 plan's own stated rules (V1 blocking scope, override purpose) rather than introducing new policy.
 Recorded so the override's reachable scope doesn't get mistaken for an oversight in a future audit.
+
+### DEV-08 — Stage 11 continues the branch-per-stage chain; no merge to `main` yet
+
+**Date:** Stage 11, at kickoff.
+**Decision:** Stages 1-10 exist as unmerged `stage/NN-*` branches; `main` is still the original placeholder
+README. The owner chose to keep chaining `stage/11-hardening-go-live` on top of `stage/10-grade-management`
+rather than merging the completed stages into `main` first.
+**Consequence:** `main` will not reflect real progress until an explicit integration step happens. That step
+still has to occur before or at go-live -- deploying to production means deploying *some* branch's content,
+and the plan's own environment model (Section 8.5) assumes `main` is what ships. Tracked here so the
+eventual "merge everything to `main`" step isn't skipped by mistake.
+**Approval status:** Confirmed by project owner, 2026-08-29.
+
+### DEV-09 — No backup/PITR for now; production runs on the existing free-tier Supabase project (deviates from DEC-31 and narrows Stage 11's Gate G11)
+
+**Date:** Stage 11, at kickoff.
+**Decision:** The plan's Stage 11 acceptance criteria require "a restore from backup has been performed and
+verified" as a hard gate condition for G11 (Go-Live Gate), and DEC-31 requires a paid tier with point-in-time
+recovery before go-live -- explicitly *not* satisfied by a free tier. The owner has decided, for now, to run
+production on the same single free-tier Supabase project already used for development (continuing DEV-01),
+with **no backup configuration and no restore rehearsal** in this pass. The Supabase subscription will be
+upgraded "once we are done with the different phases."
+**Rationale given:** Defers infrastructure cost/setup until later phases are further along.
+**Consequence -- read carefully, this is a real operational risk, not a paperwork gap:** Until this is
+revisited, **there is no recovery path from data loss, corruption, or accidental deletion of any student
+record, grade, or GPA in production.** A dropped table, a bad migration, a compromised credential, or a
+Supabase incident is unrecoverable. This also means Stage 11's own acceptance criteria for G11 (Go-Live Gate)
+**cannot be fully met** under the plan's own definition -- what ships is a soft-launch/pilot on unprotected
+infrastructure, not the plan's "Go-Live" as specified. DEC-31 stays open. The semester-export feature and the
+reconciliation-query runner (Stage 11's other DB-hardening deliverables) are unaffected and will still be
+built -- only backup/restore is deferred.
+**Approval status:** Confirmed by project owner, 2026-08-29 -- explicitly accepted the risk above.
+
+### DEV-10 — Security review performed as an internal code-level audit, not a third-party review
+
+**Date:** Stage 11, at kickoff.
+**Decision:** The plan's Stage 11 scope calls for a "full review against Section 18" and "dependency
+vulnerability sweep." The owner confirmed this will be done as a self-review of the codebase against every
+§18 control (rather than an external consultant or penetration test), matching the plan's own guidance that a
+formal penetration test is a FUTURE/Phase-2 item, not a Phase 1 requirement.
+**Consequence:** Findings and fixes will be recorded directly against the code; there is no independent
+third-party sign-off backing the security review for this go-live.
+**Approval status:** Confirmed by project owner, 2026-08-29.
+
+### DEV-11 — Administrator manual and student guide delivered as Markdown in the repo
+
+**Date:** Stage 11, at kickoff.
+**Decision:** Stage 11's documentation deliverables (administrator manual, student guide) will be written as
+plain Markdown files in the repository, alongside `DECISIONS.md`/`ASSUMPTIONS.md`, rather than as separate
+formatted documents (Word/PDF).
+**Consequence:** These documents version with the code and are easy to keep in sync as features change, but
+are not immediately in a format ready to hand to non-technical Admin office staff without conversion.
+**Approval status:** Confirmed by project owner, 2026-08-29.
