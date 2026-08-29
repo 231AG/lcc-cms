@@ -26,10 +26,47 @@ import { appUser } from "@/lib/db/schema";
  */
 const EXEMPT_EXACT = new Set(["/login", "/change-password"]);
 
+/**
+ * §18 RECOMMENDED: "Security headers -- Content-Security-Policy,
+ * X-Content-Type-Options, Referrer-Policy, frame-ancestors deny." Applied
+ * here (not next.config.ts) so every response this proxy touches --
+ * including the redirect to /change-password -- carries them, with one
+ * definition instead of two.
+ *
+ * The CSP is deliberately not nonce-based: a couple of existing pages
+ * (e.g. the A-16 import-progress bar chart) use inline `style` attributes
+ * for per-row dynamic values, and this app loads no third-party scripts
+ * or styles at all -- 'self'-only script-src plus 'unsafe-inline' for
+ * style-src is the honest, pragmatic middle ground for an institutional
+ * app with this threat model (plan §18's own framing: "not a public-
+ * facing system with an adversarial internet population"), not a
+ * strict/nonce-based CSP. Recorded plainly rather than claimed as
+ * stricter than it is.
+ */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+function withSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("Content-Security-Policy", CSP);
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("X-Frame-Options", "DENY");
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (EXEMPT_EXACT.has(pathname)) {
-    return NextResponse.next();
+    return withSecurityHeaders(NextResponse.next());
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,7 +74,7 @@ export async function proxy(request: NextRequest) {
   if (!url || !anonKey) {
     // Misconfigured environment -- every page that needs Supabase will
     // fail on its own with a clear error; nothing to enforce here yet.
-    return NextResponse.next();
+    return withSecurityHeaders(NextResponse.next());
   }
 
   let response = NextResponse.next({ request });
@@ -65,14 +102,14 @@ export async function proxy(request: NextRequest) {
 
   // Not signed in: let the destination page's own getCurrentActor()/
   // requireActor() check handle the /login redirect, exactly as today.
-  if (!user) return response;
+  if (!user) return withSecurityHeaders(response);
 
   const row = await db.query.appUser.findFirst({ where: eq(appUser.id, user.id) });
   if (row?.mustChangePassword) {
-    return NextResponse.redirect(new URL("/change-password", request.url));
+    return withSecurityHeaders(NextResponse.redirect(new URL("/change-password", request.url)));
   }
 
-  return response;
+  return withSecurityHeaders(response);
 }
 
 export const config = {
