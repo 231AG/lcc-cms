@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { SESSION_COOKIE_OPTIONS } from "./cookieOptions";
 
 /**
  * Request-scoped Supabase client bound to the caller's session cookie.
@@ -42,5 +43,6 @@ export async function createServerSupabaseClient() {
         }
       },
     },
+    cookieOptions: SESSION_COOKIE_OPTIONS,
   });
 }

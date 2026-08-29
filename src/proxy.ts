@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { appUser } from "@/lib/db/schema";
+import { SESSION_COOKIE_OPTIONS } from "@/lib/supabase/cookieOptions";
 
 /**
  * Security self-review finding (Stage 11, plan §18 REQUIRED control:
@@ -94,6 +95,7 @@ export async function proxy(request: NextRequest) {
         }
       },
     },
+    cookieOptions: SESSION_COOKIE_OPTIONS,
   });
 
   const {
