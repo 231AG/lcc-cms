@@ -81,3 +81,13 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Playwright e2e (npm run test:e2e, e2e/*.spec.ts) is intentionally
+      # NOT run here, for the exact same reason as the excluded vitest
+      # suites above (DEV-12): every spec signs in through the real login
+      # form, which means creating real accounts via the Supabase Admin
+      # API against a real project -- this runner has none, and per
+      # DEV-01/DEV-09 CI must never write test accounts into the College's
+      # shared project. Run `npm run test:e2e` locally against a real
+      # Supabase project (see the local execution checklist) before
+      # merging any change that touches a page or flow with e2e coverage.

@@ -71,8 +71,17 @@ test("forced password change cannot be bypassed by navigating straight to /porta
 
   await expect(page).toHaveURL(/\/change-password$/);
 
-  // REQ-A03: unbypassable by direct URL.
+  // REQ-A03: unbypassable by direct URL -- Stage 11 regression coverage.
+  // Before src/proxy.ts existed (Stage 11), this check only ever lived on
+  // /portal and /planning; every other route had no such check at all.
+  // /admin/accounts and /admin/audit are checked here as representative
+  // Admin- and Super-Admin-only routes that were previously reachable
+  // with a forced password change still outstanding.
   await page.goto("/portal");
+  await expect(page).toHaveURL(/\/change-password$/);
+  await page.goto("/admin/accounts");
+  await expect(page).toHaveURL(/\/change-password$/);
+  await page.goto("/admin/audit");
   await expect(page).toHaveURL(/\/change-password$/);
 
   await page.getByLabel("New password", { exact: true }).fill(NEW_PASSWORD);

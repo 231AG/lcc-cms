@@ -254,6 +254,16 @@ passing a smaller suite.
 **Approval status:** Confirmed by project owner, 2026-08-29 -- explicitly declined the free test-project
 option and accepted this gap.
 
+**Addendum (later in Stage 11):** the same reasoning applies to Playwright e2e (`e2e/*.spec.ts`) --
+every spec signs in through the real login form, so it needs a real Supabase project exactly like the 9
+excluded vitest files. `npm run test:e2e` is not run in CI, annotated in `ci.yml` accordingly. A new spec was
+added this stage (`e2e/admin-grades.spec.ts`, covering Stage 10's grade-submission/approval/publish lifecycle
+end to end) and the existing `auth.spec.ts` was extended with two more must-change-password bypass checks
+regression-testing the `src/proxy.ts` fix (see SECURITY_REVIEW.md) -- both were typechecked and confirmed to parse/list
+correctly via `npx playwright test --list`, but **neither has actually been run against a real browser and
+Supabase project**, for the same reason the 9 vitest files can't be. Flagged for the local execution
+checklist, not claimed as verified.
+
 ### DEV-13 — `next build` fails on every authenticated page without any Supabase env vars present; fixed with placeholder public values in CI
 
 **Date:** Stage 11, during CI work.
