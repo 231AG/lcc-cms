@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:ci": "vitest run --exclude \"src/lib/academic/__tests__/calendar.integration.test.ts\" --exclude \"src/lib/academic/__tests__/structure.integration.test.ts\" --exclude \"src/lib/gpa/__tests__/recompute.integration.test.ts\" --exclude \"src/lib/grades/__tests__/grades.integration.test.ts\" --exclude \"src/lib/historical/__tests__/historical.integration.test.ts\" --exclude \"src/lib/identity/__tests__/accounts.integration.test.ts\" --exclude \"src/lib/offerings/__tests__/offerings.integration.test.ts\" --exclude \"src/lib/planning/__tests__/planning.integration.test.ts\" --exclude \"src/lib/students/__tests__/students.integration.test.ts\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/lib/db/migrate.ts",
     "db:seed": "tsx src/lib/db/seed.ts",

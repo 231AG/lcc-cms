@@ -26,6 +26,18 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:54329/lcc_eportal_dev
+      # Placeholders, not secrets: `next build`'s static-generation pass
+      # calls every admin/auth page once to decide static vs. dynamic.
+      # Without ANY value here, src/lib/supabase/server.ts's own
+      # "must be set" check throws before Next ever reaches the cookies()
+      # read that would mark the route dynamic, and the build fails on
+      # every authenticated page -- confirmed by running `next build` with
+      # no Supabase env at all during Stage 11. These never need to
+      # resolve to a real project: cookies() short-circuits the prerender
+      # before any network call happens. Real values live only in the
+      # actual deploy target's environment, never here.
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
 
     steps:
       - uses: actions/checkout@v4
@@ -43,14 +55,29 @@ jobs:
       - name: Seed reference data
         run: npm run db:seed
 
+      - name: Bootstrap test-fixture Super Admin
+        run: npm run test:fixtures
+
       - name: Lint
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test (unit + integration against real Postgres)
-        run: npm run test
+      # DEV-12 (DECISIONS.md, Stage 11): `test:ci` deliberately excludes 9
+      # integration test files (academic/calendar+structure, gpa/recompute,
+      # grades, historical, identity/accounts, offerings, planning,
+      # students) that create real accounts via createStaffAccount/
+      # enrollStudent, which call the Supabase Admin API. This runner has
+      # no Supabase project configured -- by design, the plan's own
+      # single-shared-project decision (DEV-01/DEV-09) means CI must never
+      # write test accounts into the College's real project, and a
+      # dedicated free-tier test project was offered and declined. Those 9
+      # files must still be run locally (`npm run test`) against a real
+      # Supabase project by whoever changes that area. This is a known,
+      # accepted gap -- see DEV-12 -- not silent flakiness.
+      - name: Test (unit + integration against real Postgres; excludes Supabase-Auth-dependent suites, see DEV-12)
+        run: npm run test:ci
 
       - name: Build
         run: npm run build

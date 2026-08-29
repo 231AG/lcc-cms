@@ -225,3 +225,69 @@ formatted documents (Word/PDF).
 **Consequence:** These documents version with the code and are easy to keep in sync as features change, but
 are not immediately in a format ready to hand to non-technical Admin office staff without conversion.
 **Approval status:** Confirmed by project owner, 2026-08-29.
+
+### DEV-12 — CI cannot run ~45% of the integration suite without real Supabase Auth; accepted as a known gap rather than provisioning a second project
+
+**Date:** Stage 11, during CI work.
+**Decision:** Running the full test suite fresh (migrate → seed → test, exactly as `ci.yml` does) for the
+first time ever in this session surfaced two things. First, **this repository's GitHub Actions workflow has
+never actually run — zero workflow runs recorded** — because it only triggers on push-to-`main` or a pull
+request, and neither has happened yet; every stage's "tests pass" claim to date was verified locally, not by
+CI. Second, once run fresh, 9 of 20 test files fail: `realSuperAdminActor()` (the pattern every integration
+test since Stage 3 uses to get an `Actor` for FK-bound writes) found no bootstrapped Super Admin, because
+nothing bootstraps one from scratch — fixed here with a new test-only fixture script
+(`src/lib/db/testFixtures.ts`, `npm run test:fixtures`, wired into `ci.yml`). But underneath that, every one
+of those same 9 files also calls `createStaffAccount`/`enrollStudent` at some point, which calls
+`createAdminClient()` — a real Supabase Admin API call. `ci.yml` has no Supabase credentials at all (by
+design: DEV-01/DEV-09 keep one shared project, and CI was never going to write test accounts into it). The
+owner was offered a free-tier Supabase project dedicated solely to CI/test use (zero cost, doesn't touch the
+production-designated project) and **declined it, choosing to accept the gap for now.**
+**Consequence:** CI (once it actually runs) will pass lint/typecheck/build and the ~11 test files that don't
+create a Supabase-backed account (pure unit tests: GPA engine, semester state machine, Student-ID resolution,
+plus a handful of RLS/privilege integration tests). The other 9 files — covering academic structure, calendar,
+GPA recomputation, grades, historical import, offerings, planning, students, and account management — **do
+not run in CI and must continue to be run locally against a real Supabase project by whoever is developing
+that area**, until a test Supabase project is provisioned. This means Stage 11's G11 acceptance criterion
+"the full regression suite passes with nothing skipped" **is not literally achievable** under the current
+setup — `ci.yml` will be annotated to say exactly which files are excluded and why, rather than silently
+passing a smaller suite.
+**Approval status:** Confirmed by project owner, 2026-08-29 -- explicitly declined the free test-project
+option and accepted this gap.
+
+### DEV-13 — `next build` fails on every authenticated page without any Supabase env vars present; fixed with placeholder public values in CI
+
+**Date:** Stage 11, during CI work.
+**Finding:** Continuing DEV-12's investigation, `npm run build` was also run for the first time against
+`ci.yml`'s exact environment (only `DATABASE_URL` set, no Supabase vars at all) and failed: `next build`'s
+static-generation pass calls each page once to decide static vs. dynamic, and `src/lib/supabase/server.ts`
+throws its own "must be set" error the moment any admin/auth page is probed, before the code ever reaches the
+`cookies()` read that would normally tell Next.js to mark the route dynamic and skip prerendering it. This is
+not a Cache Components issue (not enabled in `next.config.ts`) -- it is that the explicit env-var guard fires
+first. Confirmed the fix: setting `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` to any
+non-empty placeholder value (they never need to resolve to a real project -- `cookies()` short-circuits the
+prerender attempt before any network call happens) lets the build correctly mark all 21 routes dynamic (`ƒ`)
+and complete. `ci.yml` now sets these two as harmless placeholders (they are public, non-secret values by
+design; nothing sensitive is exposed by hardcoding a fake one in the workflow file).
+**Consequence:** Like DEV-12, this had never been caught because CI has never actually run. No code change
+was needed -- only `ci.yml`'s env block.
+**Approval status:** Not a deviation requiring approval -- a CI configuration fix for a real, previously
+undetected build failure, not a design change.
+
+### DEV-14 — DER-25's 150KB student-page JS budget is measurably exceeded by the framework baseline alone; flagged, not silently waived
+
+**Date:** Stage 11, performance verification.
+**Finding:** Measured `/login` (zero client components -- a plain server-rendered form with a server action,
+nothing this codebase could trim further at the component level) against a real production build: **~174KB
+of JavaScript gzipped** (~566KB uncompressed) is sent to the browser, against DER-25's stated budget of
+"student-facing pages ≤ 150KB of JavaScript transferred." Confirmed by grepping the shipped chunks that none
+of it is server-only code leaking into the client bundle (no `supabase`/`postgres`/`drizzle`/service-role
+strings found) -- this is React 19 + Next.js 16 App Router's own client runtime (hydration, RSC protocol,
+client-side router), not application code. The budget appears to have been written without accounting for
+this framework floor.
+**Consequence:** This is a real, measured gap against a literal Stage 11 acceptance number, not a
+judgement call to wave through. Closing it for real would mean a materially different rendering approach for
+at least the fully-anonymous pages (e.g., a true static-HTML login page with no Next.js client runtime at
+all) -- larger than a Stage 11-sized change to attempt unprompted. Recorded here rather than either quietly
+passing or quietly fixing; needs a decision on whether to accept the number as measured, revise DER-25, or
+scope a follow-up change.
+**Approval status:** Open -- awaiting project owner decision.
