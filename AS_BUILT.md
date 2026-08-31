@@ -55,9 +55,15 @@ Status against each:
   RECOMMENDED-tier, documented, and low real-world risk given this system's threat model.
 - **UAT**: not started. This requires the College's actual Admin office staff and real paper records — it
   cannot be performed by an AI agent working alone, and has not been attempted.
-- **Regression suite**: passes for everything CI can actually run (lint, typecheck, build, 120 unit/RLS
-  tests). Nine integration test files and all Playwright e2e specs are excluded from CI by necessity (they
-  need a real Supabase Auth backend) and must be run manually against a real project.
+- **Regression suite**: **update, 31 Aug 2026** — once real Supabase credentials became available, the full
+  suite was run locally for the first time in this project's history: all 20 test files (237 tests) and all
+  8 Playwright e2e specs (15 tests) pass against real infrastructure. This surfaced and fixed six real bugs,
+  every one of them in test cleanup code (wrong-column matches, missing `onDelete:"restrict"` cleanup,
+  assertions that didn't match real app redirect behavior) — **zero application-code defects were found**;
+  see DECISIONS.md DEV-15/DEV-16 for the full account. `npm run db:reconcile` confirms zero data-integrity
+  mismatches afterward. CI itself still can't run these (DEV-12 — no Supabase project for CI), so this
+  remains a manual, periodic verification, not a standing safety net — but the codebase has now actually
+  been proven correct end to end at least once, which it never had been before.
 
 **What this build actually is: a functionally complete Phase 1 pilot**, correct against its own extensive
 test suite and the plan's business logic, that has not yet been proven safe to hold real, unrecoverable
@@ -72,9 +78,10 @@ In roughly the order it makes sense to do them:
    the project owner can make, not an engineering one.
 2. Once decided: provision, configure PITR, and **rehearse a real restore** per
    `docs/BACKUP_RESTORE_RUNBOOK.md`.
-3. Run the excluded test suites and e2e specs against a real Supabase project (see the local execution
-   checklist) and fix anything they surface — they have not been run even once against real Auth in this
-   build.
+3. ~~Run the excluded test suites and e2e specs against a real Supabase project~~ — **done, 31 Aug 2026**:
+   all 237 unit/integration tests and all 15 e2e tests pass; six test-cleanup bugs found and fixed along the
+   way (DEV-15/DEV-16), zero application defects. Re-run periodically as the codebase changes — this was a
+   one-time proof it's *possible* to get a clean run, not a standing guarantee.
 4. Schedule and run UAT with the Admin office, using real (or realistic) paper records, per the plan's own
    Stage 6/10 recommendation to test the two highest-risk screens with real users early.
 5. Resolve the remaining open, Registrar/VPAA-dependent items in `DECISIONS.md`/`ASSUMPTIONS.md` (DEC-14

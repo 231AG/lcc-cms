@@ -60,8 +60,10 @@ Risk assessment: `drizzle-kit` is a **dev-only** dependency (schema generation a
 - **Multi-factor authentication for Super Admin**, **IP allow-listing**, **self-service password reset**,
   **field-level encryption**, **formal penetration test** — all explicitly listed in the plan itself as
   FUTURE/Phase-2 items, not Phase 1 requirements. Not attempted.
-- **A live, authenticated-session test of the proxy's redirect and the cookie flags** — this environment has
-  only a placeholder Supabase project (no real Auth backend), so the actual `mustChangePassword=true →
-  redirected everywhere` behavior and the cookie's real `Set-Cookie` flags in a genuine browser session could
-  not be exercised end-to-end here. See the local execution checklist for how to verify this once a real
-  Supabase project is available.
+- ~~A live, authenticated-session test of the proxy's redirect~~ — **done, 31 Aug 2026**, once real
+  Supabase access was available: `e2e/auth.spec.ts`'s bypass test (extended to also check `/admin/accounts`
+  and `/admin/audit`, not only `/portal`) passes against a real browser and real Auth session — confirms
+  the forced-password-change redirect genuinely holds across previously-unprotected routes, not just in
+  code review. The cookie's exact `Set-Cookie` flags (`HttpOnly`/`Secure`/`SameSite`) were not separately
+  inspected via browser devtools in this pass; the config wiring itself (`src/lib/supabase/cookieOptions.ts`)
+  is unit-verifiable by inspection and unchanged since it was written.
