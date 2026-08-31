@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { createAdminClient } from "../src/lib/supabase/admin";
 import { db } from "../src/lib/db/client";
-import { academicRecord, appUser, academicYear, course, courseOffering, department, gradeRecord, gradeSubmission, offeringMeeting, registration, semester, studentSemesterSummary } from "../src/lib/db/schema";
+import { academicRecord, appUser, academicYear, course, courseOffering, department, gradeRecord, gradeSubmission, offeringMeeting, registration, semester, studentCumulativeSummary, studentSemesterSummary } from "../src/lib/db/schema";
 import { resolveLoginIdentifierToEmail } from "../src/lib/identity/resolve";
 import { createAcademicYear, createSemester, transitionSemester } from "../src/lib/academic/calendar";
 import { createCourse } from "../src/lib/academic/structure";
@@ -97,6 +97,12 @@ test.afterAll(async ({}, testInfo) => {
     await db.delete(course).where(eq(course.id, id)).catch(() => {});
   }
   for (const id of cleanupUserIds) {
+    // A 6th leftover found the same way as the other five above --
+    // non-blocking (no FK from student_cumulative_summary reaches
+    // semester/offering, so it never produced a stuck-semester symptom),
+    // but confirmed via db:reconcile's I-15 self-heal that it was never
+    // cleaned up here at all.
+    await db.delete(studentCumulativeSummary).where(eq(studentCumulativeSummary.studentId, id)).catch(() => {});
     await db.update(appUser).set({ status: "DISABLED" }).where(eq(appUser.id, id));
     await createAdminClient().auth.admin.deleteUser(id).catch(() => {});
   }
