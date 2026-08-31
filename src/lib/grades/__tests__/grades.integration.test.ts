@@ -226,6 +226,20 @@ beforeAll(async () => {
 }, 400_000);
 
 afterAll(async () => {
+  // academic_record.grade_record_id -> grade_record.id is onDelete:
+  // "restrict" (Section 9.4.14's origin/grade_record_id coherence). Every
+  // academic_record referencing a grade_record MUST be deleted before that
+  // grade_record, or the delete is silently refused by Postgres and
+  // swallowed by this cleanup's own .catch(() => {}) -- found via Stage
+  // 11's new I-05 reconciliation check (npm run db:reconcile) reporting
+  // real PUBLISHED_GRADE_WITHOUT_RECORD rows left behind in a real
+  // Supabase project by exactly this ordering bug, the first time this
+  // file was ever run against real infrastructure end to end.
+  for (const id of cleanupUserIds) {
+    await db.delete(academicRecord).where(eq(academicRecord.studentId, id)).catch(() => {});
+    await db.delete(studentSemesterSummary).where(eq(studentSemesterSummary.studentId, id)).catch(() => {});
+    await db.delete(studentCumulativeSummary).where(eq(studentCumulativeSummary.studentId, id)).catch(() => {});
+  }
   for (const id of cleanupOfferingIds) {
     const regs = await db.query.registration.findMany({ where: eq(registration.offeringId, id) }).catch(() => []);
     for (const r of regs) {
@@ -240,11 +254,6 @@ afterAll(async () => {
       await db.delete(gradeSubmission).where(eq(gradeSubmission.id, s.id)).catch(() => {});
     }
     await db.delete(registration).where(eq(registration.offeringId, id)).catch(() => {});
-  }
-  for (const id of cleanupUserIds) {
-    await db.delete(academicRecord).where(eq(academicRecord.studentId, id)).catch(() => {});
-    await db.delete(studentSemesterSummary).where(eq(studentSemesterSummary.studentId, id)).catch(() => {});
-    await db.delete(studentCumulativeSummary).where(eq(studentCumulativeSummary.studentId, id)).catch(() => {});
   }
   for (const id of [...cleanupOfferingIds].reverse()) {
     await db.delete(offeringMeeting).where(eq(offeringMeeting.offeringId, id)).catch(() => {});

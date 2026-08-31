@@ -333,3 +333,26 @@ those are the pages actual students use most and were not reachable from this en
 **Approval status:** Open -- awaiting project owner decision on the recommendation above. Left open on
 purpose, per explicit instruction: do not silently change the requirement or degrade the application to
 force the number under 150KB.
+
+### DEV-15 — the full test suite (all 20 files) and the new I-05 reconciliation check both ran against real Supabase for the first time; one real cleanup-ordering bug found and fixed
+
+**Date:** After Stage 11, once the project owner provided real Supabase credentials and access to run
+locally.
+**What happened:** `npm run test` (not `test:ci` -- the full suite, including the 9 files DEV-12 excludes
+from CI) was run against a real Supabase project for the first time in this project's history. All 20 files,
+237 tests, passed. `npm run db:reconcile` (also its first-ever run against real data) then reported 11 I-05
+violations: published `grade_record` rows with no linked `academic_record`.
+**Root cause:** `grades.integration.test.ts`'s `afterAll` deleted `gradeRecord` rows before deleting the
+`academicRecord` rows that reference them via `grade_record_id` (`onDelete: "restrict"`) -- the delete was
+refused by Postgres and silently swallowed by the cleanup's own `.catch(() => {})`, leaving the grade_record
+behind once the (unconstrained) `academicRecord` delete succeeded afterward. Confirmed all 11 affected
+students were "Test Student-*" fixtures (not real data) before removing them.
+**Fix:** reordered the cleanup to delete `academicRecord` rows first (see the code comment at the top of
+that `afterAll` block); re-ran `npm run db:reconcile` afterward -- zero mismatches. This was a test-cleanup
+bug, not an application defect -- the actual `approveSubmission`/publish transaction in `grades.ts` is
+unaffected and was never in question.
+**Significance:** this is exactly what a reconciliation check run against real data before real use is for
+-- see `docs/BACKUP_RESTORE_RUNBOOK.md`'s instruction to run it after every restore rehearsal, and the
+plan's own "run before every go-live and at every semester end." First real run, first real (if minor)
+finding, caught and fixed.
+**Approval status:** Not a deviation requiring approval -- a test-code bug fix, not a design change.
