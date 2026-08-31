@@ -355,4 +355,22 @@ unaffected and was never in question.
 -- see `docs/BACKUP_RESTORE_RUNBOOK.md`'s instruction to run it after every restore rehearsal, and the
 plan's own "run before every go-live and at every semester end." First real run, first real (if minor)
 finding, caught and fixed.
-**Approval status:** Not a deviation requiring approval -- a test-code bug fix, not a design change.
+
+**Two more findings surfacing during the same investigation, same session:**
+1. That same test file also used a fully hardcoded academic year label (`"2096/2097"`) with a
+   reuse-on-conflict fallback on `createAcademicYear` but none on `createSemester` -- residue from an
+   independent, unrelated earlier run on this machine (predating this session, 10 offerings and 2
+   registrations deep) made a fresh isolated run of the file fail outright with "Sequence 1 already exists."
+   Fixed by time-suffixing the label (`2100 + Date.now() % 90`), matching the convention already used in
+   `admin-offerings.spec.ts`; the leftover residue itself was cleaned up directly (confirmed via query it was
+   the test's own far-future fixture, zero academic_record rows, before deleting).
+2. A `db:reconcile` run partway through this cleanup reported 16 more I-15 "mismatches" that turned out to
+   be **correct, benign self-healing, not bugs**: several test-fixture students (created by other suites --
+   offerings, planning -- that enroll students but never publish a grade for them) had never had a
+   `student_cumulative_summary` row created at all. `reconcileSummariesMatchEngine` correctly detected the
+   missing row, `recomputeStudentSummaries` correctly created it (with a legitimately null CGPA, since they
+   have zero GPA-eligible records), and a subsequent run confirmed zero mismatches. No code change was
+   needed here -- included in this record only because "reconciliation FAILED" reads alarming for what is
+   actually the self-healing mechanism (documented in `reconciliation.ts`'s own comment) doing its job.
+**Approval status:** Not a deviation requiring approval -- test-code bug fixes and one confirmed non-bug,
+not a design change.

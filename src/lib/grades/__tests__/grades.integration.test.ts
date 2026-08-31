@@ -192,8 +192,15 @@ beforeAll(async () => {
   pastSemesterId = pastSem.id;
   cleanupPastSemesterId = pastSem.id;
 
-  const yearLabel = `2096/2097`;
-  const year = await createAcademicYear(adminActor, { label: yearLabel, startDate: "2096-08-01", endDate: "2097-06-30" }).catch(
+  // Was a fixed "2096/2097" -- collided with residue from an independent
+  // earlier run (createAcademicYear's own reuse-on-conflict fallback below
+  // papered over the year, but createSemester below has no such fallback,
+  // so a leftover sequence-1 semester from a prior run made a fresh run
+  // fail outright). Time-suffixed like the e2e fixtures' own convention
+  // (e.g. admin-offerings.spec.ts's yearBase) so this can't recur.
+  const yearBase = 2100 + (Date.now() % 90);
+  const yearLabel = `${yearBase}/${yearBase + 1}`;
+  const year = await createAcademicYear(adminActor, { label: yearLabel, startDate: `${yearBase}-08-01`, endDate: `${yearBase + 1}-06-30` }).catch(
     async () => (await db.query.academicYear.findFirst({ where: eq(academicYear.label, yearLabel) }))!,
   );
   cleanupAcademicYearId = year.id;
@@ -201,8 +208,8 @@ beforeAll(async () => {
     academicYearId: year.id,
     sequence: 1,
     name: "First Semester",
-    startDate: "2096-09-01",
-    endDate: "2097-01-15",
+    startDate: `${yearBase}-09-01`,
+    endDate: `${yearBase + 1}-01-15`,
   });
   semesterId = sem.id;
   cleanupSemesterId = sem.id;
