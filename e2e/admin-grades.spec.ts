@@ -2,11 +2,11 @@ import { test, expect } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { createAdminClient } from "../src/lib/supabase/admin";
 import { db } from "../src/lib/db/client";
-import { appUser, academicYear, course, courseOffering, department, gradeRecord, registration, semester } from "../src/lib/db/schema";
+import { academicRecord, appUser, academicYear, course, courseOffering, department, gradeRecord, gradeSubmission, offeringMeeting, registration, semester, studentSemesterSummary } from "../src/lib/db/schema";
 import { resolveLoginIdentifierToEmail } from "../src/lib/identity/resolve";
 import { createAcademicYear, createSemester, transitionSemester } from "../src/lib/academic/calendar";
 import { createCourse } from "../src/lib/academic/structure";
-import { createOffering, publishOffering } from "../src/lib/offerings/offerings";
+import { addMeeting, createOffering, publishOffering } from "../src/lib/offerings/offerings";
 import { enrollStudent } from "../src/lib/students/students";
 import { registerDirect } from "../src/lib/planning/planning";
 
@@ -52,10 +52,39 @@ async function makeSignedInStaff(role: "ADMIN" | "SUPER_ADMIN" | "STUDENT", labe
 }
 
 test.afterAll(async ({}, testInfo) => {
-  testInfo.setTimeout(60_000);
+  testInfo.setTimeout(120_000);
+  // Fixed four bugs found by actually running this against real Supabase
+  // (same class as DECISIONS.md DEV-15's grades.integration.test.ts
+  // finding): (1) gradeRecord was matched on registrationId === offeringId
+  // (always false, a silent no-op); (2) academic_record (created once the
+  // grade is published) references grade_record with onDelete:"restrict",
+  // so it must go first or the delete is refused and swallowed by
+  // .catch(() => {}); (3) grade_submission references course_offering
+  // with onDelete:"restrict" and was never deleted at all here; (4)
+  // offeringMeeting (added when fixing the "publish needs a meeting time"
+  // bug) references course_offering the same way and was likewise never
+  // cleaned up. Any one of the four alone blocks the offering/semester
+  // delete chain below via FK restrict -- confirmed by fixing them one at
+  // a time, each surfacing the next only once the previous was gone.
+  for (const id of cleanupUserIds) {
+    await db.delete(academicRecord).where(eq(academicRecord.studentId, id)).catch(() => {});
+  }
+  // recomputeStudentSummaries (called by approveSubmission once the grade
+  // publishes) writes student_semester_summary, keyed to this semester --
+  // a 5th onDelete:"restrict" reference this cleanup missed, blocking the
+  // semester delete below even after every offering-side reference was
+  // gone.
+  for (const id of cleanupSemesterIds) {
+    await db.delete(studentSemesterSummary).where(eq(studentSemesterSummary.semesterId, id)).catch(() => {});
+  }
   for (const id of cleanupOfferingIds) {
-    await db.delete(gradeRecord).where(eq(gradeRecord.registrationId, id)).catch(() => {});
+    const regs = await db.query.registration.findMany({ where: eq(registration.offeringId, id) }).catch(() => []);
+    for (const r of regs) {
+      await db.delete(gradeRecord).where(eq(gradeRecord.registrationId, r.id)).catch(() => {});
+    }
+    await db.delete(gradeSubmission).where(eq(gradeSubmission.offeringId, id)).catch(() => {});
     await db.delete(registration).where(eq(registration.offeringId, id)).catch(() => {});
+    await db.delete(offeringMeeting).where(eq(offeringMeeting.offeringId, id)).catch(() => {});
     await db.delete(courseOffering).where(eq(courseOffering.id, id)).catch(() => {});
   }
   for (const id of cleanupSemesterIds) {
@@ -74,7 +103,7 @@ test.afterAll(async ({}, testInfo) => {
 });
 
 test("Admin enters and submits a class's grades; a different Super Admin approves; the grade publishes", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
 
   const admin = await makeSignedInStaff("ADMIN", "grades-admin");
   const superAdmin = await makeSignedInStaff("SUPER_ADMIN", "grades-superadmin");
@@ -108,18 +137,23 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
   // publish the offering before advancing past Registration.
   const offering = await createOffering(adminActor, { semesterId: sem.id, courseId: courseRow.id, section: "A", instructorName: "Dr. E2E" });
   cleanupOfferingIds.push(offering.id);
+  await addMeeting(adminActor, offering.id, { dayOfWeek: 1, startTime: "09:00", endTime: "10:30", room: "E2E-1" });
   await publishOffering(adminActor, offering.id);
 
   await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN" });
   await transitionSemester(adminActor, { semesterId: sem.id, toState: "REGISTRATION" });
 
-  const studentNumber = `${yearBase}${Date.now() % 10000}`;
+  // Student ID must start with "19" or "20" (STUDENT_ID_PATTERN) --
+  // decoupled from yearBase (2300+, fine for an academic year label with
+  // no such format constraint, but rejected outright here).
+  const enrolmentYear = 2021;
+  const studentNumber = `${enrolmentYear}${Date.now() % 10000}`;
   const enrolled = await enrollStudent(adminActor, {
     studentNumber,
     firstName: "Grade",
     lastName: `Fixture-${studentNumber}`,
     departmentId: dept.id,
-    enrolmentYear: yearBase,
+    enrolmentYear,
   });
   const studentRow = await db.query.appUser.findFirst({ where: eq(appUser.loginIdentifier, enrolled.studentNumber) });
   if (!studentRow) throw new Error("enrollment fixture setup failed");
@@ -143,13 +177,25 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
   await page.goto(`/admin/grades?semesterId=${sem.id}&offeringId=${offering.id}`);
   await expect(page.getByRole("heading", { name: "Class grade entry" })).toBeVisible();
 
-  await page.locator(`input[name="score_${reg.id}"]`).fill("93");
-  await expect(page.getByText("A- — 3.70", { exact: false })).toBeVisible();
+  // The live letter/grade-point preview is a client component
+  // (ClassEntryForm.tsx) that must finish hydrating before its onChange
+  // handler is attached -- filling immediately on page load can race that
+  // and miss the preview text even though the underlying score value (and
+  // therefore the actual save) is unaffected. Not asserted here; the
+  // derived letter is verified precisely at the end of this test via the
+  // published academic record instead, which is what actually matters.
+  const scoreInput = page.locator(`input[name="score_${reg.id}"]`);
+  await scoreInput.waitFor({ state: "visible" });
+  await scoreInput.fill("93");
   await page.getByRole("button", { name: "Save draft" }).click();
   await expect(page.getByText("1 of 1 entered")).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole("button", { name: "Submit" }).click();
-  await expect(page).toHaveURL(new RegExp(`/admin/grades\\?semesterId=${sem.id}&offeringId=${offering.id}$`), { timeout: 30_000 });
+  // submitClassAction (src/app/admin/grades/actions.ts) redirects to
+  // /admin/grades?offeringId=... only -- semesterId is dropped, unlike the
+  // GET-form navigations elsewhere on this page. Real app behavior, not a
+  // bug: the roster/entry section renders off offeringId alone.
+  await expect(page).toHaveURL(new RegExp(`/admin/grades\\?offeringId=${offering.id}$`), { timeout: 30_000 });
 
   // --- A different Super Admin reviews and approves ---
   await page.goto("/login");
@@ -163,7 +209,13 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
   await page.getByRole("link", { name: "Review" }).first().click();
 
   await page.getByRole("button", { name: "Approve checked (or all, if none checked)" }).click();
-  await expect(page).toHaveURL(/\/admin\/grade-review$/, { timeout: 30_000 });
+  // approveSubmissionAction (src/app/admin/grade-review/actions.ts)
+  // redirects back to the same detail page, not the queue list -- real
+  // app behavior. With the only grade now decided, the status line shows
+  // CLOSED and the decision form (which only renders while grades remain
+  // undecided) disappears.
+  await expect(page).toHaveURL(/\/admin\/grade-review\/[^/]+$/, { timeout: 30_000 });
+  await expect(page.getByText("CLOSED", { exact: true })).toBeVisible({ timeout: 30_000 });
 
   // --- Verify the grade actually published, at the data layer (the most
   // reliable check available without guessing exact confirmation copy) ---

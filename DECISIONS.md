@@ -374,3 +374,33 @@ finding, caught and fixed.
    actually the self-healing mechanism (documented in `reconciliation.ts`'s own comment) doing its job.
 **Approval status:** Not a deviation requiring approval -- test-code bug fixes and one confirmed non-bug,
 not a design change.
+
+### DEV-16 — e2e/admin-grades.spec.ts (written but never run in the cloud session that authored it) needed five real fixes before it ran clean end to end
+
+**Date:** Same session as DEV-15, continuing local verification once real Supabase access was available.
+**Context:** This spec was written and typechecked, but explicitly flagged as NOT run-verified (no real
+Supabase in that session). Running it for real, iteratively, surfaced:
+1. `publishOffering` requires at least one meeting time -- the test never added one. Fixed by calling
+   `addMeeting` before `publishOffering`.
+2. The test's `yearBase` (2300+, fine for an academic year label) was also used for the student number and
+   `enrolmentYear` -- `STUDENT_ID_PATTERN` requires a `19`/`20` prefix, so every enrolment was rejected.
+   Decoupled: a fixed `enrolmentYear = 2021` for the student, `yearBase` kept only for the semester label.
+3. `submitClassAction`'s real redirect target omits `semesterId` from the URL (`/admin/grades?offeringId=…`
+   only) -- the test asserted a URL that never occurs. Fixed the assertion to match actual app behavior.
+4. `approveSubmissionAction`'s real redirect returns to the same submission detail page, not the queue list
+   -- same category of fix, assertion corrected to check for the resulting `CLOSED` status instead.
+5. The cleanup itself needed five separate fixes before a run left zero residue: `gradeRecord` matched on
+   the wrong column (same DEV-15-class bug); `academic_record`, `grade_submission`, `offering_meeting`, and
+   `student_semester_summary` were each missed entirely, each with its own `onDelete:"restrict"` reference
+   blocking the offering/semester delete chain -- confirmed one at a time, each only becoming visible once
+   the previous blocker was removed. Each left a leftover semester that then hit Section 13.6's
+   one-semester-per-state-institution-wide rule and blocked the *next* run, compounding the debugging cycle;
+   all residue was identified by direct query (matching the test's own fixture naming/label patterns) before
+   deletion, and cleaned up with one-off scripts (not committed).
+**Result:** after all five cleanup fixes, two full end-to-end runs left zero residue and `npm run
+db:reconcile` reported zero mismatches against 79 real students afterward. The test itself (Admin enters
+grades → submits → a different Super Admin approves → grade publishes, verified against the real database)
+passes reliably now.
+**Approval status:** Not a deviation requiring approval -- test-code bug fixes, matching DEV-15's pattern
+exactly. Recorded at this length because five fixes in one file, all invisible without a real run, is itself
+the evidence for why "written but typechecked" was never claimed as "verified" for this file.

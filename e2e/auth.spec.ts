@@ -89,8 +89,12 @@ test("forced password change cannot be bypassed by navigating straight to /porta
   await page.getByRole("button", { name: "Set password" }).click();
 
   await expect(page).toHaveURL(/\/portal$/);
-  await expect(page.getByText("E2E Test Admin")).toBeVisible();
-  await expect(page.getByText("ADMIN", { exact: true })).toBeVisible();
+  // Stage 11's A-01 dashboard (src/app/portal/page.tsx) replaced the
+  // original generic "Signed in as {displayName}, role {role}" placeholder
+  // with real work-queue content for Admin -- it no longer displays the
+  // actor's name or role text anywhere, so this checks the actual current
+  // page instead of asserting on content that no longer exists.
+  await expect(page.getByRole("heading", { name: "Admin home" })).toBeVisible();
 });
 
 test("wrong password shows a generic error, not which field was wrong", async ({
