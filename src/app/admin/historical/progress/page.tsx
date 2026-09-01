@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { getImportProgressReport } from "@/lib/historical/historical";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+
+export const metadata: Metadata = { title: "Historical import progress" };
 
 /**
  * A-16 (plan Section 20.4, REQ-H06), finalised in Stage 11: counts by
@@ -13,13 +20,16 @@ import { getImportProgressReport } from "@/lib/historical/historical";
 export default async function ImportProgressPage() {
   const actor = await getCurrentActor();
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -29,137 +39,143 @@ export default async function ImportProgressPage() {
 
   if (report.totalStudents === 0) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-8">
-        <h1 className="mb-1 text-xl font-semibold">Historical import progress</h1>
-        <p className="text-sm text-gray-500">Nothing to report yet -- no students have been enrolled.</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+        <PageHeader title="Historical import progress" />
+        <p className="text-sm text-neutral-500">Nothing to report yet -- no students have been enrolled.</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-1 text-xl font-semibold">Historical import progress</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        <Link href="/admin/students" className="text-blue-700 underline">
-          Students
-        </Link>
-      </p>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader
+        title="Historical import progress"
+        description={
+          <Link href="/admin/students" className="font-medium text-brand-700 hover:underline">
+            Students
+          </Link>
+        }
+      />
 
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Overall</h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-1">Status</th>
-              <th className="py-1">Students</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(report.byStatus).map(([status, count]) => (
-              <tr key={status} className="border-b">
-                <td className="py-1">{status}</td>
-                <td className="py-1">{count}</td>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-700">Overall</h2>
+        <Card>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Status</Th>
+                <Th>Students</Th>
               </tr>
-            ))}
-            <tr>
-              <td className="py-1 font-medium">Total</td>
-              <td className="py-1 font-medium">{report.totalStudents}</td>
-            </tr>
-          </tbody>
-        </table>
+            </Thead>
+            <tbody>
+              {Object.entries(report.byStatus).map(([status, count]) => (
+                <Tr key={status}>
+                  <Td>{status}</Td>
+                  <Td>{count}</Td>
+                </Tr>
+              ))}
+              <Tr>
+                <Td className="font-semibold text-neutral-900">Total</Td>
+                <Td className="font-semibold text-neutral-900">{report.totalStudents}</Td>
+              </Tr>
+            </tbody>
+          </Table>
+        </Card>
       </section>
 
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">By College / Department</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[500px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="py-1">College</th>
-                <th className="py-1">Department</th>
-                <th className="py-1">Not started</th>
-                <th className="py-1">In progress</th>
-                <th className="py-1">Complete</th>
-                <th className="py-1">Total</th>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-700">By College / Department</h2>
+        <Card>
+          <Table className="min-w-[500px]">
+            <Thead>
+              <tr>
+                <Th>College</Th>
+                <Th>Department</Th>
+                <Th>Not started</Th>
+                <Th>In progress</Th>
+                <Th>Complete</Th>
+                <Th>Total</Th>
               </tr>
-            </thead>
+            </Thead>
             <tbody>
               {report.byDepartment.map((d) => (
-                <tr key={d.collegeCode + d.departmentCode} className="border-b">
-                  <td className="py-1">{d.collegeCode}</td>
-                  <td className="py-1">{d.departmentName}</td>
-                  <td className="py-1">{d.byStatus.NOT_STARTED ?? 0}</td>
-                  <td className="py-1">{d.byStatus.IN_PROGRESS ?? 0}</td>
-                  <td className="py-1">{d.byStatus.COMPLETE ?? 0}</td>
-                  <td className="py-1 font-medium">{d.total}</td>
-                </tr>
+                <Tr key={d.collegeCode + d.departmentCode}>
+                  <Td>{d.collegeCode}</Td>
+                  <Td>{d.departmentName}</Td>
+                  <Td>{d.byStatus.NOT_STARTED ?? 0}</Td>
+                  <Td>{d.byStatus.IN_PROGRESS ?? 0}</Td>
+                  <Td>{d.byStatus.COMPLETE ?? 0}</Td>
+                  <Td className="font-medium text-neutral-900">{d.total}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
       </section>
 
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">By cohort (enrolment year)</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[400px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="py-1">Year</th>
-                <th className="py-1">Not started</th>
-                <th className="py-1">In progress</th>
-                <th className="py-1">Complete</th>
-                <th className="py-1">Total</th>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-700">By cohort (enrolment year)</h2>
+        <Card>
+          <Table className="min-w-[400px]">
+            <Thead>
+              <tr>
+                <Th>Year</Th>
+                <Th>Not started</Th>
+                <Th>In progress</Th>
+                <Th>Complete</Th>
+                <Th>Total</Th>
               </tr>
-            </thead>
+            </Thead>
             <tbody>
               {report.byCohort.map((c) => (
-                <tr key={c.enrolmentYear} className="border-b">
-                  <td className="py-1">{c.enrolmentYear}</td>
-                  <td className="py-1">{c.byStatus.NOT_STARTED ?? 0}</td>
-                  <td className="py-1">{c.byStatus.IN_PROGRESS ?? 0}</td>
-                  <td className="py-1">{c.byStatus.COMPLETE ?? 0}</td>
-                  <td className="py-1 font-medium">{c.total}</td>
-                </tr>
+                <Tr key={c.enrolmentYear}>
+                  <Td>{c.enrolmentYear}</Td>
+                  <Td>{c.byStatus.NOT_STARTED ?? 0}</Td>
+                  <Td>{c.byStatus.IN_PROGRESS ?? 0}</Td>
+                  <Td>{c.byStatus.COMPLETE ?? 0}</Td>
+                  <Td className="font-medium text-neutral-900">{c.total}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
       </section>
 
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Records entered per week</h2>
-        <p className="mb-2 text-xs text-gray-500">Last 12 weeks -- a flat or falling line is a stall, not steady progress.</p>
-        <div className="flex h-24 items-end gap-1">
-          {report.recordsEnteredPerWeek.map((w) => (
-            <div key={w.weekStart} className="flex flex-1 flex-col items-center gap-1" title={`${w.weekStart}: ${w.count}`}>
-              <div
-                className="w-full rounded-t bg-blue-600"
-                style={{ height: `${Math.max(2, (w.count / maxWeekCount) * 80)}px` }}
-              />
-              <span className="text-[10px] text-gray-400">{w.count}</span>
-            </div>
-          ))}
-        </div>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-700">Records entered per week</h2>
+        <p className="mb-2 text-xs text-neutral-500">Last 12 weeks -- a flat or falling line is a stall, not steady progress.</p>
+        <Card className="p-4">
+          <div className="flex h-24 items-end gap-1">
+            {report.recordsEnteredPerWeek.map((w) => (
+              <div key={w.weekStart} className="flex flex-1 flex-col items-center gap-1" title={`${w.weekStart}: ${w.count}`}>
+                <div
+                  className="w-full rounded-t bg-brand-600"
+                  style={{ height: `${Math.max(2, (w.count / maxWeekCount) * 80)}px` }}
+                />
+                <span className="text-[10px] text-neutral-400">{w.count}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">
-          Flagged issues ({report.unknownCourseIssues})
-        </h2>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-700">Flagged issues ({report.unknownCourseIssues})</h2>
         {report.flaggedIssues.length === 0 ? (
-          <p className="text-sm text-gray-500">No flagged issues.</p>
+          <p className="text-sm text-neutral-500">No flagged issues.</p>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-2">
             {report.flaggedIssues.map((issue, i) => (
-              <li key={i} className="flex items-center justify-between rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-                <span>
-                  {issue.studentName} ({issue.studentNumber}) -- course code{" "}
-                  <span className="font-mono">{issue.courseCodeSnapshot}</span> not in the catalogue
-                </span>
-                <Link href={`/admin/students/${issue.studentId}`} className="text-blue-700 underline">
-                  Review
-                </Link>
+              <li key={i}>
+                <Card className="flex items-center justify-between border-warning-200 bg-warning-50 px-3 py-2 text-sm">
+                  <span>
+                    {issue.studentName} ({issue.studentNumber}) -- course code{" "}
+                    <span className="font-mono">{issue.courseCodeSnapshot}</span> not in the catalogue
+                  </span>
+                  <Link href={`/admin/students/${issue.studentId}`} className="font-medium text-brand-700 hover:underline">
+                    Review
+                  </Link>
+                </Card>
               </li>
             ))}
           </ul>
