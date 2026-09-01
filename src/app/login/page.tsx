@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
+import { GraduationCap } from "lucide-react";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Label, Input } from "@/components/ui/Form";
 import { loginAction } from "./actions";
+
+export const metadata: Metadata = { title: "Sign in" };
 
 /**
  * S-01 (plan Section 20.3). Plain server-rendered form, no client
@@ -14,55 +21,43 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 text-xl font-semibold">Liberia Christian College</h1>
-      <p className="mb-6 text-sm text-gray-600">E-Portal sign in</p>
-
-      {error === "disabled" && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          This account has been disabled. Contact the Admin office.
-        </p>
-      )}
-      {error === "1" && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Student ID/username or password is incorrect.
-        </p>
-      )}
-
-      <form action={loginAction} className="flex flex-col gap-4">
-        <div>
-          <label htmlFor="identifier" className="mb-1 block text-sm font-medium">
-            Student ID or Username
-          </label>
-          <input
-            id="identifier"
-            name="identifier"
-            type="text"
-            required
-            autoComplete="username"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-base"
-          />
+    <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-4 py-12 outline-none">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50">
+            <GraduationCap className="h-6 w-6 text-brand-700" aria-hidden="true" />
+          </span>
+          <h1 className="text-xl font-semibold text-neutral-900">Liberia Christian College</h1>
+          <p className="mt-1 text-sm text-neutral-600">E-Portal sign in</p>
         </div>
-        <div>
-          <label htmlFor="password" className="mb-1 block text-sm font-medium">
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-base"
-          />
+
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+          {error === "disabled" && (
+            <Alert tone="danger" className="mb-4">
+              This account has been disabled. Contact the Admin office.
+            </Alert>
+          )}
+          {error === "1" && (
+            <Alert tone="danger" className="mb-4">
+              Student ID/username or password is incorrect.
+            </Alert>
+          )}
+
+          <form action={loginAction} className="flex flex-col gap-4">
+            <div>
+              <Label htmlFor="identifier">Student ID or Username</Label>
+              <Input id="identifier" name="identifier" type="text" required autoComplete="username" />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" name="password" type="password" required autoComplete="current-password" />
+            </div>
+            <Button type="submit" className="mt-2 w-full">
+              Sign in
+            </Button>
+          </form>
         </div>
-        <button
-          type="submit"
-          className="rounded bg-blue-700 px-4 py-2 font-medium text-white"
-        >
-          Sign in
-        </button>
-      </form>
+      </div>
     </main>
   );
 }

@@ -1,8 +1,63 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens for the LCC E-Portal UI (design/professional-ui branch).
+ * Tailwind 4 has no tailwind.config.js -- this @theme block IS the config
+ * (see DECISIONS.md's new DEV-## entry for this pass). Palette: a deep
+ * navy/ink primary (institutional, trustworthy) plus warm neutrals, with a
+ * small set of semantic status colors reused everywhere a badge/alert
+ * appears (grade status, semester state, correction status, provisional
+ * warnings) instead of ad hoc red-50/amber-50 utility classes per page.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f7f5;
+  --foreground: #1c1e21;
+
+  /* Brand / primary -- deep navy, the institutional color. */
+  --color-brand-50: #eef2f8;
+  --color-brand-100: #dbe4f0;
+  --color-brand-200: #b3c6e0;
+  --color-brand-300: #85a3cc;
+  --color-brand-400: #4d75a8;
+  --color-brand-500: #2c5282;
+  --color-brand-600: #1e3f68;
+  --color-brand-700: #16304f;
+  --color-brand-800: #10233a;
+  --color-brand-900: #0b1a2b;
+
+  /* Warm neutrals for surfaces, borders, body text. */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f7f5;
+  --color-neutral-100: #efeeea;
+  --color-neutral-200: #e2e0d9;
+  --color-neutral-300: #cbc8bd;
+  --color-neutral-400: #a6a296;
+  --color-neutral-500: #837e70;
+  --color-neutral-600: #635f54;
+  --color-neutral-700: #494539;
+  --color-neutral-800: #302d24;
+  --color-neutral-900: #1c1a15;
+
+  /* Semantic status colors -- one scale each, used by Badge/Alert. */
+  --color-success-50: #eefaf1;
+  --color-success-200: #b7e3c3;
+  --color-success-600: #1f7a41;
+  --color-success-800: #14532b;
+
+  --color-warning-50: #fdf6e8;
+  --color-warning-200: #f0dba3;
+  --color-warning-600: #92660a;
+  --color-warning-800: #6b4a06;
+
+  --color-danger-50: #fdf0ef;
+  --color-danger-200: #f0bcb6;
+  --color-danger-600: #b3261e;
+  --color-danger-800: #7f1a14;
+
+  --color-info-50: #eef4fb;
+  --color-info-200: #b9d3ec;
+  --color-info-600: #205e9c;
+  --color-info-800: #16436f;
 }
 
 @theme inline {
@@ -10,17 +65,81 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-brand-50: var(--color-brand-50);
+  --color-brand-100: var(--color-brand-100);
+  --color-brand-200: var(--color-brand-200);
+  --color-brand-300: var(--color-brand-300);
+  --color-brand-400: var(--color-brand-400);
+  --color-brand-500: var(--color-brand-500);
+  --color-brand-600: var(--color-brand-600);
+  --color-brand-700: var(--color-brand-700);
+  --color-brand-800: var(--color-brand-800);
+  --color-brand-900: var(--color-brand-900);
+
+  --color-neutral-0: var(--color-neutral-0);
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-500: var(--color-neutral-500);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-700: var(--color-neutral-700);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-neutral-900: var(--color-neutral-900);
+
+  --color-success-50: var(--color-success-50);
+  --color-success-200: var(--color-success-200);
+  --color-success-600: var(--color-success-600);
+  --color-success-800: var(--color-success-800);
+
+  --color-warning-50: var(--color-warning-50);
+  --color-warning-200: var(--color-warning-200);
+  --color-warning-600: var(--color-warning-600);
+  --color-warning-800: var(--color-warning-800);
+
+  --color-danger-50: var(--color-danger-50);
+  --color-danger-200: var(--color-danger-200);
+  --color-danger-600: var(--color-danger-600);
+  --color-danger-800: var(--color-danger-800);
+
+  --color-info-50: var(--color-info-50);
+  --color-info-200: var(--color-info-200);
+  --color-info-600: var(--color-info-600);
+  --color-info-800: var(--color-info-800);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #12130f;
+    --foreground: #ececea;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Print stylesheet for the server-rendered semester grade sheet
+ * (constraint 7: dedicated @media print CSS against server-rendered HTML,
+ * not a client-side PDF library). Chrome that shouldn't print (the app
+ * header/nav, buttons) uses Tailwind's built-in `print:hidden` variant at
+ * the call site, matching the existing PrintButton convention -- this
+ * block only resets page-level layout so printed content isn't clipped by
+ * screen-only max-width/padding.
+ */
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
 }

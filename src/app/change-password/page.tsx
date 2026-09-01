@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { KeyRound } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Label, Input } from "@/components/ui/Form";
 import { changePasswordAction } from "./actions";
+
+export const metadata: Metadata = { title: "Change password" };
 
 /**
  * S-02 (plan Section 20.3). Reachable whether or not a change is forced --
@@ -20,61 +27,47 @@ export default async function ChangePasswordPage({
   const { error } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 text-xl font-semibold">Change your password</h1>
-      <p className="mb-6 text-sm text-gray-600">
-        {actor.mustChangePassword
-          ? "You must set a new password before continuing."
-          : `Signed in as ${actor.displayName}.`}
-      </p>
-
-      {error === "1" && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Passwords must match and be at least 10 characters.
-        </p>
-      )}
-      {error === "2" && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          That password is too easy to guess. Choose something less common.
-        </p>
-      )}
-
-      <form action={changePasswordAction} className="flex flex-col gap-4">
-        <div>
-          <label htmlFor="newPassword" className="mb-1 block text-sm font-medium">
-            New password
-          </label>
-          <input
-            id="newPassword"
-            name="newPassword"
-            type="password"
-            required
-            minLength={10}
-            autoComplete="new-password"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-base"
-          />
+    <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-4 py-12 outline-none">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50">
+            <KeyRound className="h-6 w-6 text-brand-700" aria-hidden="true" />
+          </span>
+          <h1 className="text-xl font-semibold text-neutral-900">Change your password</h1>
+          <p className="mt-1 text-sm text-neutral-600">
+            {actor.mustChangePassword
+              ? "You must set a new password before continuing."
+              : `Signed in as ${actor.displayName}.`}
+          </p>
         </div>
-        <div>
-          <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium">
-            Confirm new password
-          </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            required
-            minLength={10}
-            autoComplete="new-password"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-base"
-          />
+
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+          {error === "1" && (
+            <Alert tone="danger" className="mb-4">
+              Passwords must match and be at least 10 characters.
+            </Alert>
+          )}
+          {error === "2" && (
+            <Alert tone="danger" className="mb-4">
+              That password is too easy to guess. Choose something less common.
+            </Alert>
+          )}
+
+          <form action={changePasswordAction} className="flex flex-col gap-4">
+            <div>
+              <Label htmlFor="newPassword">New password</Label>
+              <Input id="newPassword" name="newPassword" type="password" required minLength={10} autoComplete="new-password" />
+            </div>
+            <div>
+              <Label htmlFor="confirmPassword">Confirm new password</Label>
+              <Input id="confirmPassword" name="confirmPassword" type="password" required minLength={10} autoComplete="new-password" />
+            </div>
+            <Button type="submit" className="mt-2 w-full">
+              Set password
+            </Button>
+          </form>
         </div>
-        <button
-          type="submit"
-          className="rounded bg-blue-700 px-4 py-2 font-medium text-white"
-        >
-          Set password
-        </button>
-      </form>
+      </div>
     </main>
   );
 }
