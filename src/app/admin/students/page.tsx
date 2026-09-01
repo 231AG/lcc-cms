@@ -1,8 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { searchStudents, STUDENT_STATUSES } from "@/lib/students/students";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Alert } from "@/components/ui/Alert";
+import { Card } from "@/components/ui/Card";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { Label, Input, Select } from "@/components/ui/Form";
+import { Button } from "@/components/ui/Button";
 import { EnrollStudentForm } from "./EnrollStudentForm";
+
+export const metadata: Metadata = { title: "Students" };
 
 /**
  * A-09 (Admin: search, enrol, quick links to edit) and X-07 (Super Admin:
@@ -18,13 +27,16 @@ export default async function StudentsPage({
   const actor = await getCurrentActor();
   const { q, status, page, error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -44,84 +56,84 @@ export default async function StudentsPage({
   const totalPages = Math.max(1, Math.ceil(results.total / results.pageSize));
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Students</h1>
-        <Link href="/admin/historical/progress" className="text-sm text-blue-700 underline">
-          Historical import progress
-        </Link>
-      </div>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader
+        title="Students"
+        actions={
+          <Link href="/admin/historical/progress" className="text-sm font-medium text-brand-700 hover:underline">
+            Historical import progress
+          </Link>
+        }
+      />
 
       {error && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <Alert tone="danger" className="mb-4">
           {error}
-        </p>
+        </Alert>
       )}
 
       {actor.role === "ADMIN" && <EnrollStudentForm departments={departments.map((d) => ({ id: d.id, code: d.code, name: d.name }))} />}
 
       <form method="GET" className="mb-4 flex flex-wrap items-end gap-2">
         <div>
-          <label htmlFor="q" className="mb-1 block text-xs font-medium">
+          <Label htmlFor="q" className="text-xs">
             Search
-          </label>
-          <input
-            id="q"
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Student ID or name"
-            className="w-56 rounded border border-gray-300 px-2 py-1 text-sm"
-          />
+          </Label>
+          <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Student ID or name" className="w-56" />
         </div>
         <div>
-          <label htmlFor="status" className="mb-1 block text-xs font-medium">
+          <Label htmlFor="status" className="text-xs">
             Status
-          </label>
-          <select id="status" name="status" defaultValue={status ?? ""} className="rounded border border-gray-300 px-2 py-1 text-sm">
+          </Label>
+          <Select id="status" name="status" defaultValue={status ?? ""}>
             <option value="">All</option>
             {STUDENT_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
-        <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">
+        <Button type="submit" variant="secondary">
           Search
-        </button>
+        </Button>
       </form>
 
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b text-left">
-            <th className="py-1">Student ID</th>
-            <th className="py-1">Name</th>
-            <th className="py-1">Status</th>
-            <th className="py-1">Enrolment year</th>
-            <th className="py-1">Import status</th>
-            <th className="py-1"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.rows.map((s) => (
-            <tr key={s.id} className="border-b">
-              <td className="py-1">{s.studentNumber}</td>
-              <td className="py-1">{s.lastName}, {s.firstName}</td>
-              <td className="py-1">{s.status}</td>
-              <td className="py-1">{s.enrolmentYear}</td>
-              <td className="py-1">{s.historicalImportStatus}</td>
-              <td className="py-1">
-                <Link href={`/admin/students/${s.id}`} className="text-blue-700 underline">
-                  {actor.role === "ADMIN" ? "Edit" : "View"}
-                </Link>
-              </td>
+      <Card>
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Student ID</Th>
+              <Th>Name</Th>
+              <Th>Status</Th>
+              <Th>Enrolment year</Th>
+              <Th>Import status</Th>
+              <Th></Th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </Thead>
+          <tbody>
+            {results.rows.map((s) => (
+              <Tr key={s.id}>
+                <Td className="font-mono text-xs text-neutral-700">{s.studentNumber}</Td>
+                <Td className="font-medium text-neutral-900">
+                  {s.lastName}, {s.firstName}
+                </Td>
+                <Td>{s.status}</Td>
+                <Td>{s.enrolmentYear}</Td>
+                <Td>{s.historicalImportStatus}</Td>
+                <Td>
+                  <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-700 hover:underline">
+                    {actor.role === "ADMIN" ? "Edit" : "View"}
+                  </Link>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      </Card>
 
       {results.rows.length === 0 && (
-        <p className="mt-4 text-sm text-gray-500">
+        <p className="mt-4 text-sm text-neutral-500">
           {q || status ? "No students match this search." : "No students enrolled yet."}
         </p>
       )}
@@ -129,15 +141,21 @@ export default async function StudentsPage({
       {totalPages > 1 && (
         <div className="mt-4 flex items-center gap-3 text-sm">
           {pageNum > 1 && (
-            <Link href={`/admin/students?q=${encodeURIComponent(q ?? "")}&status=${encodeURIComponent(status ?? "")}&page=${pageNum - 1}`} className="text-blue-700 underline">
+            <Link
+              href={`/admin/students?q=${encodeURIComponent(q ?? "")}&status=${encodeURIComponent(status ?? "")}&page=${pageNum - 1}`}
+              className="font-medium text-brand-700 hover:underline"
+            >
               Previous
             </Link>
           )}
-          <span>
+          <span className="text-neutral-600">
             Page {pageNum} of {totalPages}
           </span>
           {pageNum < totalPages && (
-            <Link href={`/admin/students?q=${encodeURIComponent(q ?? "")}&status=${encodeURIComponent(status ?? "")}&page=${pageNum + 1}`} className="text-blue-700 underline">
+            <Link
+              href={`/admin/students?q=${encodeURIComponent(q ?? "")}&status=${encodeURIComponent(status ?? "")}&page=${pageNum + 1}`}
+              className="font-medium text-brand-700 hover:underline"
+            >
               Next
             </Link>
           )}
