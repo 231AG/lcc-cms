@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getRegistrationsForOffering } from "@/lib/planning/planning";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardBody } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Label, Input, Select } from "@/components/ui/Form";
 import { dropRegistrationAction, registerDirectAction } from "./actions";
+
+export const metadata: Metadata = { title: "Registrations" };
 
 /**
  * A-17 (plan Section 20.4, Stage 9, DEC-14): registrations for one
@@ -17,13 +25,16 @@ export default async function RegistrationsPage({
   const actor = await getCurrentActor();
   const { offeringId, error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -48,65 +59,83 @@ export default async function RegistrationsPage({
   const registrations = offeringId ? await getRegistrationsForOffering(actor, offeringId) : [];
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold">Registrations</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Registrations" />
 
-      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
       <form method="GET" className="mb-6 flex flex-wrap items-end gap-2">
         <div>
-          <label htmlFor="offeringId" className="mb-1 block text-xs font-medium">Offering</label>
-          <select id="offeringId" name="offeringId" defaultValue={offeringId ?? ""} className="w-96 rounded border border-gray-300 px-2 py-1 text-sm">
+          <Label htmlFor="offeringId" className="text-xs">
+            Offering
+          </Label>
+          <Select id="offeringId" name="offeringId" defaultValue={offeringId ?? ""} className="w-96">
             <option value="">Select an offering…</option>
             {offerings.map((o) => (
-              <option key={o.id} value={o.id}>{offeringLabel(o)}</option>
+              <option key={o.id} value={o.id}>
+                {offeringLabel(o)}
+              </option>
             ))}
-          </select>
+          </Select>
         </div>
-        <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">Select</button>
+        <Button type="submit" variant="secondary">
+          Select
+        </Button>
       </form>
 
       {offeringId && (
         <>
-          <section className="mb-6 rounded border border-gray-200 p-4">
-            <h2 className="mb-3 font-medium">Register a student directly</h2>
-            <form action={registerDirectAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="offeringId" value={offeringId} />
-              <div>
-                <label className="mb-1 block text-xs font-medium">Student</label>
-                <select name="studentId" required className="w-64 rounded border border-gray-300 px-2 py-1 text-sm">
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>{s.studentNumber} — {s.firstName} {s.lastName}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium">Reason</label>
-                <input name="reason" required className="w-64 rounded border border-gray-300 px-2 py-1 text-sm" />
-              </div>
-              <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">Register</button>
-            </form>
-          </section>
+          <Card className="mb-6">
+            <CardBody>
+              <h2 className="mb-3 font-medium text-neutral-900">Register a student directly</h2>
+              <form action={registerDirectAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="offeringId" value={offeringId} />
+                <div>
+                  <Label className="text-xs">Student</Label>
+                  <Select name="studentId" required className="w-64">
+                    {students.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.studentNumber} — {s.firstName} {s.lastName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Reason</Label>
+                  <Input name="reason" required className="w-64" />
+                </div>
+                <Button type="submit">Register</Button>
+              </form>
+            </CardBody>
+          </Card>
 
           <section>
-            <h2 className="mb-3 font-medium">Class list</h2>
-            {registrations.length === 0 && <p className="text-sm text-gray-500">No registrations yet.</p>}
+            <h2 className="mb-3 font-medium text-neutral-900">Class list</h2>
+            {registrations.length === 0 && <p className="text-sm text-neutral-500">No registrations yet.</p>}
             <ul className="flex flex-col gap-2">
               {registrations.map((r) => (
-                <li key={r.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm">
-                  <span>
-                    {studentLabel(r.studentId)} — {r.status}
-                    {r.isRetake && " — retake"} — {r.source === "ADMIN_DIRECT" ? "direct" : "plan"}
-                    {r.status === "DROPPED" && r.droppedReason && ` (${r.droppedReason})`}
-                  </span>
-                  {r.status === "REGISTERED" && (
-                    <form action={dropRegistrationAction} className="flex items-center gap-2">
-                      <input type="hidden" name="offeringId" value={offeringId} />
-                      <input type="hidden" name="registrationId" value={r.id} />
-                      <input name="reason" required placeholder="Reason" className="w-40 rounded border border-gray-300 px-1 py-0.5 text-xs" />
-                      <button type="submit" className="text-xs text-red-700 underline">Drop</button>
-                    </form>
-                  )}
+                <li key={r.id}>
+                  <Card className="flex items-center justify-between px-3 py-2 text-sm">
+                    <span>
+                      {studentLabel(r.studentId)} — {r.status}
+                      {r.isRetake && " — retake"} — {r.source === "ADMIN_DIRECT" ? "direct" : "plan"}
+                      {r.status === "DROPPED" && r.droppedReason && ` (${r.droppedReason})`}
+                    </span>
+                    {r.status === "REGISTERED" && (
+                      <form action={dropRegistrationAction} className="flex items-center gap-2">
+                        <input type="hidden" name="offeringId" value={offeringId} />
+                        <input type="hidden" name="registrationId" value={r.id} />
+                        <input name="reason" required placeholder="Reason" className="w-40 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                        <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                          Drop
+                        </button>
+                      </form>
+                    )}
+                  </Card>
                 </li>
               ))}
             </ul>

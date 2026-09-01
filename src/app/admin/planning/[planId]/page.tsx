@@ -2,6 +2,11 @@ import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetings, getOfferingsForSemester } from "@/lib/offerings/offerings";
 import { getPlan, getPlanItems } from "@/lib/planning/planning";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardBody } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { approvePlanAction, overridePrerequisiteAction, rejectPlanAction } from "../actions";
 
 const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -23,13 +28,16 @@ export default async function PlanDetailPage({
   const { planId } = await params;
   const { error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -37,8 +45,8 @@ export default async function PlanDetailPage({
   const plan = await getPlan(actor, planId);
   if (!plan) {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="text-sm text-gray-500">Plan not found.</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <p className="text-sm text-neutral-500">Plan not found.</p>
       </main>
     );
   }
@@ -60,71 +68,85 @@ export default async function PlanDetailPage({
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-1 text-xl font-semibold">
-        {student ? `${student.studentNumber} — ${student.firstName} ${student.lastName}` : plan.studentId}
-      </h1>
-      <p className="mb-6 text-sm text-gray-500">
-        {semester?.name ?? plan.semesterId} — status <span className="font-medium">{plan.status}</span> — {plan.totalCredits} credit hours
-      </p>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader
+        title={student ? `${student.studentNumber} — ${student.firstName} ${student.lastName}` : plan.studentId}
+        description={
+          <>
+            {semester?.name ?? plan.semesterId} — status <Badge tone="brand">{plan.status}</Badge> — {plan.totalCredits} credit hours
+          </>
+        }
+      />
 
-      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
-
-      {plan.status === "REJECTED" && plan.rejectionReason && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Previously rejected: {plan.rejectionReason}
-        </p>
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
       )}
 
-      <section className="mb-6 rounded border border-gray-200 p-4">
-        <h2 className="mb-3 font-medium">Items</h2>
-        <div className="flex flex-col gap-3">
-          {items.map((i) => {
-            const c = courseFor(i.courseId);
-            const o = offeringFor(i.offeringId);
-            const meetings = o ? meetingsByOffering.get(o.id) ?? [] : [];
-            return (
-              <div key={i.id} className="rounded border border-gray-200 p-3 text-sm">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="font-medium">
-                    {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section})
-                  </span>
-                  <span className="text-xs text-gray-500">{o?.frozenCreditHours}cr{i.isRetake && " — retake"}</span>
+      {plan.status === "REJECTED" && plan.rejectionReason && (
+        <Alert tone="danger" className="mb-4">
+          Previously rejected: {plan.rejectionReason}
+        </Alert>
+      )}
+
+      <Card className="mb-6">
+        <CardBody>
+          <h2 className="mb-3 font-medium text-neutral-900">Items</h2>
+          <div className="flex flex-col gap-3">
+            {items.map((i) => {
+              const c = courseFor(i.courseId);
+              const o = offeringFor(i.offeringId);
+              const meetings = o ? meetingsByOffering.get(o.id) ?? [] : [];
+              return (
+                <div key={i.id} className="rounded-md border border-neutral-200 p-3 text-sm">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="font-medium text-neutral-900">
+                      {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section})
+                    </span>
+                    <span className="text-xs text-neutral-500">
+                      {o?.frozenCreditHours}cr{i.isRetake && " — retake"}
+                    </span>
+                  </div>
+                  <p className="mb-2 text-xs text-neutral-500">
+                    {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}`).join(", ")}
+                  </p>
+                  {i.prereqOverrideReason ? (
+                    <p className="text-xs text-warning-700">Prerequisite overridden: {i.prereqOverrideReason}</p>
+                  ) : (
+                    plan.status !== "APPROVED" && (
+                      <details>
+                        <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Override a failed prerequisite</summary>
+                        <form action={overridePrerequisiteAction} className="mt-2 flex flex-wrap items-end gap-2">
+                          <input type="hidden" name="planId" value={planId} />
+                          <input type="hidden" name="planItemId" value={i.id} />
+                          <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                          <Button type="submit" variant="secondary" size="sm">
+                            Override
+                          </Button>
+                        </form>
+                      </details>
+                    )
+                  )}
                 </div>
-                <p className="mb-2 text-xs text-gray-500">
-                  {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}`).join(", ")}
-                </p>
-                {i.prereqOverrideReason ? (
-                  <p className="text-xs text-amber-700">Prerequisite overridden: {i.prereqOverrideReason}</p>
-                ) : (
-                  plan.status !== "APPROVED" && (
-                    <details>
-                      <summary className="cursor-pointer text-xs text-blue-700 underline">Override a failed prerequisite</summary>
-                      <form action={overridePrerequisiteAction} className="mt-2 flex flex-wrap items-end gap-2">
-                        <input type="hidden" name="planId" value={planId} />
-                        <input type="hidden" name="planItemId" value={i.id} />
-                        <input name="reason" required placeholder="Reason" className="w-64 rounded border border-gray-300 px-2 py-1 text-xs" />
-                        <button type="submit" className="rounded border border-gray-300 px-2 py-1 text-xs font-medium">Override</button>
-                      </form>
-                    </details>
-                  )
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </CardBody>
+      </Card>
 
       {plan.status === "SUBMITTED" && (
         <section className="flex flex-wrap items-start gap-4">
           <form action={approvePlanAction}>
             <input type="hidden" name="planId" value={planId} />
-            <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">Approve</button>
+            <Button type="submit">Approve</Button>
           </form>
           <form action={rejectPlanAction} className="flex items-end gap-2">
             <input type="hidden" name="planId" value={planId} />
-            <input name="reason" required placeholder="Reason for rejection" className="w-64 rounded border border-gray-300 px-2 py-1 text-sm" />
-            <button type="submit" className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700">Reject</button>
+            <input name="reason" required placeholder="Reason for rejection" className="w-64 rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <Button type="submit" variant="danger">
+              Reject
+            </Button>
           </form>
         </section>
       )}

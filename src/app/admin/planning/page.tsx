@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getPlanQueue } from "@/lib/planning/planning";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardBody } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Label, Select } from "@/components/ui/Form";
 import { findPlanAction } from "./actions";
+
+export const metadata: Metadata = { title: "Course plan review" };
 
 /**
  * A-11 (plan Section 20.4, Stage 9): the queue half -- plans awaiting a
@@ -21,23 +29,22 @@ export default async function PlanningQueuePage({
   const actor = await getCurrentActor();
   const { semesterId, error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
 
   const [semesters, academicYears, students] = await asUser(actor.userId, (tx) =>
-    Promise.all([
-      tx.query.semester.findMany(),
-      tx.query.academicYear.findMany(),
-      tx.query.student.findMany(),
-    ]),
+    Promise.all([tx.query.semester.findMany(), tx.query.academicYear.findMany(), tx.query.student.findMany()]),
   );
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
@@ -52,61 +59,85 @@ export default async function PlanningQueuePage({
   const queue = semesterId ? await getPlanQueue(actor, semesterId) : [];
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold">Course plan review</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Course plan review" />
 
-      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
       <form method="GET" className="mb-6 flex flex-wrap items-end gap-2">
         <div>
-          <label htmlFor="semesterId" className="mb-1 block text-xs font-medium">Semester</label>
-          <select id="semesterId" name="semesterId" defaultValue={semesterId ?? ""} className="w-72 rounded border border-gray-300 px-2 py-1 text-sm">
+          <Label htmlFor="semesterId" className="text-xs">
+            Semester
+          </Label>
+          <Select id="semesterId" name="semesterId" defaultValue={semesterId ?? ""} className="w-72">
             <option value="">Select a semester…</option>
             {semesters.map((s) => (
-              <option key={s.id} value={s.id}>{yearLabel(s.id)} ({s.state})</option>
+              <option key={s.id} value={s.id}>
+                {yearLabel(s.id)} ({s.state})
+              </option>
             ))}
-          </select>
+          </Select>
         </div>
-        <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">Select</button>
+        <Button type="submit" variant="secondary">
+          Select
+        </Button>
       </form>
 
       {semesterId && (
         <section className="mb-8">
-          <h2 className="mb-3 font-medium">Awaiting a decision -- {yearLabel(semesterId)}</h2>
-          {queue.length === 0 && <p className="text-sm text-gray-500">No plans awaiting approval.</p>}
+          <h2 className="mb-3 font-medium text-neutral-900">Awaiting a decision -- {yearLabel(semesterId)}</h2>
+          {queue.length === 0 && <p className="text-sm text-neutral-500">No plans awaiting approval.</p>}
           <ul className="flex flex-col gap-2">
             {queue.map((p) => (
-              <li key={p.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm">
-                <span>{studentLabel(p.studentId)} — {p.totalCredits} credit hours</span>
-                <Link href={`/admin/planning/${p.id}`} className="text-blue-700 underline">Review</Link>
+              <li key={p.id}>
+                <Card className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span>
+                    {studentLabel(p.studentId)} — {p.totalCredits} credit hours
+                  </span>
+                  <Link href={`/admin/planning/${p.id}`} className="font-medium text-brand-700 hover:underline">
+                    Review
+                  </Link>
+                </Card>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      <section className="rounded border border-gray-200 p-4">
-        <h2 className="mb-3 font-medium">Look up a specific plan</h2>
-        <form action={findPlanAction} className="flex flex-wrap items-end gap-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium">Student ID</label>
-            <select name="studentId" required className="w-64 rounded border border-gray-300 px-2 py-1 text-sm">
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>{s.studentNumber} — {s.firstName} {s.lastName}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium">Semester</label>
-            <select name="semesterId" required className="w-64 rounded border border-gray-300 px-2 py-1 text-sm">
-              {semesters.map((s) => (
-                <option key={s.id} value={s.id}>{yearLabel(s.id)}</option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">Find plan</button>
-        </form>
-      </section>
+      <Card>
+        <CardBody>
+          <h2 className="mb-3 font-medium text-neutral-900">Look up a specific plan</h2>
+          <form action={findPlanAction} className="flex flex-wrap items-end gap-2">
+            <div>
+              <Label className="text-xs">Student ID</Label>
+              <Select name="studentId" required className="w-64">
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.studentNumber} — {s.firstName} {s.lastName}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Semester</Label>
+              <Select name="semesterId" required className="w-64">
+                {semesters.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {yearLabel(s.id)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button type="submit" variant="secondary">
+              Find plan
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
     </main>
   );
 }
