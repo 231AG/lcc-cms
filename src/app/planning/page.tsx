@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetings, getOfferingsForSemester } from "@/lib/offerings/offerings";
 import { getMyPlan, getPlanItems, getRegistrationsForStudent } from "@/lib/planning/planning";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { startPlanAction, addPlanItemAction, removePlanItemAction, submitPlanAction, revisePlanAction, deleteDraftPlanAction } from "./actions";
+
+export const metadata: Metadata = { title: "Course planning" };
 
 const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -26,10 +33,8 @@ export default async function PlanningPage({
 
   if (actor.role !== "STUDENT") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -48,9 +53,9 @@ export default async function PlanningPage({
 
   if (!openSemester) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-12">
-        <h1 className="mb-4 text-xl font-semibold">Course planning</h1>
-        <p className="text-sm text-gray-500">Course planning is not currently open.</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 outline-none">
+        <PageHeader title="Course planning" />
+        <p className="text-sm text-neutral-500">Course planning is not currently open.</p>
       </main>
     );
   }
@@ -74,149 +79,164 @@ export default async function PlanningPage({
   const registrations = plan?.status === "APPROVED" ? await getRegistrationsForStudent(actor, actor.userId, semesterId) : [];
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-1 text-xl font-semibold">Course planning</h1>
-      <p className="mb-6 text-sm text-gray-500">{yearLabel(semesterId)}</p>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Course planning" description={yearLabel(semesterId)} />
 
-      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
       {!plan && (
         <form action={startPlanAction}>
           <input type="hidden" name="semesterId" value={semesterId} />
-          <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-            Start building your plan
-          </button>
+          <Button type="submit">Start building your plan</Button>
         </form>
       )}
 
       {plan && (plan.status === "DRAFT" || plan.status === "REJECTED") && (
         <>
           {plan.status === "REJECTED" && (
-            <section className="mb-6 rounded border border-red-300 bg-red-50 p-4">
-              <h2 className="mb-1 font-medium text-red-900">Rejected</h2>
-              <p className="mb-3 text-sm text-red-800">{plan.rejectionReason}</p>
-              <form action={revisePlanAction}>
-                <input type="hidden" name="semesterId" value={semesterId} />
-                <input type="hidden" name="planId" value={plan.id} />
-                <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">
-                  Revise
-                </button>
-              </form>
-            </section>
-          )}
-
-          <section className="mb-6 rounded border border-gray-200 p-4">
-            <h2 className="mb-3 font-medium">Your plan -- {totalCredits} credit hours</h2>
-            {items.length === 0 && <p className="mb-3 text-sm text-gray-500">No courses added yet.</p>}
-            <ul className="mb-3 flex flex-col gap-2">
-              {items.map((i) => {
-                const c = courseFor(i.courseId);
-                const o = offeringFor(i.offeringId);
-                return (
-                  <li key={i.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm">
-                    <span>
-                      {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section}){i.isRetake && " — retake"}
-                    </span>
-                    <form action={removePlanItemAction}>
-                      <input type="hidden" name="semesterId" value={semesterId} />
-                      <input type="hidden" name="planItemId" value={i.id} />
-                      <button type="submit" className="text-xs text-red-700 underline">
-                        Remove
-                      </button>
-                    </form>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="flex items-center gap-3">
-              <form action={submitPlanAction}>
-                <input type="hidden" name="semesterId" value={semesterId} />
-                <input type="hidden" name="planId" value={plan.id} />
-                <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-                  Submit
-                </button>
-              </form>
-              {plan.status === "DRAFT" && (
-                <form action={deleteDraftPlanAction}>
+            <Card className="mb-6 border-danger-200 bg-danger-50">
+              <CardBody>
+                <CardTitle className="mb-1 text-danger-800">Rejected</CardTitle>
+                <p className="mb-3 text-sm text-danger-800">{plan.rejectionReason}</p>
+                <form action={revisePlanAction}>
                   <input type="hidden" name="semesterId" value={semesterId} />
                   <input type="hidden" name="planId" value={plan.id} />
-                  <button type="submit" className="text-xs text-red-700 underline">
-                    Delete plan
-                  </button>
+                  <Button type="submit" variant="secondary">
+                    Revise
+                  </Button>
                 </form>
-              )}
-            </div>
-          </section>
+              </CardBody>
+            </Card>
+          )}
 
-          <section>
-            <h2 className="mb-3 font-medium">Available offerings</h2>
-            <div className="flex flex-col gap-3">
-              {offerings.map((o) => {
-                const c = courseFor(o.courseId);
-                const meetings = meetingsByOffering.get(o.id) ?? [];
-                const already = plannedOfferingIds.has(o.id);
-                return (
-                  <div key={o.id} className="rounded border border-gray-200 p-3 text-sm">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="font-medium">
-                        {c ? `${c.code} — ${c.title}` : o.courseId} (Section {o.section})
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Your plan -- {totalCredits} credit hours</CardTitle>
+            </CardHeader>
+            <CardBody>
+              {items.length === 0 && <p className="mb-3 text-sm text-neutral-500">No courses added yet.</p>}
+              <ul className="mb-4 flex flex-col gap-2">
+                {items.map((i) => {
+                  const c = courseFor(i.courseId);
+                  const o = offeringFor(i.offeringId);
+                  return (
+                    <li key={i.id} className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm">
+                      <span>
+                        {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section}){i.isRetake && " — retake"}
                       </span>
-                      <span className="text-xs text-gray-500">{o.frozenCreditHours}cr</span>
-                    </div>
-                    <p className="mb-2 text-xs text-gray-500">
-                      {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}${m.room ? ` (${m.room})` : ""}`).join(", ")}
-                      {o.instructorName ? ` — ${o.instructorName}` : ""}
-                    </p>
-                    {already ? (
-                      <span className="text-xs text-gray-400">Already in your plan</span>
-                    ) : (
-                      <form action={addPlanItemAction}>
+                      <form action={removePlanItemAction}>
                         <input type="hidden" name="semesterId" value={semesterId} />
-                        <input type="hidden" name="planId" value={plan.id} />
-                        <input type="hidden" name="offeringId" value={o.id} />
-                        <button type="submit" className="text-xs text-blue-700 underline">
-                          Add
+                        <input type="hidden" name="planItemId" value={i.id} />
+                        <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                          Remove
                         </button>
                       </form>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="flex items-center gap-3">
+                <form action={submitPlanAction}>
+                  <input type="hidden" name="semesterId" value={semesterId} />
+                  <input type="hidden" name="planId" value={plan.id} />
+                  <Button type="submit">Submit</Button>
+                </form>
+                {plan.status === "DRAFT" && (
+                  <form action={deleteDraftPlanAction}>
+                    <input type="hidden" name="semesterId" value={semesterId} />
+                    <input type="hidden" name="planId" value={plan.id} />
+                    <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                      Delete plan
+                    </button>
+                  </form>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Available offerings</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <div className="flex flex-col gap-3">
+                {offerings.map((o) => {
+                  const c = courseFor(o.courseId);
+                  const meetings = meetingsByOffering.get(o.id) ?? [];
+                  const already = plannedOfferingIds.has(o.id);
+                  return (
+                    <div key={o.id} className="rounded-md border border-neutral-200 p-3 text-sm">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="font-medium text-neutral-900">
+                          {c ? `${c.code} — ${c.title}` : o.courseId} (Section {o.section})
+                        </span>
+                        <span className="text-xs text-neutral-500">{o.frozenCreditHours}cr</span>
+                      </div>
+                      <p className="mb-2 text-xs text-neutral-500">
+                        {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}${m.room ? ` (${m.room})` : ""}`).join(", ")}
+                        {o.instructorName ? ` — ${o.instructorName}` : ""}
+                      </p>
+                      {already ? (
+                        <span className="text-xs text-neutral-400">Already in your plan</span>
+                      ) : (
+                        <form action={addPlanItemAction}>
+                          <input type="hidden" name="semesterId" value={semesterId} />
+                          <input type="hidden" name="planId" value={plan.id} />
+                          <input type="hidden" name="offeringId" value={o.id} />
+                          <button type="submit" className="text-xs font-medium text-brand-700 hover:underline">
+                            Add
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardBody>
+          </Card>
         </>
       )}
 
       {plan && plan.status === "SUBMITTED" && (
-        <section className="rounded border border-gray-200 p-4">
-          <h2 className="mb-2 font-medium">Submitted -- awaiting a decision</h2>
-          <p className="mb-3 text-sm text-gray-500">{totalCredits} credit hours, submitted {plan.submittedAt?.toISOString().slice(0, 10)}.</p>
-          <ul className="flex flex-col gap-1 text-sm">
-            {items.map((i) => {
-              const c = courseFor(i.courseId);
-              return <li key={i.id}>{c ? `${c.code} — ${c.title}` : i.courseId}</li>;
-            })}
-          </ul>
-        </section>
+        <Card>
+          <CardBody>
+            <CardTitle className="mb-2">Submitted -- awaiting a decision</CardTitle>
+            <p className="mb-3 text-sm text-neutral-500">
+              {totalCredits} credit hours, submitted {plan.submittedAt?.toISOString().slice(0, 10)}.
+            </p>
+            <ul className="flex flex-col gap-1 text-sm">
+              {items.map((i) => {
+                const c = courseFor(i.courseId);
+                return <li key={i.id}>{c ? `${c.code} — ${c.title}` : i.courseId}</li>;
+              })}
+            </ul>
+          </CardBody>
+        </Card>
       )}
 
       {plan && plan.status === "APPROVED" && (
-        <section className="rounded border border-green-300 bg-green-50 p-4">
-          <h2 className="mb-2 font-medium text-green-900">Approved</h2>
-          <p className="mb-3 text-sm text-green-800">{totalCredits} credit hours registered.</p>
-          <ul className="flex flex-col gap-1 text-sm">
-            {registrations.filter((r) => r.status === "REGISTERED").map((r) => {
-              const o = offeringFor(r.offeringId);
-              const c = o ? courseFor(o.courseId) : undefined;
-              return (
-                <li key={r.id}>
-                  {c ? `${c.code} — ${c.title}` : r.offeringId}
-                  {r.isRetake && " — retake"}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        <Card className="border-success-200 bg-success-50">
+          <CardBody>
+            <CardTitle className="mb-2 text-success-800">Approved</CardTitle>
+            <p className="mb-3 text-sm text-success-800">{totalCredits} credit hours registered.</p>
+            <ul className="flex flex-col gap-1 text-sm text-success-800">
+              {registrations.filter((r) => r.status === "REGISTERED").map((r) => {
+                const o = offeringFor(r.offeringId);
+                const c = o ? courseFor(o.courseId) : undefined;
+                return (
+                  <li key={r.id}>
+                    {c ? `${c.code} — ${c.title}` : r.offeringId}
+                    {r.isRetake && " — retake"}
+                  </li>
+                );
+              })}
+            </ul>
+          </CardBody>
+        </Card>
       )}
     </main>
   );
