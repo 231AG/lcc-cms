@@ -204,7 +204,12 @@ export default async function CalendarPage({
                             <input type="hidden" name="semesterId" value={s.id} />
                             <input type="hidden" name="toState" value={rule.to} />
                             {rule.reasonRequired && (
-                              <Input name="reason" required placeholder="Reason (required)" className="w-48 py-1 text-xs" />
+                              <input
+                                name="reason"
+                                required
+                                placeholder="Reason (required)"
+                                className="w-48 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                              />
                             )}
                             <Button type="submit" variant="secondary" size="sm">
                               {rule.actorRole === "ADMIN" ? "Advance to" : "Move back to"} {rule.to}
