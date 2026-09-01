@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
+import { Download } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { countUnpublishedGrades } from "@/lib/export/academicExport";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardBody } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+
+export const metadata: Metadata = { title: "Semester export" };
 
 /**
  * Section 11.3's "Run the semester-end export" -- Admin and Super Admin
@@ -11,13 +18,16 @@ import { countUnpublishedGrades } from "@/lib/export/academicExport";
 export default async function ExportPage() {
   const actor = await getCurrentActor();
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -33,34 +43,38 @@ export default async function ExportPage() {
   const unpublishedCounts = await Promise.all(semesters.map((s) => countUnpublishedGrades(s.id)));
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-2 text-xl font-semibold">Semester-end academic data export</h1>
-      <p className="mb-6 text-sm text-gray-600">
-        A full copy of a semester&apos;s academic data leaves the system when you download it. Every export is
-        recorded in the audit log.
-      </p>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader
+        title="Semester-end academic data export"
+        description="A full copy of a semester's academic data leaves the system when you download it. Every export is recorded in the audit log."
+      />
 
-      {semesters.length === 0 && <p className="text-sm text-gray-500">No semesters exist yet.</p>}
+      {semesters.length === 0 && <p className="text-sm text-neutral-500">No semesters exist yet.</p>}
 
       <ul className="flex flex-col gap-2">
         {semesters.map((s, i) => {
           const unpublished = unpublishedCounts[i];
           return (
-            <li key={s.id} className="flex flex-col gap-1 rounded border border-gray-200 px-3 py-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span>
-                  {yearLabel(s.academicYearId)} — {s.name} <span className="text-xs text-gray-500">({s.state})</span>
-                </span>
-                <a href={`/admin/export/${s.id}`} className="text-blue-700 underline">
-                  Download CSV
-                </a>
-              </div>
-              {unpublished > 0 && (
-                <p className="text-xs text-amber-700">
-                  {unpublished} registered student{unpublished === 1 ? "" : "s"} in this semester still {unpublished === 1 ? "has" : "have"} no
-                  published grade -- this export will not include a final result for them.
-                </p>
-              )}
+            <li key={s.id}>
+              <Card>
+                <CardBody className="flex flex-col gap-1 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-800">
+                      {yearLabel(s.academicYearId)} — {s.name} <span className="text-xs text-neutral-500">({s.state})</span>
+                    </span>
+                    <a href={`/admin/export/${s.id}`} className="flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+                      <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                      Download CSV
+                    </a>
+                  </div>
+                  {unpublished > 0 && (
+                    <p className="text-xs text-warning-700">
+                      {unpublished} registered student{unpublished === 1 ? "" : "s"} in this semester still {unpublished === 1 ? "has" : "have"} no
+                      published grade -- this export will not include a final result for them.
+                    </p>
+                  )}
+                </CardBody>
+              </Card>
             </li>
           );
         })}

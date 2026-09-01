@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getCorrectionQueue } from "@/lib/grades/grades";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Label, Select } from "@/components/ui/Form";
 import { decideCorrectionAction, requestCorrectionAction } from "./actions";
+
+export const metadata: Metadata = { title: "Grade corrections" };
 
 /**
  * X-03 (plan Section 24.11, Stage 10): grade corrections. Admin requests
@@ -16,21 +24,28 @@ export default async function GradeCorrectionsPage({
   const actor = await getCurrentActor();
   const { semesterId, offeringId, error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold">Grade corrections</h1>
-      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Grade corrections" />
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
       {actor.role === "ADMIN" ? (
         <AdminRequestSection actor={actor} semesterId={semesterId} offeringId={offeringId} />
@@ -83,53 +98,76 @@ async function AdminRequestSection({
     <>
       <form method="GET" className="mb-6 flex flex-wrap items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium">Semester</label>
-          <select name="semesterId" defaultValue={semesterId ?? ""} className="w-72 rounded border border-gray-300 px-2 py-1 text-sm">
+          <Label className="text-xs">Semester</Label>
+          <Select name="semesterId" defaultValue={semesterId ?? ""} className="w-72">
             <option value="">Select a semester…</option>
             {semesters.map((s) => (
-              <option key={s.id} value={s.id}>{yearLabel(s.id)}</option>
+              <option key={s.id} value={s.id}>
+                {yearLabel(s.id)}
+              </option>
             ))}
-          </select>
+          </Select>
         </div>
-        <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">Select</button>
+        <Button type="submit" variant="secondary">
+          Select
+        </Button>
       </form>
 
       {semesterId && (
         <form method="GET" className="mb-6 flex flex-wrap items-end gap-2">
           <input type="hidden" name="semesterId" value={semesterId} />
           <div>
-            <label className="mb-1 block text-xs font-medium">Class</label>
-            <select name="offeringId" defaultValue={offeringId ?? ""} className="w-96 rounded border border-gray-300 px-2 py-1 text-sm">
+            <Label className="text-xs">Class</Label>
+            <Select name="offeringId" defaultValue={offeringId ?? ""} className="w-96">
               <option value="">Select a class…</option>
               {offerings.map((o) => (
-                <option key={o.id} value={o.id}>{offeringLabel(o)}</option>
+                <option key={o.id} value={o.id}>
+                  {offeringLabel(o)}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
-          <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">Select</button>
+          <Button type="submit" variant="secondary">
+            Select
+          </Button>
         </form>
       )}
 
       {offeringId && (
         <section>
-          <h2 className="mb-3 font-medium">Published grades</h2>
-          {publishedGrades.length === 0 && <p className="text-sm text-gray-500">No published grades in this class.</p>}
+          <h2 className="mb-3 font-medium text-neutral-900">Published grades</h2>
+          {publishedGrades.length === 0 && <p className="text-sm text-neutral-500">No published grades in this class.</p>}
           <ul className="flex flex-col gap-3">
             {publishedGrades.map((g) => (
-              <li key={g.id} className="rounded border border-gray-200 p-3 text-sm">
-                <p className="mb-2">Current: {g.letter}{g.score ? ` (${g.score})` : ""}</p>
-                <details>
-                  <summary className="cursor-pointer text-xs text-blue-700 underline">Request a correction</summary>
-                  <form action={requestCorrectionAction} className="mt-2 flex flex-wrap items-end gap-2">
-                    <input type="hidden" name="gradeRecordId" value={g.id} />
-                    <input name="newScore" type="number" min={0} max={100} step={0.1} placeholder="New score" className="w-24 rounded border border-gray-300 px-2 py-1 text-xs" />
-                    <label className="flex items-center gap-1 text-xs">
-                      <input type="checkbox" name="isIncomplete" /> Incomplete
-                    </label>
-                    <input name="reason" required placeholder="Reason" className="w-64 rounded border border-gray-300 px-2 py-1 text-xs" />
-                    <button type="submit" className="rounded border border-gray-300 px-2 py-1 text-xs font-medium">Request</button>
-                  </form>
-                </details>
+              <li key={g.id}>
+                <Card className="p-3 text-sm">
+                  <p className="mb-2 text-neutral-800">
+                    Current: {g.letter}
+                    {g.score ? ` (${g.score})` : ""}
+                  </p>
+                  <details>
+                    <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Request a correction</summary>
+                    <form action={requestCorrectionAction} className="mt-2 flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="gradeRecordId" value={g.id} />
+                      <input
+                        name="newScore"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        placeholder="New score"
+                        className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                      />
+                      <label className="flex items-center gap-1 text-xs text-neutral-700">
+                        <input type="checkbox" name="isIncomplete" className="h-3.5 w-3.5 rounded border-neutral-300" /> Incomplete
+                      </label>
+                      <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                      <Button type="submit" variant="secondary" size="sm">
+                        Request
+                      </Button>
+                    </form>
+                  </details>
+                </Card>
               </li>
             ))}
           </ul>
@@ -144,28 +182,36 @@ async function SuperAdminDecideSection({ actor }: { actor: NonNullable<Awaited<R
 
   return (
     <section>
-      <h2 className="mb-3 font-medium">Pending correction requests</h2>
-      {queue.length === 0 && <p className="text-sm text-gray-500">No corrections awaiting a decision.</p>}
+      <h2 className="mb-3 font-medium text-neutral-900">Pending correction requests</h2>
+      {queue.length === 0 && <p className="text-sm text-neutral-500">No corrections awaiting a decision.</p>}
       <ul className="flex flex-col gap-3">
         {queue.map((r) => (
-          <li key={r.id} className="rounded border border-gray-200 p-3 text-sm">
-            <p className="mb-1">
-              {r.oldLetter}{r.oldScore ? ` (${r.oldScore})` : ""} → {r.newLetter}{r.newScore ? ` (${r.newScore})` : ""}
-            </p>
-            <p className="mb-2 text-xs text-gray-500">Reason: {r.reason}</p>
-            <div className="flex flex-wrap items-end gap-2">
-              <form action={decideCorrectionAction}>
-                <input type="hidden" name="correctionRequestId" value={r.id} />
-                <input type="hidden" name="decision" value="APPROVE" />
-                <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-xs font-medium text-white">Approve</button>
-              </form>
-              <form action={decideCorrectionAction} className="flex items-end gap-2">
-                <input type="hidden" name="correctionRequestId" value={r.id} />
-                <input type="hidden" name="decision" value="REJECT" />
-                <input name="note" placeholder="Note" className="w-48 rounded border border-gray-300 px-2 py-1 text-xs" />
-                <button type="submit" className="rounded border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700">Reject</button>
-              </form>
-            </div>
+          <li key={r.id}>
+            <Card className="p-3 text-sm">
+              <p className="mb-1 text-neutral-800">
+                {r.oldLetter}
+                {r.oldScore ? ` (${r.oldScore})` : ""} → {r.newLetter}
+                {r.newScore ? ` (${r.newScore})` : ""}
+              </p>
+              <p className="mb-2 text-xs text-neutral-500">Reason: {r.reason}</p>
+              <div className="flex flex-wrap items-end gap-2">
+                <form action={decideCorrectionAction}>
+                  <input type="hidden" name="correctionRequestId" value={r.id} />
+                  <input type="hidden" name="decision" value="APPROVE" />
+                  <Button type="submit" size="sm">
+                    Approve
+                  </Button>
+                </form>
+                <form action={decideCorrectionAction} className="flex items-end gap-2">
+                  <input type="hidden" name="correctionRequestId" value={r.id} />
+                  <input type="hidden" name="decision" value="REJECT" />
+                  <input name="note" placeholder="Note" className="w-48 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                  <Button type="submit" variant="danger" size="sm">
+                    Reject
+                  </Button>
+                </form>
+              </div>
+            </Card>
           </li>
         ))}
       </ul>
