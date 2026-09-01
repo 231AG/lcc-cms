@@ -1,6 +1,13 @@
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getSubmissionDetail } from "@/lib/grades/grades";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Label } from "@/components/ui/Form";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { approveSubmissionAction, rejectSubmissionAction } from "../actions";
 
 /**
@@ -21,13 +28,16 @@ export default async function GradeReviewDetailPage({
   const { submissionId } = await params;
   const { error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "SUPER_ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -35,8 +45,8 @@ export default async function GradeReviewDetailPage({
   const detail = await getSubmissionDetail(actor, submissionId);
   if (!detail) {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="text-sm text-gray-500">Submission not found.</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <p className="text-sm text-neutral-500">Submission not found.</p>
       </main>
     );
   }
@@ -64,68 +74,80 @@ export default async function GradeReviewDetailPage({
   const undecided = grades.filter((g) => g.status === "SUBMITTED");
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-1 text-xl font-semibold">
-        {course ? `${course.code} — ${course.title}` : submission.offeringId} (Section {offering?.section})
-      </h1>
-      <p className="mb-6 text-sm text-gray-500">
-        Attempt {submission.attemptNo} — status <span className="font-medium">{submission.status}</span>
-      </p>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader
+        title={`${course ? `${course.code} — ${course.title}` : submission.offeringId} (Section ${offering?.section})`}
+        description={
+          <>
+            Attempt {submission.attemptNo} — status <Badge tone="brand">{submission.status}</Badge>
+          </>
+        }
+      />
 
-      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
       <form>
-        <table className="mb-4 w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-xs text-gray-500">
-              <th className="py-1 pr-2"></th>
-              <th className="py-1 pr-2">Student</th>
-              <th className="py-1 pr-2">Grade</th>
-              <th className="py-1">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {grades.map((g) => {
-              const s = studentFor(g.registrationId);
-              return (
-                <tr key={g.id} className="border-b">
-                  <td className="py-1.5 pr-2">
-                    {g.status === "SUBMITTED" && (
-                      <input
-                        type="checkbox"
-                        name="gradeRecordId"
-                        value={g.id}
-                        form="decision-form"
-                        aria-label={`Select ${s ? `${s.firstName} ${s.lastName}` : g.registrationId} for this decision`}
-                      />
-                    )}
-                  </td>
-                  <td className="py-1.5 pr-2">{s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : g.registrationId}</td>
-                  <td className="py-1.5 pr-2">{g.letter}{g.score ? ` (${g.score})` : ""}</td>
-                  <td className="py-1.5 text-xs text-gray-500">
-                    {g.status}
-                    {g.decisionReason && <span className="ml-1 text-red-700">— {g.decisionReason}</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <Card className="mb-4">
+          <Table>
+            <Thead>
+              <tr>
+                <Th></Th>
+                <Th>Student</Th>
+                <Th>Grade</Th>
+                <Th>Status</Th>
+              </tr>
+            </Thead>
+            <tbody>
+              {grades.map((g) => {
+                const s = studentFor(g.registrationId);
+                return (
+                  <Tr key={g.id}>
+                    <Td>
+                      {g.status === "SUBMITTED" && (
+                        <input
+                          type="checkbox"
+                          name="gradeRecordId"
+                          value={g.id}
+                          form="decision-form"
+                          aria-label={`Select ${s ? `${s.firstName} ${s.lastName}` : g.registrationId} for this decision`}
+                          className="h-4 w-4 rounded border-neutral-300"
+                        />
+                      )}
+                    </Td>
+                    <Td>{s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : g.registrationId}</Td>
+                    <Td>
+                      {g.letter}
+                      {g.score ? ` (${g.score})` : ""}
+                    </Td>
+                    <Td className="text-xs text-neutral-500">
+                      {g.status}
+                      {g.decisionReason && <span className="ml-1 text-danger-600">— {g.decisionReason}</span>}
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </Card>
       </form>
 
       {undecided.length > 0 && (
         <form id="decision-form" className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="submissionId" value={submissionId} />
           <div className="flex-1">
-            <label className="mb-1 block text-xs font-medium">Reason (required to reject)</label>
-            <input name="reason" placeholder="Reason for rejection" className="w-64 rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs">Reason (required to reject)</Label>
+            <input name="reason" placeholder="Reason for rejection" className="w-64 rounded-md border border-neutral-300 px-3 py-2 text-sm" />
           </div>
-          <button type="submit" formAction={approveSubmissionAction} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
+          <Button type="submit" formAction={approveSubmissionAction}>
             Approve checked (or all, if none checked)
-          </button>
-          <button type="submit" formAction={rejectSubmissionAction} className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700">
+          </Button>
+          <Button type="submit" formAction={rejectSubmissionAction} variant="danger">
             Reject checked (or all, if none checked)
-          </button>
+          </Button>
         </form>
       )}
     </main>

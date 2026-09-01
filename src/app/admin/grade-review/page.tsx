@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getSubmissionQueue } from "@/lib/grades/grades";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+
+export const metadata: Metadata = { title: "Grade submission review" };
 
 /**
  * X-02 (plan Section 24.11, Stage 10): submissions awaiting a decision.
@@ -11,13 +17,16 @@ import { getSubmissionQueue } from "@/lib/grades/grades";
 export default async function GradeReviewQueuePage() {
   const actor = await getCurrentActor();
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "SUPER_ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -37,17 +46,21 @@ export default async function GradeReviewQueuePage() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold">Grade submission review</h1>
-      {queue.length === 0 && <p className="text-sm text-gray-500">No submissions awaiting a decision.</p>}
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Grade submission review" />
+      {queue.length === 0 && <p className="text-sm text-neutral-500">No submissions awaiting a decision.</p>}
       <ul className="flex flex-col gap-2">
         {queue.map((s) => (
-          <li key={s.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm">
-            <span>
-              {label(s.offeringId)} — {s.undecidedCount} of {s.gradeCount} undecided
-              {s.status === "PARTIALLY_DECIDED" && <span className="ml-1 text-xs text-amber-700">(partially decided)</span>}
-            </span>
-            <Link href={`/admin/grade-review/${s.id}`} className="text-blue-700 underline">Review</Link>
+          <li key={s.id}>
+            <Card className="flex items-center justify-between px-3 py-2 text-sm">
+              <span>
+                {label(s.offeringId)} — {s.undecidedCount} of {s.gradeCount} undecided
+                {s.status === "PARTIALLY_DECIDED" && <span className="ml-1 text-xs text-warning-700">(partially decided)</span>}
+              </span>
+              <Link href={`/admin/grade-review/${s.id}`} className="font-medium text-brand-700 hover:underline">
+                Review
+              </Link>
+            </Card>
           </li>
         ))}
       </ul>
