@@ -38,7 +38,7 @@ See [`docs/SETUP.md`](docs/SETUP.md).
 
 ## Status
 
-All eleven Phase 1 stages have working code (branch `stage/11-hardening-go-live`, built on
-`stage/10-grade-management`; not yet merged to `main`). **This is a functional pilot, not a
-plan-Go-Live-certified production system** — see `AS_BUILT.md` for exactly what remains (backup/restore,
-UAT, a few open College decisions) before it can be called that.
+All eleven Phase 1 stages have working code, merged to `main` (fast-forwarded from
+`stage/11-hardening-go-live` on 1 Sep 2026 — no divergent history, nothing rewritten). **This is a
+functional pilot, not a plan-Go-Live-certified production system** — see `AS_BUILT.md` for exactly what
+remains (backup/restore, UAT, a few open College decisions) before it can be called that.

@@ -185,6 +185,13 @@ and the plan's own environment model (Section 8.5) assumes `main` is what ships.
 eventual "merge everything to `main`" step isn't skipped by mistake.
 **Approval status:** Confirmed by project owner, 2026-08-29.
 
+**Resolved 1 Sep 2026:** merged to `main` after all, driven by a real constraint rather than a design
+change — the project owner's Vercel plan does not allow selecting a non-default Production Branch, so
+deploying at all required `main` to hold the real code. `origin/main`'s tip was a direct ancestor of
+`stage/11-hardening-go-live` (nothing had ever been pushed to `main` independently), so this was a clean
+`git merge --ff-only` — no conflicts, no rewritten history, no divergent branches to reconcile. `main` and
+`stage/11-hardening-go-live` are identical as of commit `62b9afc`.
+
 ### DEV-09 — No backup/PITR for now; production runs on the existing free-tier Supabase project (deviates from DEC-31 and narrows Stage 11's Gate G11)
 
 **Date:** Stage 11, at kickoff.
