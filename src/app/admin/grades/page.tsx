@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getClassRoster } from "@/lib/grades/grades";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardBody, CardTitle } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Label, Select } from "@/components/ui/Form";
 import ClassEntryForm from "./ClassEntryForm";
 import { submitClassAction } from "./actions";
+
+export const metadata: Metadata = { title: "Class grade entry" };
 
 /**
  * A-12 (plan Section 20.6, Stage 10): class grade entry. Admin only
@@ -17,13 +25,16 @@ export default async function GradesPage({
   const actor = await getCurrentActor();
   const { semesterId, offeringId, error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -65,62 +76,84 @@ export default async function GradesPage({
   const enteredCount = rosterRows.filter((r) => r.gradeId).length;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold">Class grade entry</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Class grade entry" />
 
-      {error && <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
       <form method="GET" className="mb-6 flex flex-wrap items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium">Semester</label>
-          <select name="semesterId" defaultValue={semesterId ?? ""} className="w-72 rounded border border-gray-300 px-2 py-1 text-sm">
+          <Label className="text-xs">Semester</Label>
+          <Select name="semesterId" defaultValue={semesterId ?? ""} className="w-72">
             <option value="">Select a semester…</option>
             {semesters
               .filter((s) => s.state === "GRADE_SUBMISSION")
               .map((s) => (
-                <option key={s.id} value={s.id}>{yearLabel(s.id)}</option>
+                <option key={s.id} value={s.id}>
+                  {yearLabel(s.id)}
+                </option>
               ))}
-          </select>
+          </Select>
         </div>
-        <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">Select</button>
+        <Button type="submit" variant="secondary">
+          Select
+        </Button>
       </form>
 
       {semesterId && (
         <form method="GET" className="mb-6 flex flex-wrap items-end gap-2">
           <input type="hidden" name="semesterId" value={semesterId} />
           <div>
-            <label className="mb-1 block text-xs font-medium">Class</label>
-            <select name="offeringId" defaultValue={offeringId ?? ""} className="w-96 rounded border border-gray-300 px-2 py-1 text-sm">
+            <Label className="text-xs">Class</Label>
+            <Select name="offeringId" defaultValue={offeringId ?? ""} className="w-96">
               <option value="">Select a class…</option>
               {offerings.map((o) => (
-                <option key={o.id} value={o.id}>{offeringLabel(o)}</option>
+                <option key={o.id} value={o.id}>
+                  {offeringLabel(o)}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
-          <button type="submit" className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">Select</button>
+          <Button type="submit" variant="secondary">
+            Select
+          </Button>
         </form>
       )}
 
       {offeringId && (
         <>
-          <p className="mb-3 text-sm text-gray-500">{enteredCount} of {rosterRows.length} entered</p>
+          <p className="mb-3 text-sm text-neutral-500">
+            {enteredCount} of {rosterRows.length} entered
+          </p>
           {rosterRows.length === 0 ? (
-            <p className="text-sm text-gray-500">No registered students in this class.</p>
+            <p className="text-sm text-neutral-500">No registered students in this class.</p>
           ) : (
             <>
               <ClassEntryForm offeringId={offeringId} roster={rosterRows} scale={activeScale} />
-              <section className="mt-6 rounded border border-gray-200 p-4">
-                <h2 className="mb-2 font-medium">Submit for approval</h2>
-                <form action={submitClassAction} className="flex flex-col gap-2">
-                  <input type="hidden" name="offeringId" value={offeringId} />
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="confirmPartial" />
-                    Confirm submitting with missing grades
-                  </label>
-                  <input name="partialNote" placeholder="Note (required if submitting with missing grades)" className="w-96 rounded border border-gray-300 px-2 py-1 text-sm" />
-                  <button type="submit" className="w-fit rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">Submit</button>
-                </form>
-              </section>
+              <Card className="mt-6">
+                <CardBody>
+                  <CardTitle className="mb-2">Submit for approval</CardTitle>
+                  <form action={submitClassAction} className="flex flex-col gap-2">
+                    <input type="hidden" name="offeringId" value={offeringId} />
+                    <label className="flex items-center gap-2 text-sm text-neutral-700">
+                      <input type="checkbox" name="confirmPartial" className="h-4 w-4 rounded border-neutral-300" />
+                      Confirm submitting with missing grades
+                    </label>
+                    <input
+                      name="partialNote"
+                      placeholder="Note (required if submitting with missing grades)"
+                      className="w-96 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                    />
+                    <Button type="submit" className="w-fit">
+                      Submit
+                    </Button>
+                  </form>
+                </CardBody>
+              </Card>
             </>
           )}
         </>

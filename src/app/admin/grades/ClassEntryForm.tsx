@@ -2,6 +2,9 @@
 
 import { useRef, useState } from "react";
 import { deriveLetterFromScore, type GradeScaleEntry } from "@/lib/gpa/engine";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { clearDraftGradeAction, saveClassDraftAction } from "./actions";
 
 export interface RosterRowProps {
@@ -76,76 +79,77 @@ export default function ClassEntryForm({
     <>
       <form action={saveClassDraftAction}>
         <input type="hidden" name="offeringId" value={offeringId} />
-        <table className="mb-4 w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left text-xs text-gray-500">
-              <th className="py-1 pr-2">Student</th>
-              <th className="py-1 pr-2">Score</th>
-              <th className="py-1 pr-2">Incomplete</th>
-              <th className="py-1 pr-2">Grade</th>
-            </tr>
-          </thead>
-          <tbody>
-            {roster.map((r) => {
-              const locked = r.status !== null && r.status !== "DRAFT";
-              return (
-                <tr key={r.registrationId} className="border-b">
-                  <td className="py-1.5 pr-2">
-                    {r.studentName} <span className="text-xs text-gray-400">({r.studentNumber})</span>
-                    {r.isRetake && <span className="ml-1 text-xs text-amber-700">retake</span>}
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <input type="hidden" name="registrationId" value={r.registrationId} />
-                    {r.gradeId && <input type="hidden" name={`version_${r.registrationId}`} value={r.currentVersion ?? 0} />}
-                    <input
-                      ref={(el) => {
-                        inputRefs.current[r.registrationId] = el;
-                      }}
-                      name={`score_${r.registrationId}`}
-                      aria-label={`Score for ${r.studentName}`}
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      disabled={locked || incomplete[r.registrationId]}
-                      defaultValue={r.currentLetter !== "I" ? r.currentScore ?? "" : ""}
-                      onChange={(e) => handleScoreChange(r.registrationId, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "ArrowDown") {
-                          e.preventDefault();
-                          focusNext(r.registrationId);
-                        }
-                      }}
-                      className="w-20 rounded border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100"
-                    />
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <input
-                      type="checkbox"
-                      name={`incomplete_${r.registrationId}`}
-                      aria-label={`Incomplete for ${r.studentName}`}
-                      disabled={locked}
-                      defaultChecked={r.currentLetter === "I"}
-                      onChange={(e) => setIncomplete((p) => ({ ...p, [r.registrationId]: e.target.checked }))}
-                    />
-                  </td>
-                  <td className="py-1.5 pr-2 text-xs text-gray-600">
-                    {preview[r.registrationId] || (r.currentLetter ? `${r.currentLetter} — ${r.currentScore ?? ""}` : "")}
-                    {locked && <span className="ml-1 text-gray-400">({r.status})</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-          Save draft
-        </button>
+        <Card className="mb-4">
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Student</Th>
+                <Th>Score</Th>
+                <Th>Incomplete</Th>
+                <Th>Grade</Th>
+              </tr>
+            </Thead>
+            <tbody>
+              {roster.map((r) => {
+                const locked = r.status !== null && r.status !== "DRAFT";
+                return (
+                  <Tr key={r.registrationId}>
+                    <Td>
+                      {r.studentName} <span className="text-xs text-neutral-400">({r.studentNumber})</span>
+                      {r.isRetake && <span className="ml-1 text-xs text-warning-700">retake</span>}
+                    </Td>
+                    <Td>
+                      <input type="hidden" name="registrationId" value={r.registrationId} />
+                      {r.gradeId && <input type="hidden" name={`version_${r.registrationId}`} value={r.currentVersion ?? 0} />}
+                      <input
+                        ref={(el) => {
+                          inputRefs.current[r.registrationId] = el;
+                        }}
+                        name={`score_${r.registrationId}`}
+                        aria-label={`Score for ${r.studentName}`}
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        disabled={locked || incomplete[r.registrationId]}
+                        defaultValue={r.currentLetter !== "I" ? r.currentScore ?? "" : ""}
+                        onChange={(e) => handleScoreChange(r.registrationId, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "ArrowDown") {
+                            e.preventDefault();
+                            focusNext(r.registrationId);
+                          }
+                        }}
+                        className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline focus:outline-2 focus:outline-brand-100 disabled:bg-neutral-100"
+                      />
+                    </Td>
+                    <Td>
+                      <input
+                        type="checkbox"
+                        name={`incomplete_${r.registrationId}`}
+                        aria-label={`Incomplete for ${r.studentName}`}
+                        disabled={locked}
+                        defaultChecked={r.currentLetter === "I"}
+                        onChange={(e) => setIncomplete((p) => ({ ...p, [r.registrationId]: e.target.checked }))}
+                        className="h-4 w-4 rounded border-neutral-300"
+                      />
+                    </Td>
+                    <Td className="text-xs text-neutral-600">
+                      {preview[r.registrationId] || (r.currentLetter ? `${r.currentLetter} — ${r.currentScore ?? ""}` : "")}
+                      {locked && <span className="ml-1 text-neutral-400">({r.status})</span>}
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </Card>
+        <Button type="submit">Save draft</Button>
       </form>
 
       {clearable.length > 0 && (
         <details className="mt-4">
-          <summary className="cursor-pointer text-xs text-blue-700 underline">Clear a draft grade</summary>
+          <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Clear a draft grade</summary>
           <ul className="mt-2 flex flex-col gap-1">
             {clearable.map((r) => (
               <li key={r.registrationId} className="flex items-center gap-2 text-xs">
@@ -153,7 +157,9 @@ export default function ClassEntryForm({
                 <form action={clearDraftGradeAction}>
                   <input type="hidden" name="offeringId" value={offeringId} />
                   <input type="hidden" name="gradeRecordId" value={r.gradeId!} />
-                  <button type="submit" className="text-red-700 underline">Clear</button>
+                  <button type="submit" className="font-medium text-danger-600 hover:underline">
+                    Clear
+                  </button>
                 </form>
               </li>
             ))}
