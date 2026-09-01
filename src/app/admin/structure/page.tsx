@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Label, Input, Select } from "@/components/ui/Form";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import {
   createCollegeAction,
   toggleCollegeActiveAction,
@@ -10,6 +18,8 @@ import {
   addPrerequisiteAction,
   removePrerequisiteAction,
 } from "./actions";
+
+export const metadata: Metadata = { title: "Academic structure" };
 
 /**
  * A-02 through A-05 combined onto one page for Stage 3 (plan Section 20.4).
@@ -26,13 +36,16 @@ export default async function AcademicStructurePage({
   const actor = await getCurrentActor();
   const { error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -51,231 +64,271 @@ export default async function AcademicStructurePage({
   const courseCode = (id: string) => courses.find((c) => c.id === id)?.code ?? id;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold">Academic structure</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Academic structure" />
 
       {error && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <Alert tone="danger" className="mb-4">
           {error}
-        </p>
+        </Alert>
       )}
 
       {/* Colleges */}
       <section className="mb-10">
-        <h2 className="mb-3 font-medium">Colleges</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Colleges</h2>
         <form action={createCollegeAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="college-code">Code</label>
-            <input id="college-code" name="code" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="college-code">
+              Code
+            </Label>
+            <Input id="college-code" name="code" required />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="college-name">Name</label>
-            <input id="college-name" name="name" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="college-name">
+              Name
+            </Label>
+            <Input id="college-name" name="name" required />
           </div>
-          <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-            Add college
-          </button>
+          <Button type="submit">Add college</Button>
         </form>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-1">Code</th>
-              <th className="py-1">Name</th>
-              <th className="py-1">Status</th>
-              <th className="py-1">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {colleges.map((c) => (
-              <tr key={c.id} className="border-b">
-                <td className="py-1">{c.code}</td>
-                <td className="py-1">{c.name}</td>
-                <td className="py-1">{c.isActive ? "ACTIVE" : "INACTIVE"}</td>
-                <td className="py-1">
-                  <form action={toggleCollegeActiveAction}>
-                    <input type="hidden" name="collegeId" value={c.id} />
-                    <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
-                    <button type="submit" className="text-blue-700 underline">
-                      {c.isActive ? "Deactivate" : "Reactivate"}
-                    </button>
-                  </form>
-                </td>
+        <Card>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Code</Th>
+                <Th>Name</Th>
+                <Th>Status</Th>
+                <Th>Action</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </Thead>
+            <tbody>
+              {colleges.map((c) => (
+                <Tr key={c.id}>
+                  <Td className="font-mono text-xs text-neutral-700">{c.code}</Td>
+                  <Td className="font-medium text-neutral-900">{c.name}</Td>
+                  <Td>
+                    <Badge tone={c.isActive ? "success" : "neutral"}>{c.isActive ? "ACTIVE" : "INACTIVE"}</Badge>
+                  </Td>
+                  <Td>
+                    <form action={toggleCollegeActiveAction}>
+                      <input type="hidden" name="collegeId" value={c.id} />
+                      <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
+                      <button type="submit" className="font-medium text-brand-700 hover:underline">
+                        {c.isActive ? "Deactivate" : "Reactivate"}
+                      </button>
+                    </form>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       </section>
 
       {/* Departments */}
       <section className="mb-10">
-        <h2 className="mb-3 font-medium">Departments</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Departments</h2>
         <form action={createDepartmentAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="dept-college">College</label>
-            <select id="dept-college" name="collegeId" required className="rounded border border-gray-300 px-2 py-1 text-sm">
+            <Label className="text-xs" htmlFor="dept-college">
+              College
+            </Label>
+            <Select id="dept-college" name="collegeId" required>
               {colleges.map((c) => (
-                <option key={c.id} value={c.id}>{c.code}</option>
+                <option key={c.id} value={c.id}>
+                  {c.code}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="dept-code">Code</label>
-            <input id="dept-code" name="code" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="dept-code">
+              Code
+            </Label>
+            <Input id="dept-code" name="code" required />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="dept-name">Name</label>
-            <input id="dept-name" name="name" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="dept-name">
+              Name
+            </Label>
+            <Input id="dept-name" name="name" required />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="dept-max">Credit ceiling (optional)</label>
-            <input id="dept-max" name="maxCreditsOverride" type="number" min={1} max={21} className="w-24 rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="dept-max">
+              Credit ceiling (optional)
+            </Label>
+            <Input id="dept-max" name="maxCreditsOverride" type="number" min={1} max={21} className="w-24" />
           </div>
-          <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-            Add department
-          </button>
+          <Button type="submit">Add department</Button>
         </form>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-1">Code</th>
-              <th className="py-1">Name</th>
-              <th className="py-1">College</th>
-              <th className="py-1">Status</th>
-              <th className="py-1">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {departments.map((d) => (
-              <tr key={d.id} className="border-b">
-                <td className="py-1">{d.code}</td>
-                <td className="py-1">{d.name}</td>
-                <td className="py-1">{collegeName(d.collegeId)}</td>
-                <td className="py-1">{d.isActive ? "ACTIVE" : "INACTIVE"}</td>
-                <td className="py-1">
-                  <form action={toggleDepartmentActiveAction}>
-                    <input type="hidden" name="departmentId" value={d.id} />
-                    <input type="hidden" name="isActive" value={(!d.isActive).toString()} />
-                    <button type="submit" className="text-blue-700 underline">
-                      {d.isActive ? "Deactivate" : "Reactivate"}
-                    </button>
-                  </form>
-                </td>
+        <Card>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Code</Th>
+                <Th>Name</Th>
+                <Th>College</Th>
+                <Th>Status</Th>
+                <Th>Action</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </Thead>
+            <tbody>
+              {departments.map((d) => (
+                <Tr key={d.id}>
+                  <Td className="font-mono text-xs text-neutral-700">{d.code}</Td>
+                  <Td className="font-medium text-neutral-900">{d.name}</Td>
+                  <Td>{collegeName(d.collegeId)}</Td>
+                  <Td>
+                    <Badge tone={d.isActive ? "success" : "neutral"}>{d.isActive ? "ACTIVE" : "INACTIVE"}</Badge>
+                  </Td>
+                  <Td>
+                    <form action={toggleDepartmentActiveAction}>
+                      <input type="hidden" name="departmentId" value={d.id} />
+                      <input type="hidden" name="isActive" value={(!d.isActive).toString()} />
+                      <button type="submit" className="font-medium text-brand-700 hover:underline">
+                        {d.isActive ? "Deactivate" : "Reactivate"}
+                      </button>
+                    </form>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       </section>
 
       {/* Courses */}
       <section className="mb-10">
-        <h2 className="mb-3 font-medium">Courses</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Courses</h2>
         <form action={createCourseAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="course-dept">Department</label>
-            <select id="course-dept" name="departmentId" required className="rounded border border-gray-300 px-2 py-1 text-sm">
+            <Label className="text-xs" htmlFor="course-dept">
+              Department
+            </Label>
+            <Select id="course-dept" name="departmentId" required>
               {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.code}</option>
+                <option key={d.id} value={d.id}>
+                  {d.code}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="course-code">Code</label>
-            <input id="course-code" name="code" required placeholder="CSC 201" className="rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="course-code">
+              Code
+            </Label>
+            <Input id="course-code" name="code" required placeholder="CSC 201" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="course-title">Title</label>
-            <input id="course-title" name="title" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="course-title">
+              Title
+            </Label>
+            <Input id="course-title" name="title" required />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="course-credits">Credit hours</label>
-            <input id="course-credits" name="creditHours" type="number" min={1} required className="w-20 rounded border border-gray-300 px-2 py-1 text-sm" />
+            <Label className="text-xs" htmlFor="course-credits">
+              Credit hours
+            </Label>
+            <Input id="course-credits" name="creditHours" type="number" min={1} required className="w-20" />
           </div>
-          <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-            Add course
-          </button>
+          <Button type="submit">Add course</Button>
         </form>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-1">Code</th>
-              <th className="py-1">Title</th>
-              <th className="py-1">Department</th>
-              <th className="py-1">Credits</th>
-              <th className="py-1">Status</th>
-              <th className="py-1">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {courses.map((c) => (
-              <tr key={c.id} className="border-b">
-                <td className="py-1">{c.code}</td>
-                <td className="py-1">{c.title}</td>
-                <td className="py-1">{departmentName(c.departmentId)}</td>
-                <td className="py-1">{c.creditHours}</td>
-                <td className="py-1">{c.isActive ? "ACTIVE" : "INACTIVE"}</td>
-                <td className="py-1">
-                  <form action={toggleCourseActiveAction}>
-                    <input type="hidden" name="courseId" value={c.id} />
-                    <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
-                    <button type="submit" className="text-blue-700 underline">
-                      {c.isActive ? "Deactivate" : "Reactivate"}
-                    </button>
-                  </form>
-                </td>
+        <Card>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Code</Th>
+                <Th>Title</Th>
+                <Th>Department</Th>
+                <Th>Credits</Th>
+                <Th>Status</Th>
+                <Th>Action</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </Thead>
+            <tbody>
+              {courses.map((c) => (
+                <Tr key={c.id}>
+                  <Td className="font-mono text-xs text-neutral-700">{c.code}</Td>
+                  <Td className="font-medium text-neutral-900">{c.title}</Td>
+                  <Td>{departmentName(c.departmentId)}</Td>
+                  <Td>{c.creditHours}</Td>
+                  <Td>
+                    <Badge tone={c.isActive ? "success" : "neutral"}>{c.isActive ? "ACTIVE" : "INACTIVE"}</Badge>
+                  </Td>
+                  <Td>
+                    <form action={toggleCourseActiveAction}>
+                      <input type="hidden" name="courseId" value={c.id} />
+                      <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
+                      <button type="submit" className="font-medium text-brand-700 hover:underline">
+                        {c.isActive ? "Deactivate" : "Reactivate"}
+                      </button>
+                    </form>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       </section>
 
       {/* Prerequisites */}
       <section>
-        <h2 className="mb-3 font-medium">Prerequisites</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Prerequisites</h2>
         <form action={addPrerequisiteAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="prereq-course">Course</label>
-            <select id="prereq-course" name="courseId" required className="rounded border border-gray-300 px-2 py-1 text-sm">
+            <Label className="text-xs" htmlFor="prereq-course">
+              Course
+            </Label>
+            <Select id="prereq-course" name="courseId" required>
               {courses.map((c) => (
-                <option key={c.id} value={c.id}>{c.code}</option>
+                <option key={c.id} value={c.id}>
+                  {c.code}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium" htmlFor="prereq-of">Requires</label>
-            <select id="prereq-of" name="prerequisiteCourseId" required className="rounded border border-gray-300 px-2 py-1 text-sm">
+            <Label className="text-xs" htmlFor="prereq-of">
+              Requires
+            </Label>
+            <Select id="prereq-of" name="prerequisiteCourseId" required>
               {courses.map((c) => (
-                <option key={c.id} value={c.id}>{c.code}</option>
+                <option key={c.id} value={c.id}>
+                  {c.code}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
-          <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-            Add prerequisite
-          </button>
+          <Button type="submit">Add prerequisite</Button>
         </form>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-1">Course</th>
-              <th className="py-1">Requires</th>
-              <th className="py-1">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {prerequisites.map((p) => (
-              <tr key={`${p.courseId}:${p.prerequisiteCourseId}`} className="border-b">
-                <td className="py-1">{courseCode(p.courseId)}</td>
-                <td className="py-1">{courseCode(p.prerequisiteCourseId)}</td>
-                <td className="py-1">
-                  <form action={removePrerequisiteAction}>
-                    <input type="hidden" name="courseId" value={p.courseId} />
-                    <input type="hidden" name="prerequisiteCourseId" value={p.prerequisiteCourseId} />
-                    <button type="submit" className="text-red-700 underline">Remove</button>
-                  </form>
-                </td>
+        <Card>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Course</Th>
+                <Th>Requires</Th>
+                <Th>Action</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </Thead>
+            <tbody>
+              {prerequisites.map((p) => (
+                <Tr key={`${p.courseId}:${p.prerequisiteCourseId}`}>
+                  <Td className="font-mono text-xs text-neutral-700">{courseCode(p.courseId)}</Td>
+                  <Td className="font-mono text-xs text-neutral-700">{courseCode(p.prerequisiteCourseId)}</Td>
+                  <Td>
+                    <form action={removePrerequisiteAction}>
+                      <input type="hidden" name="courseId" value={p.courseId} />
+                      <input type="hidden" name="prerequisiteCourseId" value={p.prerequisiteCourseId} />
+                      <button type="submit" className="font-medium text-danger-600 hover:underline">
+                        Remove
+                      </button>
+                    </form>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       </section>
     </main>
   );

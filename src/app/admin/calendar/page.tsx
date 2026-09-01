@@ -1,7 +1,25 @@
+import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { legalNextStates, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Badge, type Tone } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Label, Input, Select } from "@/components/ui/Form";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { createAcademicYearAction, createSemesterAction, transitionSemesterAction } from "./actions";
+
+export const metadata: Metadata = { title: "Academic calendar" };
+
+const STATE_TONE: Record<string, Tone> = {
+  DRAFT: "neutral",
+  REGISTRATION: "info",
+  OPEN: "success",
+  IN_PROGRESS: "brand",
+  CLOSED: "neutral",
+};
 
 /**
  * Academic years, semesters, and state transitions (Section 20.4, Stage 4).
@@ -19,13 +37,16 @@ export default async function CalendarPage({
   const actor = await getCurrentActor();
   const { error } = await searchParams;
 
-  if (!actor) return <main className="p-8">Please sign in.</main>;
+  if (!actor)
+    return (
+      <main id="main-content" tabIndex={-1} className="flex-1 p-8 outline-none">
+        Please sign in.
+      </main>
+    );
   if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          Not available to your role.
-        </p>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
+        <Alert tone="info">Not available to your role.</Alert>
       </main>
     );
   }
@@ -40,149 +61,164 @@ export default async function CalendarPage({
   const yearLabel = (id: string) => years.find((y) => y.id === id)?.label ?? id;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold">Academic calendar</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Academic calendar" />
 
       {error && (
-        <p className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <Alert tone="danger" className="mb-4">
           {error}
-        </p>
+        </Alert>
       )}
 
       {/* Academic years */}
       <section className="mb-10">
-        <h2 className="mb-3 font-medium">Academic years</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Academic years</h2>
 
         {actor.role === "ADMIN" && (
           <form action={createAcademicYearAction} className="mb-4 flex flex-wrap items-end gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="year-label">Label</label>
-              <input id="year-label" name="label" required placeholder="2026/2027" className="rounded border border-gray-300 px-2 py-1 text-sm" />
+              <Label className="text-xs" htmlFor="year-label">
+                Label
+              </Label>
+              <Input id="year-label" name="label" required placeholder="2026/2027" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="year-start">Start date</label>
-              <input id="year-start" name="startDate" type="date" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+              <Label className="text-xs" htmlFor="year-start">
+                Start date
+              </Label>
+              <Input id="year-start" name="startDate" type="date" required />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="year-end">End date</label>
-              <input id="year-end" name="endDate" type="date" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+              <Label className="text-xs" htmlFor="year-end">
+                End date
+              </Label>
+              <Input id="year-end" name="endDate" type="date" required />
             </div>
-            <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-              Add academic year
-            </button>
+            <Button type="submit">Add academic year</Button>
           </form>
         )}
 
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-1">Label</th>
-              <th className="py-1">Start</th>
-              <th className="py-1">End</th>
-            </tr>
-          </thead>
-          <tbody>
-            {years.map((y) => (
-              <tr key={y.id} className="border-b">
-                <td className="py-1">{y.label}</td>
-                <td className="py-1">{y.startDate}</td>
-                <td className="py-1">{y.endDate}</td>
+        <Card>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Label</Th>
+                <Th>Start</Th>
+                <Th>End</Th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </Thead>
+            <tbody>
+              {years.map((y) => (
+                <Tr key={y.id}>
+                  <Td className="font-medium text-neutral-900">{y.label}</Td>
+                  <Td>{y.startDate}</Td>
+                  <Td>{y.endDate}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       </section>
 
       {/* Semesters */}
       <section>
-        <h2 className="mb-3 font-medium">Semesters</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Semesters</h2>
 
         {actor.role === "ADMIN" && (
           <form action={createSemesterAction} className="mb-4 flex flex-wrap items-end gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="sem-year">Academic year</label>
-              <select id="sem-year" name="academicYearId" required className="rounded border border-gray-300 px-2 py-1 text-sm">
+              <Label className="text-xs" htmlFor="sem-year">
+                Academic year
+              </Label>
+              <Select id="sem-year" name="academicYearId" required>
                 {years.map((y) => (
-                  <option key={y.id} value={y.id}>{y.label}</option>
+                  <option key={y.id} value={y.id}>
+                    {y.label}
+                  </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="sem-sequence">Sequence</label>
-              <select id="sem-sequence" name="sequence" required className="rounded border border-gray-300 px-2 py-1 text-sm">
+              <Label className="text-xs" htmlFor="sem-sequence">
+                Sequence
+              </Label>
+              <Select id="sem-sequence" name="sequence" required>
                 <option value="1">1 (First)</option>
                 <option value="2">2 (Second)</option>
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="sem-name">Name</label>
-              <input id="sem-name" name="name" required placeholder="First Semester" className="rounded border border-gray-300 px-2 py-1 text-sm" />
+              <Label className="text-xs" htmlFor="sem-name">
+                Name
+              </Label>
+              <Input id="sem-name" name="name" required placeholder="First Semester" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="sem-start">Start date</label>
-              <input id="sem-start" name="startDate" type="date" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+              <Label className="text-xs" htmlFor="sem-start">
+                Start date
+              </Label>
+              <Input id="sem-start" name="startDate" type="date" required />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium" htmlFor="sem-end">End date</label>
-              <input id="sem-end" name="endDate" type="date" required className="rounded border border-gray-300 px-2 py-1 text-sm" />
+              <Label className="text-xs" htmlFor="sem-end">
+                End date
+              </Label>
+              <Input id="sem-end" name="endDate" type="date" required />
             </div>
-            <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white">
-              Add semester
-            </button>
+            <Button type="submit">Add semester</Button>
           </form>
         )}
 
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="py-1">Academic year</th>
-              <th className="py-1">Seq</th>
-              <th className="py-1">Name</th>
-              <th className="py-1">State</th>
-              <th className="py-1">Transition</th>
-            </tr>
-          </thead>
-          <tbody>
-            {semesters.map((s) => {
-              const currentState = s.state as SemesterState;
-              const availableRules = legalNextStates(currentState).filter((r) => r.actorRole === actor.role);
-              return (
-                <tr key={s.id} className="border-b align-top">
-                  <td className="py-1">{yearLabel(s.academicYearId)}</td>
-                  <td className="py-1">{s.sequence}</td>
-                  <td className="py-1">{s.name}</td>
-                  <td className="py-1">{s.state}</td>
-                  <td className="py-1">
-                    {availableRules.length === 0 && (
-                      <span className="text-gray-400">
-                        {actor.role === "ADMIN" ? "No forward move available" : "No backward move available"}
-                      </span>
-                    )}
-                    <div className="flex flex-col gap-2">
-                      {availableRules.map((rule) => (
-                        <form key={rule.to} action={transitionSemesterAction} className="flex items-end gap-2">
-                          <input type="hidden" name="semesterId" value={s.id} />
-                          <input type="hidden" name="toState" value={rule.to} />
-                          {rule.reasonRequired && (
-                            <input
-                              name="reason"
-                              required
-                              placeholder="Reason (required)"
-                              className="w-48 rounded border border-gray-300 px-2 py-1 text-xs"
-                            />
-                          )}
-                          <button type="submit" className="rounded border border-blue-700 px-2 py-1 text-xs font-medium text-blue-700">
-                            {rule.actorRole === "ADMIN" ? "Advance to" : "Move back to"} {rule.to}
-                          </button>
-                        </form>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <Card>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Academic year</Th>
+                <Th>Seq</Th>
+                <Th>Name</Th>
+                <Th>State</Th>
+                <Th>Transition</Th>
+              </tr>
+            </Thead>
+            <tbody>
+              {semesters.map((s) => {
+                const currentState = s.state as SemesterState;
+                const availableRules = legalNextStates(currentState).filter((r) => r.actorRole === actor.role);
+                return (
+                  <Tr key={s.id} className="align-top">
+                    <Td>{yearLabel(s.academicYearId)}</Td>
+                    <Td>{s.sequence}</Td>
+                    <Td className="font-medium text-neutral-900">{s.name}</Td>
+                    <Td>
+                      <Badge tone={STATE_TONE[s.state] ?? "neutral"}>{s.state}</Badge>
+                    </Td>
+                    <Td>
+                      {availableRules.length === 0 && (
+                        <span className="text-neutral-400">
+                          {actor.role === "ADMIN" ? "No forward move available" : "No backward move available"}
+                        </span>
+                      )}
+                      <div className="flex flex-col gap-2">
+                        {availableRules.map((rule) => (
+                          <form key={rule.to} action={transitionSemesterAction} className="flex items-end gap-2">
+                            <input type="hidden" name="semesterId" value={s.id} />
+                            <input type="hidden" name="toState" value={rule.to} />
+                            {rule.reasonRequired && (
+                              <Input name="reason" required placeholder="Reason (required)" className="w-48 py-1 text-xs" />
+                            )}
+                            <Button type="submit" variant="secondary" size="sm">
+                              {rule.actorRole === "ADMIN" ? "Advance to" : "Move back to"} {rule.to}
+                            </Button>
+                          </form>
+                        ))}
+                      </div>
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </Card>
       </section>
     </main>
   );
