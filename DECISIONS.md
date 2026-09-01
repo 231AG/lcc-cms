@@ -411,3 +411,41 @@ passes reliably now.
 **Approval status:** Not a deviation requiring approval -- test-code bug fixes, matching DEV-15's pattern
 exactly. Recorded at this length because five fixes in one file, all invisible without a real run, is itself
 the evidence for why "written but typechecked" was never claimed as "verified" for this file.
+
+### DEV-17 — Professional UI/visual redesign pass across every page, on branch `design/professional-ui`
+
+**Date:** 1 Sep 2026, after the full test suite had already been proven to pass once against real Supabase
+(DEV-15/DEV-16).
+**Context:** The system had been correctness-complete since Stage 11 but was visually plain -- default
+`<button>`s, ad hoc `red-50`/`amber-50` Tailwind strings repeated per page, no shared navigation, and the
+`<title>` still the literal `create-next-app` default. The project owner asked for a full styling/layout pass
+across every route, explicitly out of scope: any change to business logic, `"use server"` function bodies,
+test assertion logic, or the CSP.
+**What changed:**
+1. A real design system: a navy/warm-neutral palette and semantic status colors defined as Tailwind 4
+   `@theme` tokens in `src/app/globals.css` (this project has no `tailwind.config.js`), plus small local
+   components under `src/components/ui/` (`Button`, `Badge`, `Card`, `Alert`, `Table`, form field wrappers,
+   `PageHeader`) -- no new UI framework, matching the plan's existing "Tailwind utility classes only" stance.
+2. A persistent header/nav (`src/components/layout/Header.tsx`), added in `src/app/layout.tsx`, showing
+   institution branding, the signed-in user and role, role-based navigation (reusing the link lists that used
+   to live only in `src/app/portal/page.tsx`, now centralized in `src/components/layout/navLinks.ts`), and a
+   new sign-out control (`src/app/actions.ts`) -- there was previously no way to sign out from inside the app
+   at all. Every page used to be a lone `<main>` with no shell; this was the single highest-impact change.
+3. `lucide-react` added as a dependency (inline SVG icon components, no external asset requests, so no CSP
+   change needed) -- the one exception the brief allowed without stopping to ask first.
+4. Every route in the brief's route list restyled page by page, role-group by role-group. No visible
+   heading/button/form-label text was renamed; every interactive element that was a real `<button>`/`<a>`/
+   labeled `<input>` stayed one. The three files with per-row `aria-label`s added during the Stage 11
+   security review (`ClassEntryForm.tsx`, `grade-review/[submissionId]/page.tsx`, `admin/historical/page.tsx`)
+   kept those `aria-label`s verbatim. The student portal home page stayed a plain informational page, not a
+   charts dashboard (OOS-09); the semester grade sheet's print path stayed a `@media print` stylesheet against
+   server-rendered HTML, not a client-side PDF library.
+5. Fixed the page `<title>` (`src/app/layout.tsx`'s metadata) from the unchanged `create-next-app` default to
+   a real templated title, with most individual pages now setting their own via a `metadata` export.
+**Not changed:** `src/lib/**`, `"use server"` action bodies, `drizzle/` migrations, `e2e/*.spec.ts` test
+logic, and `src/proxy.ts`'s CSP -- no test assertion needed updating, since no visible text changed.
+**Approval status:** This is the task the project owner asked for directly; not a deviation. Full validation
+(typecheck, lint, build, the full `npm run test` suite, `npm run db:reconcile`, and the full Playwright e2e
+suite) was run against real Supabase before pushing the branch; results are recorded in the session's final
+report rather than duplicated here. Pushed to `design/professional-ui`, not merged to `main` -- that remains
+the project owner's decision, since `main` auto-deploys to the live production site.
