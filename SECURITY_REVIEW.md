@@ -17,7 +17,7 @@ build — nothing here is asserted from memory of the design.
 | Student data isolation | **Pass** | RLS scopes student-facing SELECT policies to `auth.uid()` (e.g. `grade_record_select_own_published`, `academic_record` policy). Every caller of a by-id lookup (`getStudent`, etc.) for a STUDENT actor passes `actor.userId` itself, never a client-supplied id — confirmed by checking every call site. Covered by `src/lib/db/__tests__/identity_rls.integration.test.ts` ("authenticate as student A, request student B's record, assert refusal"). |
 | Segregation of duties | **Pass** | `reviewedBy != submittedBy` and `decidedBy != enteredBy`/`requestedBy` are DB `CHECK` constraints on `grade_submission`, `grade_record`, `grade_correction_request` — enforced even if the service layer had a defect — plus the same check duplicated in `grades.ts`'s service code. |
 | Input validation server-side; parameterised queries only | **Pass** | Every `sql\`...\`` occurrence in the codebase uses Drizzle's tagged-template parameter binding (`${value}` is bound, not concatenated) — checked every occurrence, including the recursive-CTE cycle-detection query in `structure.ts`. No string-built SQL anywhere. |
-| Transport security (HTTPS, HSTS, secure cookies) | **Partial — cookie fixed; HTTPS/HSTS is a hosting-layer concern** | Session cookie `Secure` flag now conditioned on `NODE_ENV=production` (see below). HTTPS termination and HSTS are the deploy target's responsibility (e.g. Vercel sets these automatically for a custom domain) — not something this codebase's own code enforces or can verify from within this session. |
+| Transport security (HTTPS, HSTS, secure cookies) | **Pass — confirmed live, 1 Sep 2026** | Session cookie `Secure` flag conditioned on `NODE_ENV=production`; confirmed `true` on the live deployment. HTTPS and HSTS (`Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`) both confirmed present via direct inspection of `https://lcc-cms.vercel.app` — Vercel provides both automatically, no app-level config needed. |
 | Secrets management | **Pass** | `.env.local` is gitignored; no secret ever appears in the repo. `SUPABASE_SERVICE_ROLE_KEY` is never `NEXT_PUBLIC_*`-prefixed; confirmed absent from the actual compiled client bundle (`grep`'d shipped `.next/static/chunks/*.js` for `supabase`/`postgres`/`drizzle`/`SERVICE_ROLE` — zero matches). No `.tsx` file imports `createAdminClient`. |
 | Append-only audit | **Pass** | `authenticated` has `INSERT`-only privilege on `audit.audit_log` (`0001_audit_privileges.sql`) — no `UPDATE`/`DELETE` grant exists for any application role. |
 
@@ -60,10 +60,13 @@ Risk assessment: `drizzle-kit` is a **dev-only** dependency (schema generation a
 - **Multi-factor authentication for Super Admin**, **IP allow-listing**, **self-service password reset**,
   **field-level encryption**, **formal penetration test** — all explicitly listed in the plan itself as
   FUTURE/Phase-2 items, not Phase 1 requirements. Not attempted.
-- ~~A live, authenticated-session test of the proxy's redirect~~ — **done, 31 Aug 2026**, once real
-  Supabase access was available: `e2e/auth.spec.ts`'s bypass test (extended to also check `/admin/accounts`
-  and `/admin/audit`, not only `/portal`) passes against a real browser and real Auth session — confirms
-  the forced-password-change redirect genuinely holds across previously-unprotected routes, not just in
-  code review. The cookie's exact `Set-Cookie` flags (`HttpOnly`/`Secure`/`SameSite`) were not separately
-  inspected via browser devtools in this pass; the config wiring itself (`src/lib/supabase/cookieOptions.ts`)
-  is unit-verifiable by inspection and unchanged since it was written.
+- ~~A live, authenticated-session test of the proxy's redirect~~ — **done, 31 Aug 2026** against local dev
+  Supabase, and **done again, 1 Sep 2026, against the actual production deployment**
+  (`https://lcc-cms.vercel.app`) once it was live: a real Playwright browser session logged in, confirmed the
+  forced-password-change redirect can't be bypassed by direct navigation to `/portal`, `/admin/accounts`, or
+  `/admin/audit`, and inspected the real `Set-Cookie` flags on the live site: `sb-*-auth-token` came back
+  `httpOnly=true secure=true sameSite=Lax` — exactly matching `src/lib/supabase/cookieOptions.ts`'s intent,
+  now confirmed on real HTTPS rather than inferred from local dev (where `secure` can't actually be
+  observed true, since `next dev` serves plain HTTP). Also confirmed Vercel adds `Strict-Transport-Security`
+  automatically at the platform level — the one §18 transport-security item this document had marked
+  "hosting-layer, can't verify from inside this codebase" is now directly confirmed active.
