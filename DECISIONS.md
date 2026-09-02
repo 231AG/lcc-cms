@@ -449,3 +449,48 @@ logic, and `src/proxy.ts`'s CSP -- no test assertion needed updating, since no v
 suite) was run against real Supabase before pushing the branch; results are recorded in the session's final
 report rather than duplicated here. Pushed to `design/professional-ui`, not merged to `main` -- that remains
 the project owner's decision, since `main` auto-deploys to the live production site.
+
+### DEV-18 -- Ten demo students seeded into the live database for a walkthrough
+
+**Date:** 2 Sep 2026, at the project owner's explicit request ("populate the system with demo data ... focus
+should be on the student data"), confirmed via three scoping questions before writing anything: proceed on the
+single live Supabase project (DEV-01, no separate dev/staging environment exists), advance the real 2026/2027
+First Semester out of Draft so planning could be demoed against the real course catalogue rather than a
+throwaway one, and mark every demo record with a literal `"Demo Student —"` firstName so it's trivially
+findable and removable.
+**Context:** Before writing any data, an inspection pass found the live database already carries substantial
+orphaned test-fixture residue from earlier stages' automated test runs -- stray academic years (e.g.
+"2099/2100", "2183/2184", "2206/2207" through "2208/2209"), a semester stuck in GRADE_SUBMISSION under one of
+them, dozens of DISABLED e2e/test admin accounts, and a handful of test-named departments (including one,
+`CECS 101` under the COCE college, with a stray `maxCreditsOverride: 1`). None of that was touched or cleaned
+up here -- out of scope for this task, flagged to the project owner instead.
+**What changed:**
+1. The real "2026/2027 First Semester" (154 published offerings, imported in Stage 8) was advanced
+   DRAFT -> OPEN -> REGISTRATION through the normal Admin `transitionSemester` path -- a real, visible
+   calendar action, not reverted by the cleanup script below.
+2. Two new retrospective CLOSED semesters were created via `createRetrospectiveSemester`, each as a
+   `sequence: 2` ("Second Semester") sibling under an *existing* academic year so no pre-existing row was
+   touched: 2024/2025 Second Semester (Feb-Jun 2025) and 2025/2026 Second Semester (Feb-Jun 2026). These exist
+   solely to host the demo students' historical grades.
+3. Ten students were enrolled via the real `enrollStudent` service function (same path the Admin UI uses, same
+   Auth-user-plus-app_user-plus-student transaction, same audit trail), spread across ten different real
+   departments with real 2026/2027 offerings. Every one has `firstName === "Demo Student —"` and a reserved
+   student-number suffix (`90`-`93`) within its admission year, e.g. `202490`.
+4. Historical grades were entered via the real `enterHistoricalSemester` function (7 of the 10 students; the
+   other 3 are freshmen or intentionally have no history), producing a spread of CGPAs from 1.54 to 3.49 --
+   including one student (Emmanuel Tarr, `202491`) with a prior F and one (Samuel Konneh, `202592`) with a
+   prior D- in a major-department course, both of which correctly auto-flag as mandatory retakes when the same
+   course reappears in a later plan.
+5. Course plans for 2026/2027 were built and driven through every lifecycle state via the real `planning.ts`
+   functions: 5 left `SUBMITTED` (awaiting Admin review -- the core ask), 2 `APPROVED` (with real
+   `registration` rows created), 1 `REJECTED` (with a real rejection reason), 1 `DRAFT` (never submitted), and
+   1 student with no plan at all.
+**Not changed:** no existing student, admin/super-admin account, department, course, or the orphaned
+test-fixture residue described above.
+**Removal:** `scripts/removeDemoData.ts` (committed) deletes exactly these ten students and everything that
+references them (registrations, plan items, plans, academic records, GPA summary caches, the `student` and
+`app_user` rows, and the Supabase Auth user) in FK-safe order, identified the same way an Admin would find them
+in the UI -- `firstName === "Demo Student —"`. Supports `--dry-run` to preview first. It deliberately leaves
+the 2026/2027 semester's REGISTRATION state and the two retrospective historical semesters alone -- reverting
+calendar state is a separate, human decision, not bundled into a data-cleanup script.
+**Approval status:** Requested directly by the project owner; not a deviation from the plan.
