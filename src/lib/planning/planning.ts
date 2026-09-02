@@ -814,6 +814,21 @@ export async function getPlanQueue(actor: Actor, semesterId: string) {
   return db.query.coursePlan.findMany({ where: and(eq(coursePlan.semesterId, semesterId), eq(coursePlan.status, "SUBMITTED")) });
 }
 
+/** A-10's read-only "View" -- every plan a student has ever had, across semesters, with its items. Admin-only per Section 9.4.9 (Super Admin has no role in course planning). */
+export async function getPlansForStudent(actor: Actor, studentId: string) {
+  await assertCan(actor, "planning.reviewPlan");
+  const plans = await db.query.coursePlan.findMany({ where: eq(coursePlan.studentId, studentId) });
+  if (plans.length === 0) return [];
+  const items = await db.query.coursePlanItem.findMany({ where: inArray(coursePlanItem.planId, plans.map((p) => p.id)) });
+  const itemsByPlan = new Map<string, typeof items>();
+  for (const item of items) {
+    const list = itemsByPlan.get(item.planId) ?? [];
+    list.push(item);
+    itemsByPlan.set(item.planId, list);
+  }
+  return plans.map((p) => ({ ...p, items: itemsByPlan.get(p.id) ?? [] }));
+}
+
 export async function getPlan(actor: Actor, planId: string) {
   const isReviewer = await import("@/lib/permissions/kernel").then((k) => k.can(actor, "planning.reviewPlan"));
   if (isReviewer) {

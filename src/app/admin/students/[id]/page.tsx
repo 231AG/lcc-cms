@@ -4,10 +4,13 @@ import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
+import { getPlansForStudent } from "@/lib/planning/planning";
+import { can } from "@/lib/permissions/kernel";
 import { NotFoundError } from "@/lib/errors";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
@@ -30,11 +33,11 @@ export default async function StudentDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; mode?: string }>;
 }) {
   const actor = await getCurrentActor();
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, mode } = await searchParams;
 
   if (!actor)
     return (
@@ -64,7 +67,7 @@ export default async function StudentDetailPage({
     throw err;
   }
 
-  const [departments, history, semesters, academicYears, semesterSummaries, cumulative, obligations] = await asUser(
+  const [departments, history, semesters, academicYears, semesterSummaries, cumulative, obligations, courses] = await asUser(
     actor.userId,
     (tx) =>
       Promise.all([
@@ -75,6 +78,7 @@ export default async function StudentDetailPage({
         getSemesterSummaries(actor, record.id),
         getCumulativeSummary(actor, record.id),
         getOutstandingRepeatObligations(actor, record.id),
+        tx.query.course.findMany(),
       ]),
   );
   const semesterSummaryFor = (semesterId: string) => semesterSummaries.find((s) => s.semesterId === semesterId);
@@ -83,8 +87,19 @@ export default async function StudentDetailPage({
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
     return sem && year ? `${year.label} — ${sem.name}` : semesterId;
   };
+  const courseLabel = (courseId: string) => {
+    const c = courses.find((c) => c.id === courseId);
+    return c ? `${c.code} — ${c.title}` : courseId;
+  };
 
   const isAdmin = actor.role === "ADMIN";
+  // View is read-only regardless of role; Edit is the pre-existing
+  // editable form, still Admin-only. Super Admin reaching this page
+  // directly (its "View" link, Section 20.5's read-only extension) is
+  // always view-only, same as before.
+  const canEdit = isAdmin && mode !== "view";
+  const canReviewPlans = isAdmin && (await can(actor, "planning.reviewPlan"));
+  const plans = canReviewPlans ? await getPlansForStudent(actor, record.id) : [];
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
@@ -115,20 +130,20 @@ export default async function StudentDetailPage({
                 <Label htmlFor="firstName" className="text-xs">
                   First name
                 </Label>
-                <Input id="firstName" name="firstName" defaultValue={record.firstName} disabled={!isAdmin} required />
+                <Input id="firstName" name="firstName" defaultValue={record.firstName} disabled={!canEdit} required />
               </div>
               <div className="flex-1">
                 <Label htmlFor="lastName" className="text-xs">
                   Last name
                 </Label>
-                <Input id="lastName" name="lastName" defaultValue={record.lastName} disabled={!isAdmin} required />
+                <Input id="lastName" name="lastName" defaultValue={record.lastName} disabled={!canEdit} required />
               </div>
             </div>
             <div>
               <Label htmlFor="departmentId" className="text-xs">
                 Department
               </Label>
-              <Select id="departmentId" name="departmentId" defaultValue={record.departmentId} disabled={!isAdmin}>
+              <Select id="departmentId" name="departmentId" defaultValue={record.departmentId} disabled={!canEdit}>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.code} — {d.name}
@@ -140,19 +155,19 @@ export default async function StudentDetailPage({
               <Label htmlFor="enrolmentYear" className="text-xs">
                 Enrolment year
               </Label>
-              <Input id="enrolmentYear" name="enrolmentYear" type="number" defaultValue={record.enrolmentYear} disabled={!isAdmin} className="w-32" />
+              <Input id="enrolmentYear" name="enrolmentYear" type="number" defaultValue={record.enrolmentYear} disabled={!canEdit} className="w-32" />
             </div>
             <div>
               <Label htmlFor="contactPhone" className="text-xs">
                 Contact phone
               </Label>
-              <Input id="contactPhone" name="contactPhone" defaultValue={record.contactPhone ?? ""} disabled={!isAdmin} className="max-w-xs" />
+              <Input id="contactPhone" name="contactPhone" defaultValue={record.contactPhone ?? ""} disabled={!canEdit} className="max-w-xs" />
             </div>
             <div>
               <Label htmlFor="status" className="text-xs">
                 Status
               </Label>
-              <Select id="status" name="status" defaultValue={record.status} disabled={!isAdmin} className="max-w-xs">
+              <Select id="status" name="status" defaultValue={record.status} disabled={!canEdit} className="max-w-xs">
                 {STUDENT_STATUSES.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -161,7 +176,7 @@ export default async function StudentDetailPage({
               </Select>
             </div>
             <p className="text-xs text-neutral-500">Import status: {record.historicalImportStatus}</p>
-            {isAdmin && (
+            {canEdit && (
               <Button type="submit" className="w-fit">
                 Save changes
               </Button>
@@ -170,7 +185,7 @@ export default async function StudentDetailPage({
         </CardBody>
       </Card>
 
-      {isAdmin && (
+      {canEdit && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Reset password</CardTitle>
@@ -219,10 +234,41 @@ export default async function StudentDetailPage({
         </CardBody>
       </Card>
 
+      {canReviewPlans && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Planned courses</CardTitle>
+          </CardHeader>
+          <CardBody>
+            {plans.length === 0 && <p className="text-sm text-neutral-500">No course plans on record.</p>}
+            {plans.length > 0 && (
+              <div className="flex flex-col gap-4">
+                {plans.map((p) => (
+                  <div key={p.id}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-sm font-medium text-neutral-900">{yearLabel(p.semesterId)}</span>
+                      <Badge tone="brand">{p.status}</Badge>
+                    </div>
+                    <ul className="list-disc pl-5 text-sm text-neutral-700">
+                      {p.items.map((i) => (
+                        <li key={i.id}>
+                          {courseLabel(i.courseId)}
+                          {i.isRetake && " — retake"}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Academic history</CardTitle>
-          {isAdmin && (
+          {canEdit && (
             <Link href={`/admin/historical?studentId=${record.id}`} className="text-sm font-medium text-brand-700 hover:underline">
               Enter historical record
             </Link>
