@@ -494,3 +494,40 @@ in the UI -- `firstName === "Demo Student —"`. Supports `--dry-run` to preview
 the 2026/2027 semester's REGISTRATION state and the two retrospective historical semesters alone -- reverting
 calendar state is a separate, human decision, not bundled into a data-cleanup script.
 **Approval status:** Requested directly by the project owner; not a deviation from the plan.
+
+### DEV-19 — Per-course Admin decisions on a submitted plan, and a new PARTIALLY_APPROVED plan status
+
+**Date:** 2 Sep 2026, requested directly by the project owner ("one bad planned course shouldn't force
+rejecting the entire plan"). The plan's original design (Section 14.2/9.4.9, Stage 9) only modeled a decision
+on the whole `course_plan` row; there was no per-`course_plan_item` status at all.
+**What changed:** `course_plan_item` gained `status` (PENDING | APPROVED | REJECTED, default PENDING),
+`rejection_reason` (required when REJECTED, same convention as the plan-level field), `decided_by`,
+`decided_at` (migration `0020_course_plan_item_status.sql`, additive only, backfilled so existing
+APPROVED/REJECTED plans' items read as if each had been decided individually). `course_plan.status`'s check
+constraint gained a new value, `PARTIALLY_APPROVED`.
+**The policy question, put to the owner directly:** once every item on a plan has an individual decision and
+the outcome is mixed (some approved, some rejected), what should the plan's own overall status become? Two
+alternatives considered -- silently reuse `APPROVED` (simpler, but "APPROVED" would then no longer mean "the
+student got everything they asked for"), or leave the plan at `SUBMITTED` indefinitely (defers the question
+rather than answering it). The owner chose a new terminal `PARTIALLY_APPROVED` status: once no item is left
+PENDING, the plan auto-resolves to APPROVED (all approved), REJECTED (all rejected), or PARTIALLY_APPROVED
+(mixed) -- same rollup helper (`rollupPlanStatus`) whether the decisions came from the new per-item
+approve/reject actions or from the "Approve all pending / Reject all pending" bulk convenience actions (which
+now only touch items still PENDING, rather than assuming every item on the plan is undecided).
+**Left open, deliberately not decided here:** whether a `PARTIALLY_APPROVED` plan should ever become revisable
+(e.g. letting the student build a new plan for just the rejected courses). Treated as terminal/read-only for
+now, the same as `APPROVED` -- registrations already exist for the approved items and aren't undone. Revisit
+if the owner wants a revision path for the rejected portion.
+**Verification note:** the existing `planning.integration.test.ts` suite could not be run against this change
+-- its setup needs to move a fresh test semester into `REGISTRATION`, and the real "2026/2027 First Semester"
+already occupies that state on the shared live Supabase project (no separate CI/staging DB, DEV-01/DEV-12).
+Verified instead by: (1) reading every existing assertion in that file and confirming the rewritten bulk
+`approvePlan`/`rejectPlan` preserve identical throw-on-failure, atomicity, and audit-entry behavior for the
+"nothing individually decided yet" case those tests exercise; (2) a read-only query against the live database
+after migration confirmed the backfill was correct (APPROVED plans' items all APPROVED, REJECTED plans' items
+all REJECTED with the inherited reason, SUBMITTED plans' items all PENDING); (3) `tsc --noEmit` and `next
+build` both clean. The live click-path for the new per-item Approve/Reject buttons has not been exercised
+end-to-end in a browser -- flagged as a gap for the owner to spot-check against one of the four real
+SUBMITTED demo plans (DEV-18) in `/admin/planning`.
+**Approval status:** Schema change and the PARTIALLY_APPROVED workflow design were confirmed with the owner
+before the migration was applied to the live database.

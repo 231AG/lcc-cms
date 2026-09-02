@@ -247,13 +247,17 @@ export default async function StudentDetailPage({
                   <div key={p.id}>
                     <div className="mb-1 flex items-center justify-between">
                       <span className="text-sm font-medium text-neutral-900">{yearLabel(p.semesterId)}</span>
-                      <Badge tone="brand">{p.status}</Badge>
+                      <Badge tone={p.status === "APPROVED" ? "success" : p.status === "REJECTED" ? "danger" : p.status === "PARTIALLY_APPROVED" ? "warning" : "brand"}>
+                        {p.status}
+                      </Badge>
                     </div>
                     <ul className="list-disc pl-5 text-sm text-neutral-700">
                       {p.items.map((i) => (
                         <li key={i.id}>
                           {courseLabel(i.courseId)}
                           {i.isRetake && " — retake"}
+                          {p.status !== "DRAFT" && ` — ${i.status.toLowerCase()}`}
+                          {i.status === "REJECTED" && i.rejectionReason && ` (${i.rejectionReason})`}
                         </li>
                       ))}
                     </ul>

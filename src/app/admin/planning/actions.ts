@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
-import { approvePlan, overridePrerequisite, rejectPlan } from "@/lib/planning/planning";
+import { approvePlan, approvePlanItem, overridePrerequisite, rejectPlan, rejectPlanItem } from "@/lib/planning/planning";
 
 function errorRedirect(planId: string, message: string): never {
   redirect(`/admin/planning/${planId}?error=${encodeURIComponent(message)}`);
@@ -27,6 +27,33 @@ export async function rejectPlanAction(formData: FormData): Promise<void> {
   const reason = String(formData.get("reason") ?? "");
   try {
     await rejectPlan(actor, planId, reason);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(planId, err.message);
+    throw err;
+  }
+  redirect(`/admin/planning/${planId}`);
+}
+
+export async function approvePlanItemAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const planId = String(formData.get("planId") ?? "");
+  const planItemId = String(formData.get("planItemId") ?? "");
+  try {
+    await approvePlanItem(actor, planItemId);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(planId, err.message);
+    throw err;
+  }
+  redirect(`/admin/planning/${planId}`);
+}
+
+export async function rejectPlanItemAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const planId = String(formData.get("planId") ?? "");
+  const planItemId = String(formData.get("planItemId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  try {
+    await rejectPlanItem(actor, planItemId, reason);
   } catch (err) {
     if (err instanceof AppError) errorRedirect(planId, err.message);
     throw err;
