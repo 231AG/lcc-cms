@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { GraduationCap, LogOut, KeyRound } from "lucide-react";
+import Image from "next/image";
+import { LogOut, KeyRound } from "lucide-react";
 import type { Actor } from "@/lib/auth/session";
 import { navLinksForRole } from "./navLinks";
 import { signOutAction } from "@/app/actions";
@@ -27,7 +28,9 @@ export function Header({ actor }: { actor: Actor | null }) {
       <div className="mx-auto max-w-6xl px-4">
         <div className="flex h-14 items-center justify-between gap-4">
           <Link href={actor ? "/portal" : "/login"} className="flex items-center gap-2 font-semibold tracking-tight">
-            <GraduationCap className="h-5 w-5 text-brand-200" aria-hidden="true" />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white p-0.5">
+              <Image src="/lcc-logo.png" alt="" width={28} height={32} className="h-full w-full object-contain" priority />
+            </span>
             <span>Liberia Christian College</span>
             <span className="hidden text-brand-300 sm:inline">E-Portal</span>
           </Link>
