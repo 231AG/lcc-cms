@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
-import { Label, Select } from "@/components/ui/Form";
+import { Label, Select, Input } from "@/components/ui/Form";
 import { findPlanAction } from "./actions";
 
 export const metadata: Metadata = { title: "Course plan review" };
@@ -24,10 +24,10 @@ export const metadata: Metadata = { title: "Course plan review" };
 export default async function PlanningQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ semesterId?: string; error?: string }>;
+  searchParams: Promise<{ semesterId?: string; error?: string; q?: string }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId, error } = await searchParams;
+  const { semesterId: rawSemesterId, error, q } = await searchParams;
 
   if (!actor)
     return (
@@ -56,7 +56,15 @@ export default async function PlanningQueuePage({
     return s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : studentId;
   };
 
+  // Default to the semester currently open for registration -- same
+  // definition of "current semester" the student-facing /planning page
+  // uses -- so the queue is populated on load without forcing a manual
+  // semester pick every time. The selector stays visible and an explicit
+  // choice (including re-picking the blank placeholder) is respected.
+  const semesterId = rawSemesterId || semesters.find((s) => s.state === "REGISTRATION")?.id;
+
   const queue = semesterId ? await getPlanQueue(actor, semesterId) : [];
+  const filteredQueue = q ? queue.filter((p) => studentLabel(p.studentId).toLowerCase().includes(q.toLowerCase())) : queue;
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
@@ -90,9 +98,28 @@ export default async function PlanningQueuePage({
       {semesterId && (
         <section className="mb-8">
           <h2 className="mb-3 font-medium text-neutral-900">Awaiting a decision -- {yearLabel(semesterId)}</h2>
-          {queue.length === 0 && <p className="text-sm text-neutral-500">No plans awaiting approval.</p>}
+          <form method="GET" className="mb-3 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="semesterId" value={semesterId} />
+            <div>
+              <Label htmlFor="q" className="text-xs">
+                Search
+              </Label>
+              <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Student ID or name" className="w-64" />
+            </div>
+            <Button type="submit" variant="secondary">
+              Search
+            </Button>
+            {q && (
+              <Link href={`/admin/planning?semesterId=${semesterId}`} className="text-sm text-neutral-500 hover:underline">
+                Clear
+              </Link>
+            )}
+          </form>
+          {filteredQueue.length === 0 && (
+            <p className="text-sm text-neutral-500">{q ? "No matching plans." : "No plans awaiting approval."}</p>
+          )}
           <ul className="flex flex-col gap-2">
-            {queue.map((p) => (
+            {filteredQueue.map((p) => (
               <li key={p.id}>
                 <Card className="flex items-center justify-between px-3 py-2 text-sm">
                   <span>
