@@ -1,6 +1,6 @@
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
-import { getOfferingMeetings, getOfferingsForSemester } from "@/lib/offerings/offerings";
+import { getOfferingMeetingsForOfferings, getOfferingsByIds } from "@/lib/offerings/offerings";
 import { getPlan, getPlanItems } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -52,20 +52,18 @@ export default async function PlanDetailPage({
   }
 
   const items = await getPlanItems(actor, planId);
+  const offeringIds = [...new Set(items.map((i) => i.offeringId))];
   const [student, offerings, courses, semester] = await asUser(actor.userId, (tx) =>
     Promise.all([
       tx.query.student.findFirst({ where: (s, { eq }) => eq(s.id, plan.studentId) }),
-      getOfferingsForSemester(actor, plan.semesterId),
+      getOfferingsByIds(actor, offeringIds),
       tx.query.course.findMany(),
       tx.query.semester.findFirst({ where: (s, { eq }) => eq(s.id, plan.semesterId) }),
     ]),
   );
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
   const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
-  const meetingsByOffering = new Map<string, Awaited<ReturnType<typeof getOfferingMeetings>>>();
-  for (const o of offerings) {
-    meetingsByOffering.set(o.id, await getOfferingMeetings(actor, o.id));
-  }
+  const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, offeringIds);
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
