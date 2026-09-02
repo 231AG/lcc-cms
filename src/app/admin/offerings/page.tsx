@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
-import { getOfferingMeetings, getOfferingsForSemester } from "@/lib/offerings/offerings";
+import { getOfferingMeetingsForOfferings, getOfferingsForSemester } from "@/lib/offerings/offerings";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -27,13 +28,15 @@ const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * Super Admin sees the same list read-only (REQ-R04), same "one page,
  * role-conditional controls" pattern as /admin/calendar.
  */
+const PAGE_SIZE = 20;
+
 export default async function OfferingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semesterId?: string; error?: string }>;
+  searchParams: Promise<{ semesterId?: string; error?: string; q?: string; page?: string }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId, error } = await searchParams;
+  const { semesterId, error, q, page } = await searchParams;
 
   if (!actor)
     return (
@@ -64,11 +67,30 @@ export default async function OfferingsPage({
   };
 
   const offerings = semesterId ? await getOfferingsForSemester(actor, semesterId) : [];
-  const meetingsByOffering = new Map<string, Awaited<ReturnType<typeof getOfferingMeetings>>>();
-  for (const o of offerings) {
-    meetingsByOffering.set(o.id, await getOfferingMeetings(actor, o.id));
-  }
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
+
+  const needle = q?.trim().toLowerCase();
+  const filteredOfferings = needle
+    ? offerings.filter((o) => {
+        const c = courseFor(o.courseId);
+        return (
+          c?.code.toLowerCase().includes(needle) ||
+          c?.title.toLowerCase().includes(needle) ||
+          o.instructorName?.toLowerCase().includes(needle) ||
+          o.section.toLowerCase().includes(needle)
+        );
+      })
+    : offerings;
+
+  const pageNum = Math.max(1, Number(page) || 1);
+  const totalPages = Math.max(1, Math.ceil(filteredOfferings.length / PAGE_SIZE));
+  const pagedOfferings = filteredOfferings.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE);
+
+  // Only fetch meeting times for the offerings actually shown on this page
+  // -- with a real semester's worth of offerings (150+), eagerly loading
+  // every offering's meetings up front (one query per offering, previously
+  // sequential) was the dominant cost on this page.
+  const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, pagedOfferings.map((o) => o.id));
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
@@ -145,9 +167,27 @@ export default async function OfferingsPage({
 
           <section>
             <h2 className="mb-3 font-medium text-neutral-900">Offerings for {yearLabel(semesterId)}</h2>
+            <form method="GET" className="mb-4 flex flex-wrap items-end gap-2">
+              <input type="hidden" name="semesterId" value={semesterId} />
+              <div>
+                <Label htmlFor="q" className="text-xs">
+                  Search
+                </Label>
+                <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Course code, title, instructor, section" className="w-72" />
+              </div>
+              <Button type="submit" variant="secondary">
+                Search
+              </Button>
+              {q && (
+                <Link href={`/admin/offerings?semesterId=${semesterId}`} className="text-sm text-neutral-500 hover:underline">
+                  Clear
+                </Link>
+              )}
+            </form>
             {offerings.length === 0 && <p className="text-sm text-neutral-500">No offerings yet.</p>}
+            {offerings.length > 0 && filteredOfferings.length === 0 && <p className="text-sm text-neutral-500">No offerings match this search.</p>}
             <div className="flex flex-col gap-4">
-              {offerings.map((o) => {
+              {pagedOfferings.map((o) => {
                 const c = courseFor(o.courseId);
                 const meetings = meetingsByOffering.get(o.id) ?? [];
                 return (
@@ -266,6 +306,30 @@ export default async function OfferingsPage({
                 );
               })}
             </div>
+
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center gap-3 text-sm">
+                {pageNum > 1 && (
+                  <Link
+                    href={`/admin/offerings?semesterId=${semesterId}&q=${encodeURIComponent(q ?? "")}&page=${pageNum - 1}`}
+                    className="font-medium text-brand-700 hover:underline"
+                  >
+                    Previous
+                  </Link>
+                )}
+                <span className="text-neutral-600">
+                  Page {pageNum} of {totalPages}
+                </span>
+                {pageNum < totalPages && (
+                  <Link
+                    href={`/admin/offerings?semesterId=${semesterId}&q=${encodeURIComponent(q ?? "")}&page=${pageNum + 1}`}
+                    className="font-medium text-brand-700 hover:underline"
+                  >
+                    Next
+                  </Link>
+                )}
+              </div>
+            )}
           </section>
         </>
       )}

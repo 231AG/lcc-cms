@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { GraduationCap } from "lucide-react";
+import Image from "next/image";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
@@ -24,9 +24,7 @@ export default async function LoginPage({
     <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-4 py-12 outline-none">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50">
-            <GraduationCap className="h-6 w-6 text-brand-700" aria-hidden="true" />
-          </span>
+          <Image src="/lcc-logo.png" alt="Liberia Christian College seal" width={70} height={79} className="mb-3 h-16 w-auto" priority />
           <h1 className="text-xl font-semibold text-neutral-900">Liberia Christian College</h1>
           <p className="mt-1 text-sm text-neutral-600">E-Portal sign in</p>
         </div>

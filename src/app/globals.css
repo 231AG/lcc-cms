@@ -1,29 +1,43 @@
 @import "tailwindcss";
 
 /*
- * Design tokens for the LCC E-Portal UI (design/professional-ui branch).
- * Tailwind 4 has no tailwind.config.js -- this @theme block IS the config
- * (see DECISIONS.md's new DEV-## entry for this pass). Palette: a deep
- * navy/ink primary (institutional, trustworthy) plus warm neutrals, with a
+ * Design tokens for the LCC E-Portal UI. Tailwind 4 has no
+ * tailwind.config.js -- this @theme block IS the config. Palette: LCC's
+ * institutional purple as `primary` (matching the seal in
+ * public/lcc-logo.png) with a gold `accent`, plus warm neutrals and a
  * small set of semantic status colors reused everywhere a badge/alert
  * appears (grade status, semester state, correction status, provisional
  * warnings) instead of ad hoc red-50/amber-50 utility classes per page.
+ * The existing `brand-*` scale (used across every page already) is kept
+ * as the token NAME -- only its values change, anchored on primary/
+ * primary-dark/primary-light at brand-600/700/300 -- so this is a
+ * token-value pass, not a rename or a restructure.
  */
 :root {
-  --background: #f7f7f5;
-  --foreground: #1c1e21;
+  --background: hsl(260 33% 97%); /* near-white, faint lavender tint */
+  --foreground: hsl(260 20% 14%); /* near-black plum */
 
-  /* Brand / primary -- deep navy, the institutional color. */
-  --color-brand-50: #eef2f8;
-  --color-brand-100: #dbe4f0;
-  --color-brand-200: #b3c6e0;
-  --color-brand-300: #85a3cc;
-  --color-brand-400: #4d75a8;
-  --color-brand-500: #2c5282;
-  --color-brand-600: #1e3f68;
-  --color-brand-700: #16304f;
-  --color-brand-800: #10233a;
-  --color-brand-900: #0b1a2b;
+  /* Brand / primary -- LCC purple, anchored on primary/primary-dark/primary-light. */
+  --color-brand-50: hsl(264 60% 96%);
+  --color-brand-100: hsl(264 60% 91%);
+  --color-brand-200: hsl(264 62% 84%);
+  --color-brand-300: hsl(264 65% 65%); /* primary-light */
+  --color-brand-400: hsl(264 68% 56%);
+  --color-brand-500: hsl(264 70% 51%);
+  --color-brand-600: hsl(264 71% 47%); /* primary, #6723CD */
+  --color-brand-700: hsl(264 75% 35%); /* primary-dark, #4C169C */
+  --color-brand-800: hsl(264 78% 27%);
+  --color-brand-900: hsl(264 82% 18%);
+
+  /* Named aliases for the brand brief's own vocabulary, same values as above. */
+  --color-primary: var(--color-brand-600);
+  --color-primary-dark: var(--color-brand-700);
+  --color-primary-light: var(--color-brand-300);
+
+  /* Accent / gold -- CTAs, badges, highlights. */
+  --color-accent: hsl(47 90% 58%); /* #F4CB34 */
+  --color-accent-dark: hsl(45 100% 43%); /* #DBA400 */
+  --color-accent-light: hsl(45 100% 82%);
 
   /* Warm neutrals for surfaces, borders, body text. */
   --color-neutral-0: #ffffff;
@@ -38,33 +52,44 @@
   --color-neutral-800: #302d24;
   --color-neutral-900: #1c1a15;
 
-  /* Semantic status colors -- one scale each, used by Badge/Alert. */
-  --color-success-50: #eefaf1;
-  --color-success-200: #b7e3c3;
-  --color-success-600: #1f7a41;
-  --color-success-800: #14532b;
+  /* Semantic status colors -- one scale each, used by Badge/Alert, anchored
+     on the brand brief's success/warning/destructive/info values at the
+     -600 step (the shade solid buttons/fills use). */
+  --color-success-50: hsl(142 65% 95%);
+  --color-success-200: hsl(142 55% 82%);
+  --color-success-600: hsl(142 71% 45%);
+  --color-success-800: hsl(142 75% 22%);
 
-  --color-warning-50: #fdf6e8;
-  --color-warning-200: #f0dba3;
-  --color-warning-600: #92660a;
-  --color-warning-800: #6b4a06;
+  --color-warning-50: hsl(38 90% 95%);
+  --color-warning-200: hsl(38 85% 80%);
+  --color-warning-600: hsl(38 92% 50%);
+  --color-warning-800: hsl(38 95% 25%);
 
-  --color-danger-50: #fdf0ef;
-  --color-danger-200: #f0bcb6;
-  --color-danger-600: #b3261e;
-  --color-danger-800: #7f1a14;
+  /* "destructive" in the brand brief -- kept as the existing `danger` token name. */
+  --color-danger-50: hsl(0 70% 96%);
+  --color-danger-200: hsl(0 65% 85%);
+  --color-danger-600: hsl(0 72% 51%);
+  --color-danger-800: hsl(0 75% 28%);
 
-  --color-info-50: #eef4fb;
-  --color-info-200: #b9d3ec;
-  --color-info-600: #205e9c;
-  --color-info-800: #16436f;
+  --color-info-50: hsl(217 85% 96%);
+  --color-info-200: hsl(217 80% 85%);
+  --color-info-600: hsl(217 91% 60%);
+  --color-info-800: hsl(217 85% 30%);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
   --font-mono: var(--font-geist-mono);
+
+  --color-primary: var(--color-primary);
+  --color-primary-dark: var(--color-primary-dark);
+  --color-primary-light: var(--color-primary-light);
+  --color-accent: var(--color-accent);
+  --color-accent-dark: var(--color-accent-dark);
+  --color-accent-light: var(--color-accent-light);
 
   --color-brand-50: var(--color-brand-50);
   --color-brand-100: var(--color-brand-100);
@@ -112,15 +137,28 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #12130f;
-    --foreground: #ececea;
+    /* Same primary/accent as light mode -- only the neutral background/foreground invert. */
+    --background: hsl(260 20% 10%);
+    --foreground: hsl(260 15% 92%);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), "Source Sans 3", Arial, Helvetica, sans-serif;
+}
+
+/* Headings use the brand serif everywhere, regardless of whether they go
+   through a shared component (PageHeader/CardTitle) or a page's own
+   <h2>/<h3> -- one rule at the source instead of touching every page. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), "Playfair Display", Georgia, serif;
 }
 
 /*

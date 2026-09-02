@@ -76,7 +76,10 @@ export default async function PlanningPage({
   const plannedOfferingIds = new Set(items.map((i) => i.offeringId));
   const totalCredits = items.reduce((sum, i) => sum + (offeringFor(i.offeringId)?.frozenCreditHours ?? 0), 0);
 
-  const registrations = plan?.status === "APPROVED" ? await getRegistrationsForStudent(actor, actor.userId, semesterId) : [];
+  const registrations =
+    plan?.status === "APPROVED" || plan?.status === "PARTIALLY_APPROVED"
+      ? await getRegistrationsForStudent(actor, actor.userId, semesterId)
+      : [];
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
@@ -211,7 +214,14 @@ export default async function PlanningPage({
             <ul className="flex flex-col gap-1 text-sm">
               {items.map((i) => {
                 const c = courseFor(i.courseId);
-                return <li key={i.id}>{c ? `${c.code} — ${c.title}` : i.courseId}</li>;
+                return (
+                  <li key={i.id} className="flex items-center justify-between">
+                    <span>{c ? `${c.code} — ${c.title}` : i.courseId}</span>
+                    <span className="text-xs text-neutral-500">
+                      {i.status === "PENDING" ? "Awaiting decision" : i.status === "APPROVED" ? "Approved" : "Rejected"}
+                    </span>
+                  </li>
+                );
               })}
             </ul>
           </CardBody>
@@ -231,6 +241,30 @@ export default async function PlanningPage({
                   <li key={r.id}>
                     {c ? `${c.code} — ${c.title}` : r.offeringId}
                     {r.isRetake && " — retake"}
+                  </li>
+                );
+              })}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+
+      {plan && plan.status === "PARTIALLY_APPROVED" && (
+        <Card className="border-warning-200 bg-warning-50">
+          <CardBody>
+            <CardTitle className="mb-2 text-warning-800">Partially approved</CardTitle>
+            <p className="mb-3 text-sm text-warning-800">Some courses were approved and registered; others were rejected.</p>
+            <ul className="flex flex-col gap-1 text-sm">
+              {items.map((i) => {
+                const c = courseFor(i.courseId);
+                return (
+                  <li key={i.id} className="flex items-center justify-between">
+                    <span className="text-warning-800">{c ? `${c.code} — ${c.title}` : i.courseId}</span>
+                    {i.status === "APPROVED" ? (
+                      <span className="text-xs font-medium text-success-700">Approved</span>
+                    ) : (
+                      <span className="text-xs font-medium text-danger-700">Rejected{i.rejectionReason ? `: ${i.rejectionReason}` : ""}</span>
+                    )}
                   </li>
                 );
               })}

@@ -122,9 +122,20 @@ export default async function StudentsPage({
                 <Td>{s.enrolmentYear}</Td>
                 <Td>{s.historicalImportStatus}</Td>
                 <Td>
-                  <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-700 hover:underline">
-                    {actor.role === "ADMIN" ? "Edit" : "View"}
-                  </Link>
+                  {actor.role === "ADMIN" ? (
+                    <span className="flex gap-3">
+                      <Link href={`/admin/students/${s.id}?mode=view`} className="font-medium text-brand-700 hover:underline">
+                        View
+                      </Link>
+                      <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-700 hover:underline">
+                        Edit
+                      </Link>
+                    </span>
+                  ) : (
+                    <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-700 hover:underline">
+                      View
+                    </Link>
+                  )}
                 </Td>
               </Tr>
             ))}

@@ -564,6 +564,19 @@ export interface ApprovePlanResult {
   registrations: Array<typeof registration.$inferSelect>;
 }
 
+export interface DecidePlanItemResult {
+  item: typeof coursePlanItem.$inferSelect;
+  plan: typeof coursePlan.$inferSelect;
+  registration?: typeof registration.$inferSelect;
+}
+
+/** Once no item on a plan is left PENDING, its overall status rolls up from the individual decisions (DEV-19): all approved -> APPROVED, all rejected -> REJECTED, a mix -> PARTIALLY_APPROVED. Only valid to call once every item has a decision. */
+function rollupPlanStatus(items: Array<{ status: string }>): "APPROVED" | "REJECTED" | "PARTIALLY_APPROVED" {
+  const allApproved = items.every((i) => i.status === "APPROVED");
+  const allRejected = items.every((i) => i.status === "REJECTED");
+  return allApproved ? "APPROVED" : allRejected ? "REJECTED" : "PARTIALLY_APPROVED";
+}
+
 /**
  * REQ-P03's second enforcement point, run entirely inside one
  * transaction: re-validate, lock the plan, create one registration per
@@ -584,8 +597,10 @@ export async function approvePlan(actor: Actor, planId: string): Promise<Approve
       throw new StateError(`This student's status is ${studentRow.status}; approval is refused.`);
     }
 
-    const items = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
-    if (items.length === 0) throw new ValidationError("This plan has no items.");
+    // "Approve all" (DEV-19): decides every item still PENDING -- an item
+    // already decided individually before this was clicked is left alone.
+    const items = await tx.query.coursePlanItem.findMany({ where: and(eq(coursePlanItem.planId, planId), eq(coursePlanItem.status, "PENDING")) });
+    if (items.length === 0) throw new ValidationError("This plan has no pending items left to approve.");
 
     // Row-locked capacity recheck (edge case 6): every offering this plan
     // touches is locked before the final validation pass, so a
@@ -639,12 +654,29 @@ export async function approvePlan(actor: Actor, planId: string): Promise<Approve
         newValue: { offeringId: item.offeringId, source: "PLAN_APPROVAL", isRetake: item.isRetake },
         requestId,
       });
+
+      await tx.update(coursePlanItem).set({ status: "APPROVED", decidedBy: actor.userId, decidedAt: new Date() }).where(eq(coursePlanItem.id, item.id));
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "COURSE_PLAN_ITEM_APPROVED",
+        entityType: "course_plan_item",
+        entityId: item.id,
+        studentId: plan.studentId,
+        newValue: { offeringId: item.offeringId, registrationId: reg.id },
+        requestId,
+      });
     }
 
-    const totalCredits = await sumPlanCredits(tx, itemsForValidation);
+    const allItems = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
+    const finalStatus = rollupPlanStatus(allItems);
+    const approvedForCredit: PlanItemForValidation[] = allItems
+      .filter((i) => i.status === "APPROVED")
+      .map((i) => ({ offeringId: i.offeringId, courseId: i.courseId, isRetake: i.isRetake, prereqOverrideReason: i.prereqOverrideReason }));
+    const totalCredits = await sumPlanCredits(tx, approvedForCredit);
     const [updatedPlan] = await tx
       .update(coursePlan)
-      .set({ status: "APPROVED", totalCredits, reviewedBy: actor.userId, reviewedAt: new Date() })
+      .set({ status: finalStatus, totalCredits, reviewedBy: actor.userId, reviewedAt: new Date() })
       .where(eq(coursePlan.id, planId))
       .returning();
 
@@ -655,7 +687,7 @@ export async function approvePlan(actor: Actor, planId: string): Promise<Approve
       entityType: "course_plan",
       entityId: planId,
       studentId: plan.studentId,
-      newValue: { totalCredits, registrationCount: createdRegistrations.length },
+      newValue: { totalCredits, registrationCount: createdRegistrations.length, finalStatus },
       requestId,
     });
 
@@ -672,9 +704,32 @@ export async function rejectPlan(actor: Actor, planId: string, reason: string) {
     if (!plan) throw new ValidationError("Plan not found.");
     if (plan.status !== "SUBMITTED") throw new StateError(`Only a submitted plan can be rejected (currently ${plan.status}).`);
 
+    // "Reject all" (DEV-19): the same reason is applied to every item
+    // still PENDING; an item already decided individually is left alone.
+    const items = await tx.query.coursePlanItem.findMany({ where: and(eq(coursePlanItem.planId, planId), eq(coursePlanItem.status, "PENDING")) });
+    if (items.length === 0) throw new ValidationError("This plan has no pending items left to reject.");
+
+    for (const item of items) {
+      await tx
+        .update(coursePlanItem)
+        .set({ status: "REJECTED", rejectionReason: reason, decidedBy: actor.userId, decidedAt: new Date() })
+        .where(eq(coursePlanItem.id, item.id));
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "COURSE_PLAN_ITEM_REJECTED",
+        entityType: "course_plan_item",
+        entityId: item.id,
+        studentId: plan.studentId,
+        reason,
+      });
+    }
+
+    const allItems = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
+    const finalStatus = rollupPlanStatus(allItems);
     const [row] = await tx
       .update(coursePlan)
-      .set({ status: "REJECTED", rejectionReason: reason, reviewedBy: actor.userId, reviewedAt: new Date() })
+      .set({ status: finalStatus, rejectionReason: finalStatus === "REJECTED" ? reason : plan.rejectionReason, reviewedBy: actor.userId, reviewedAt: new Date() })
       .where(eq(coursePlan.id, planId))
       .returning();
 
@@ -690,6 +745,165 @@ export async function rejectPlan(actor: Actor, planId: string, reason: string) {
 
     return row;
   });
+}
+
+/**
+ * Per-course review (DEV-19): "one bad planned course shouldn't force
+ * rejecting the entire plan." Same row-lock-and-revalidate safety as the
+ * whole-plan approvePlan, scoped to a single item.
+ */
+export async function approvePlanItem(actor: Actor, planItemId: string): Promise<DecidePlanItemResult> {
+  await assertCan(actor, "planning.reviewPlan");
+
+  return db.transaction(async (tx) => {
+    const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
+    if (!item) throw new ValidationError("Planned course not found.");
+    if (item.status !== "PENDING") throw new StateError(`This course has already been ${item.status.toLowerCase()}.`);
+
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, item.planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+    if (plan.status !== "SUBMITTED") throw new StateError(`Only a submitted plan's courses can be decided (currently ${plan.status}).`);
+
+    const studentRow = await tx.query.student.findFirst({ where: eq(student.id, plan.studentId) });
+    if (!studentRow) throw new ValidationError("Student not found.");
+    if (studentRow.status !== "ACTIVE") {
+      throw new StateError(`This student's status is ${studentRow.status}; approval is refused.`);
+    }
+
+    await tx.select().from(courseOffering).where(eq(courseOffering.id, item.offeringId)).for("update");
+
+    const result = await validatePlan(tx, plan.studentId, plan.semesterId, [
+      { id: item.id, offeringId: item.offeringId, courseId: item.courseId, isRetake: item.isRetake, prereqOverrideReason: item.prereqOverrideReason },
+    ]);
+    if (result.blocking.length > 0) {
+      throw new ValidationError(`This course can no longer be approved: ${result.blocking.map((i) => i.message).join(" ")}`);
+    }
+
+    const offering = await tx.query.courseOffering.findFirst({ where: eq(courseOffering.id, item.offeringId) });
+    if (!offering) throw new ValidationError("Offering not found.");
+
+    const requestId = randomUUID();
+    const [reg] = await tx
+      .insert(registration)
+      .values({
+        studentId: plan.studentId,
+        offeringId: item.offeringId,
+        semesterId: plan.semesterId,
+        planItemId: item.id,
+        source: "PLAN_APPROVAL",
+        isRetake: item.isRetake,
+        status: "REGISTERED",
+        frozenCreditHours: offering.frozenCreditHours,
+      })
+      .returning();
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "REGISTRATION_CREATED",
+      entityType: "registration",
+      entityId: reg.id,
+      studentId: plan.studentId,
+      newValue: { offeringId: item.offeringId, source: "PLAN_APPROVAL", isRetake: item.isRetake },
+      requestId,
+    });
+
+    const [updatedItem] = await tx
+      .update(coursePlanItem)
+      .set({ status: "APPROVED", decidedBy: actor.userId, decidedAt: new Date() })
+      .where(eq(coursePlanItem.id, planItemId))
+      .returning();
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "COURSE_PLAN_ITEM_APPROVED",
+      entityType: "course_plan_item",
+      entityId: planItemId,
+      studentId: plan.studentId,
+      newValue: { offeringId: item.offeringId, registrationId: reg.id },
+      requestId,
+    });
+
+    const updatedPlan = await resolvePlanIfComplete(tx, actor, plan.id);
+
+    return { item: updatedItem, registration: reg, plan: updatedPlan };
+  });
+}
+
+export async function rejectPlanItem(actor: Actor, planItemId: string, reason: string): Promise<DecidePlanItemResult> {
+  await assertCan(actor, "planning.reviewPlan");
+  if (!reason?.trim()) throw new ValidationError("A reason is required to reject a planned course.");
+
+  return db.transaction(async (tx) => {
+    const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
+    if (!item) throw new ValidationError("Planned course not found.");
+    if (item.status !== "PENDING") throw new StateError(`This course has already been ${item.status.toLowerCase()}.`);
+
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, item.planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+    if (plan.status !== "SUBMITTED") throw new StateError(`Only a submitted plan's courses can be decided (currently ${plan.status}).`);
+
+    const [updatedItem] = await tx
+      .update(coursePlanItem)
+      .set({ status: "REJECTED", rejectionReason: reason, decidedBy: actor.userId, decidedAt: new Date() })
+      .where(eq(coursePlanItem.id, planItemId))
+      .returning();
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "COURSE_PLAN_ITEM_REJECTED",
+      entityType: "course_plan_item",
+      entityId: planItemId,
+      studentId: plan.studentId,
+      reason,
+    });
+
+    const updatedPlan = await resolvePlanIfComplete(tx, actor, plan.id);
+
+    return { item: updatedItem, plan: updatedPlan };
+  });
+}
+
+/** Rolls the plan's own status up once no item is left PENDING (shared by approvePlanItem/rejectPlanItem); returns the plan unchanged while any item is still awaiting a decision. */
+async function resolvePlanIfComplete(tx: Tx, actor: Actor, planId: string): Promise<typeof coursePlan.$inferSelect> {
+  const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
+  if (!plan) throw new ValidationError("Plan not found.");
+
+  const items = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
+  if (items.some((i) => i.status === "PENDING")) return plan;
+
+  const finalStatus = rollupPlanStatus(items);
+  const approvedForCredit: PlanItemForValidation[] = items
+    .filter((i) => i.status === "APPROVED")
+    .map((i) => ({ offeringId: i.offeringId, courseId: i.courseId, isRetake: i.isRetake, prereqOverrideReason: i.prereqOverrideReason }));
+  const totalCredits = await sumPlanCredits(tx, approvedForCredit);
+  const allRejected = finalStatus === "REJECTED";
+
+  const [updated] = await tx
+    .update(coursePlan)
+    .set({
+      status: finalStatus,
+      totalCredits,
+      reviewedBy: actor.userId,
+      reviewedAt: new Date(),
+      rejectionReason: allRejected ? "Every planned course was rejected individually -- see each course's own reason." : plan.rejectionReason,
+    })
+    .where(eq(coursePlan.id, planId))
+    .returning();
+
+  await auditWrite(tx, {
+    actorUserId: actor.userId,
+    actorRole: actor.role,
+    action: finalStatus === "APPROVED" ? "COURSE_PLAN_APPROVED" : finalStatus === "REJECTED" ? "COURSE_PLAN_REJECTED" : "COURSE_PLAN_PARTIALLY_APPROVED",
+    entityType: "course_plan",
+    entityId: planId,
+    studentId: plan.studentId,
+    newValue: { status: finalStatus, totalCredits },
+  });
+
+  return updated;
 }
 
 // ---------------------------------------------------------------------------
@@ -812,6 +1026,21 @@ export async function getPlanItems(actor: Actor, planId: string) {
 export async function getPlanQueue(actor: Actor, semesterId: string) {
   await assertCan(actor, "planning.reviewPlan");
   return db.query.coursePlan.findMany({ where: and(eq(coursePlan.semesterId, semesterId), eq(coursePlan.status, "SUBMITTED")) });
+}
+
+/** A-10's read-only "View" -- every plan a student has ever had, across semesters, with its items. Admin-only per Section 9.4.9 (Super Admin has no role in course planning). */
+export async function getPlansForStudent(actor: Actor, studentId: string) {
+  await assertCan(actor, "planning.reviewPlan");
+  const plans = await db.query.coursePlan.findMany({ where: eq(coursePlan.studentId, studentId) });
+  if (plans.length === 0) return [];
+  const items = await db.query.coursePlanItem.findMany({ where: inArray(coursePlanItem.planId, plans.map((p) => p.id)) });
+  const itemsByPlan = new Map<string, typeof items>();
+  for (const item of items) {
+    const list = itemsByPlan.get(item.planId) ?? [];
+    list.push(item);
+    itemsByPlan.set(item.planId, list);
+  }
+  return plans.map((p) => ({ ...p, items: itemsByPlan.get(p.id) ?? [] }));
 }
 
 export async function getPlan(actor: Actor, planId: string) {

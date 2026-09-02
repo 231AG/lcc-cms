@@ -1,11 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Playfair_Display, Source_Sans_3 } from "next/font/google";
 import { getCurrentActor } from "@/lib/auth/session";
 import { Header } from "@/components/layout/Header";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Brand typography: Playfair Display for headings, Source Sans 3 for body
+// (applied globally in globals.css, not per-component). Geist Mono stays
+// for the monospace code/ID display used throughout the admin tables.
+const headingFont = Playfair_Display({
+  variable: "--font-heading",
+  weight: "variable",
+  subsets: ["latin"],
+});
+
+const bodyFont = Source_Sans_3({
+  variable: "--font-body",
+  weight: "variable",
   subsets: ["latin"],
 });
 
@@ -28,7 +38,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${headingFont.variable} ${bodyFont.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <a

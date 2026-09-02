@@ -21,6 +21,12 @@ import { appUser } from "./identity";
  * until submitted, then again if rejected" over "editable right up to
  * approval" (DEC-35) -- the latter would let a student alter a plan an
  * Admin is actively reviewing.
+ *
+ * PARTIALLY_APPROVED (DEV-19, per-course review): once every item on a
+ * SUBMITTED plan has an individual decision, the plan auto-resolves to
+ * APPROVED (all items approved), REJECTED (all items rejected), or this
+ * new terminal state for a mixed outcome. Like APPROVED, it is not
+ * revisable -- registrations already exist for the approved items.
  */
 export const coursePlan = appSchema.table(
   "course_plan",
@@ -32,7 +38,7 @@ export const coursePlan = appSchema.table(
     semesterId: uuid("semester_id")
       .notNull()
       .references(() => semester.id, { onDelete: "restrict" }),
-    status: text("status").notNull().default("DRAFT"), // DRAFT | SUBMITTED | APPROVED | REJECTED
+    status: text("status").notNull().default("DRAFT"), // DRAFT | SUBMITTED | APPROVED | REJECTED | PARTIALLY_APPROVED
     totalCredits: integer("total_credits").notNull().default(0),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     reviewedBy: uuid("reviewed_by").references(() => appUser.id, { onDelete: "restrict" }),
@@ -41,7 +47,7 @@ export const coursePlan = appSchema.table(
     version: integer("version").notNull().default(0),
   },
   (table) => [
-    check("course_plan_status_valid", sql`${table.status} IN ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED')`),
+    check("course_plan_status_valid", sql`${table.status} IN ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PARTIALLY_APPROVED')`),
     // REQ-P10: a rejection must carry a reason, enforced by the database,
     // not only by the form.
     check(
@@ -57,6 +63,13 @@ export const coursePlan = appSchema.table(
  * (redundant with offering.courseId, but named explicitly in the spec so
  * validators can compare against academic_record/prerequisites without an
  * offering join on every check).
+ *
+ * `status` (DEV-19): each planned course gets its own Admin decision --
+ * "one bad planned course shouldn't force rejecting the entire plan."
+ * PENDING is the state under SUBMITTED review; APPROVED creates a
+ * registration for that item alone; REJECTED requires a reason, same
+ * convention as the plan-level rejection. See coursePlan's own doc
+ * comment for how these roll up into the plan's overall status.
  */
 export const coursePlanItem = appSchema.table(
   "course_plan_item",
@@ -77,7 +90,15 @@ export const coursePlanItem = appSchema.table(
     // 14.5).
     prereqOverrideReason: text("prereq_override_reason"),
     prereqOverrideBy: uuid("prereq_override_by").references(() => appUser.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("PENDING"), // PENDING | APPROVED | REJECTED
+    rejectionReason: text("rejection_reason"),
+    decidedBy: uuid("decided_by").references(() => appUser.id, { onDelete: "restrict" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
   },
+  (table) => [
+    check("course_plan_item_status_valid", sql`${table.status} IN ('PENDING', 'APPROVED', 'REJECTED')`),
+    check("course_plan_item_rejection_reason_required", sql`${table.status} != 'REJECTED' OR ${table.rejectionReason} IS NOT NULL`),
+  ],
 );
 
 /**

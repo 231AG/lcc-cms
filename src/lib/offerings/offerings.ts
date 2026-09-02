@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import { course, courseOffering, offeringMeeting, registration, semester } from "@/lib/db/schema";
@@ -328,5 +328,38 @@ export async function getOfferingMeetings(actor: Actor, offeringId: string) {
       orderBy: (m, { asc }) => [asc(m.dayOfWeek), asc(m.startTime)],
     }),
   );
+}
+
+/**
+ * Batched form of getOfferingMeetings for a set of offerings -- one query
+ * instead of one per offering, grouped in JS. Callers that used to loop
+ * `for (const o of offerings) meetingsByOffering.set(o.id, await
+ * getOfferingMeetings(...))` were opening a new asUser() transaction (a
+ * full round trip to Supabase) per offering; with ~150 offerings in a real
+ * semester that was the dominant cost on the offerings and plan-review
+ * pages, not a missing index (course_offering.semester_id and
+ * offering_meeting.offering_id both already have one, migration 0015).
+ */
+export async function getOfferingMeetingsForOfferings(actor: Actor, offeringIds: string[]) {
+  const meetingsByOffering = new Map<string, Awaited<ReturnType<typeof getOfferingMeetings>>>();
+  if (offeringIds.length === 0) return meetingsByOffering;
+  const meetings = await asUser(actor.userId, (tx) =>
+    tx.query.offeringMeeting.findMany({
+      where: inArray(offeringMeeting.offeringId, offeringIds),
+      orderBy: (m, { asc }) => [asc(m.dayOfWeek), asc(m.startTime)],
+    }),
+  );
+  for (const m of meetings) {
+    const list = meetingsByOffering.get(m.offeringId) ?? [];
+    list.push(m);
+    meetingsByOffering.set(m.offeringId, list);
+  }
+  return meetingsByOffering;
+}
+
+/** Only the offerings a caller already has specific ids for (e.g. a plan's items) -- avoids pulling every offering in the semester when a handful is all that's needed. */
+export async function getOfferingsByIds(actor: Actor, offeringIds: string[]) {
+  if (offeringIds.length === 0) return [];
+  return asUser(actor.userId, (tx) => tx.query.courseOffering.findMany({ where: inArray(courseOffering.id, offeringIds) }));
 }
 

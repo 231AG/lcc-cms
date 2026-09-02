@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -28,13 +29,15 @@ export const metadata: Metadata = { title: "Academic structure" };
  * convention: hide the controls, let assertCan() in the actions be the
  * real enforcement).
  */
+const PAGE_SIZE = 10;
+
 export default async function AcademicStructurePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; deptPage?: string; coursePage?: string }>;
 }) {
   const actor = await getCurrentActor();
-  const { error } = await searchParams;
+  const { error, deptPage, coursePage } = await searchParams;
 
   if (!actor)
     return (
@@ -62,6 +65,14 @@ export default async function AcademicStructurePage({
   const collegeName = (id: string) => colleges.find((c) => c.id === id)?.name ?? id;
   const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? id;
   const courseCode = (id: string) => courses.find((c) => c.id === id)?.code ?? id;
+
+  const deptPageNum = Math.max(1, Number(deptPage) || 1);
+  const totalDeptPages = Math.max(1, Math.ceil(departments.length / PAGE_SIZE));
+  const pagedDepartments = departments.slice((deptPageNum - 1) * PAGE_SIZE, deptPageNum * PAGE_SIZE);
+
+  const coursePageNum = Math.max(1, Number(coursePage) || 1);
+  const totalCoursePages = Math.max(1, Math.ceil(courses.length / PAGE_SIZE));
+  const pagedCourses = courses.slice((coursePageNum - 1) * PAGE_SIZE, coursePageNum * PAGE_SIZE);
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
@@ -126,7 +137,7 @@ export default async function AcademicStructurePage({
       </section>
 
       {/* Departments */}
-      <section className="mb-10">
+      <section id="departments" className="mb-10">
         <h2 className="mb-3 font-medium text-neutral-900">Departments</h2>
         <form action={createDepartmentAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
@@ -173,7 +184,7 @@ export default async function AcademicStructurePage({
               </tr>
             </Thead>
             <tbody>
-              {departments.map((d) => (
+              {pagedDepartments.map((d) => (
                 <Tr key={d.id}>
                   <Td className="font-mono text-xs text-neutral-700">{d.code}</Td>
                   <Td className="font-medium text-neutral-900">{d.name}</Td>
@@ -195,10 +206,27 @@ export default async function AcademicStructurePage({
             </tbody>
           </Table>
         </Card>
+        {totalDeptPages > 1 && (
+          <div className="mt-3 flex items-center gap-3 text-sm">
+            {deptPageNum > 1 && (
+              <Link href={`/admin/structure?deptPage=${deptPageNum - 1}#departments`} className="font-medium text-brand-700 hover:underline">
+                Previous
+              </Link>
+            )}
+            <span className="text-neutral-600">
+              Page {deptPageNum} of {totalDeptPages}
+            </span>
+            {deptPageNum < totalDeptPages && (
+              <Link href={`/admin/structure?deptPage=${deptPageNum + 1}#departments`} className="font-medium text-brand-700 hover:underline">
+                Next
+              </Link>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Courses */}
-      <section className="mb-10">
+      <section id="courses" className="mb-10">
         <h2 className="mb-3 font-medium text-neutral-900">Courses</h2>
         <form action={createCourseAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
@@ -246,7 +274,7 @@ export default async function AcademicStructurePage({
               </tr>
             </Thead>
             <tbody>
-              {courses.map((c) => (
+              {pagedCourses.map((c) => (
                 <Tr key={c.id}>
                   <Td className="font-mono text-xs text-neutral-700">{c.code}</Td>
                   <Td className="font-medium text-neutral-900">{c.title}</Td>
@@ -269,6 +297,23 @@ export default async function AcademicStructurePage({
             </tbody>
           </Table>
         </Card>
+        {totalCoursePages > 1 && (
+          <div className="mt-3 flex items-center gap-3 text-sm">
+            {coursePageNum > 1 && (
+              <Link href={`/admin/structure?coursePage=${coursePageNum - 1}#courses`} className="font-medium text-brand-700 hover:underline">
+                Previous
+              </Link>
+            )}
+            <span className="text-neutral-600">
+              Page {coursePageNum} of {totalCoursePages}
+            </span>
+            {coursePageNum < totalCoursePages && (
+              <Link href={`/admin/structure?coursePage=${coursePageNum + 1}#courses`} className="font-medium text-brand-700 hover:underline">
+                Next
+              </Link>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Prerequisites */}
