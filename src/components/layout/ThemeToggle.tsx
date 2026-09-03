@@ -13,9 +13,8 @@ import { cn } from "@/components/ui/cn";
  *
  * Both states are rendered into the HTML and CSS picks one -- the
  * `.theme-when-light` / `.theme-when-dark` rules in globals.css mirror the same
- * OS-preference/`data-theme` cascade the colour tokens use. So the correct icon
- * and label are right on the very first paint, with no JavaScript involved in
- * choosing them.
+ * `data-theme` cascade the colour tokens use. So the correct icon and label are
+ * right on the very first paint, with no JavaScript involved in choosing them.
  *
  * The preference is stored per-browser in localStorage: the app has no
  * user-settings table (nothing in src/lib/db/schema/*, nothing on `Actor`), and

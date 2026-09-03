@@ -26,16 +26,21 @@
  * `light-dark()` resolves against the used `color-scheme`, so the whole theme
  * switch is three declarations:
  *
- *   :root                      -> color-scheme: light dark   (follow the OS)
+ *   :root                      -> color-scheme: light        (the default)
  *   :root[data-theme="light"]  -> color-scheme: light        (explicit choice)
  *   :root[data-theme="dark"]   -> color-scheme: dark         (explicit choice)
  *
- * With no stored preference the `data-theme` attribute is simply absent and the
- * OS preference wins -- and keeps winning live, without a reload. The inline
- * script in the root layout only writes the attribute when the user has made an
- * explicit choice, which is what keeps the first paint flash-free. It also means
- * the theme still follows the OS with JavaScript disabled, and that native UI
- * (scrollbars, date pickers, autofill) is themed correctly for free.
+ * Light is the default, deliberately, rather than following the OS: this is a
+ * records system that people also print and read next to paper, and everyone
+ * should see the same thing on a first visit regardless of how their laptop
+ * happens to be configured. Dark is opt-in, per browser, via the header toggle.
+ *
+ * With no stored preference the `data-theme` attribute is simply absent, so the
+ * default applies with no JavaScript involved at all. The script in the root
+ * layout only writes the attribute when the user has made an explicit choice,
+ * which is what keeps the first paint flash-free -- and it means the theme is
+ * still correct with JavaScript disabled, and that native UI (scrollbars, date
+ * pickers, autofill) is themed correctly for free.
  *
  * Brand palette: Deep Orchid #932CCC (primary), Lavender Haze #B76DF7
  * (secondary/interaction), Gold Yellow #FFD700 and Honey Gold #F0E68C
@@ -153,7 +158,9 @@
    2. SEMANTIC TOKENS -- one declaration per token, both themes inside it.
    =========================================================================== */
 :root {
-  color-scheme: light dark;
+  /* Light unless the user opts into dark; see the note at the top of the file
+     for why this does not follow `prefers-color-scheme`. */
+  color-scheme: light;
 
   /* --- Global: backgrounds & surfaces ----------------------------------- */
   --background: light-dark(var(--gray-25), var(--ink-950));
@@ -287,9 +294,10 @@
   );
 }
 
-/* Explicit user choice overrides the OS preference. The inline script in the
-   root layout writes this attribute before first paint; absent it, `:root`'s
-   `color-scheme: light dark` follows the OS (and keeps following it live). */
+/* An explicit user choice, written to <html> by public/theme.js before first
+   paint. `[data-theme="light"]` is redundant against the default today, but it
+   is what makes "I chose light" distinguishable from "I have not chosen", so
+   the default can change later without silently overriding people. */
 :root[data-theme="light"] {
   color-scheme: light;
 }
@@ -427,19 +435,10 @@ h6 {
    Lets the theme toggle render both of its states in the server HTML and let
    CSS pick one, instead of resolving the active theme in JavaScript after
    mount -- no hydration mismatch and no wrong icon on first paint. Mirrors
-   the `color-scheme` cascade above: OS preference by default, `data-theme`
-   when the user has chosen explicitly. */
+   the `color-scheme` cascade above exactly, so the icon can never disagree
+   with the theme actually being rendered: light unless `data-theme="dark"`. */
 .theme-when-dark {
   display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .theme-when-light {
-    display: none;
-  }
-  :root:not([data-theme="light"]) .theme-when-dark {
-    display: inline-flex;
-  }
 }
 
 :root[data-theme="dark"] .theme-when-light {

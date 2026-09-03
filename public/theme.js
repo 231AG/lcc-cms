@@ -13,11 +13,11 @@
  * app whose pages are deliberately server-rendered with no client JS.
  *
  * Two jobs, in order:
- *   1. Before first paint, apply a stored preference to <html> so a user who
- *      chose the theme that isn't their OS default never sees a flash of the
- *      other one. Nothing is written when no preference is stored -- CSS
- *      (`color-scheme: light dark` in globals.css) then follows the OS, and
- *      keeps following it live.
+ *   1. Before first paint, apply a stored preference to <html> so someone who
+ *      chose dark never sees a flash of light. Nothing is written when no
+ *      preference is stored: light is the default and CSS applies it on its
+ *      own (`color-scheme: light` in globals.css), so a first visit needs no
+ *      JavaScript at all.
  *   2. Register one delegated click listener for the header toggle.
  */
 (function () {
@@ -30,7 +30,7 @@
       return value === "light" || value === "dark" ? value : null;
     } catch {
       // Storage unavailable (private mode, cookies blocked): fall through to
-      // the OS preference rather than throwing before the page renders.
+      // the light default rather than throwing before the page renders.
       return null;
     }
   }
@@ -43,14 +43,10 @@
     if (!target || !target.closest) return;
     if (!target.closest("[data-theme-toggle]")) return;
 
-    // No attribute yet means "following the OS", so read the OS to work out
-    // which theme the user is actually looking at before flipping away from it.
-    var current =
-      root.dataset.theme === "dark" || root.dataset.theme === "light"
-        ? root.dataset.theme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+    // No attribute yet means nobody has chosen, which renders as light -- so
+    // that is what we are flipping away from. Must stay in step with the
+    // `color-scheme` default in globals.css.
+    var current = root.dataset.theme === "dark" ? "dark" : "light";
     var next = current === "dark" ? "light" : "dark";
 
     root.dataset.theme = next;
