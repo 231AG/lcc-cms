@@ -6,3 +6,4 @@ export { Alert, type AlertTone } from "./Alert";
 export { Table, Thead, Th, Td, Tr } from "./Table";
 export { Label, Input, Select, Textarea, FormField } from "./Form";
 export { PageHeader } from "./PageHeader";
+export { Pagination, pageWindow } from "./Pagination";
