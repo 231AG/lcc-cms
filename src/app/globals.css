@@ -260,6 +260,22 @@
      near-white chip behind it under both themes (32px, not a "large fill"). */
   --seal-backdrop: light-dark(var(--gray-0), var(--gray-100));
 
+  /* Backdrop for the chromeless screens (sign-in, 404, 403): a single very
+     soft brand-tinted glow behind an otherwise plain page. Deliberately low
+     opacity -- it should read as depth, not as decoration competing with the
+     card in front of it. */
+  --screen-glow: radial-gradient(
+      60rem 32rem at 50% -6rem,
+      light-dark(rgba(147, 44, 204, 0.09), rgba(147, 44, 204, 0.22)) 0%,
+      light-dark(rgba(183, 109, 247, 0.04), rgba(183, 109, 247, 0.07)) 45%,
+      transparent 72%
+    ),
+    radial-gradient(
+      44rem 28rem at 88% 108%,
+      light-dark(rgba(183, 109, 247, 0.06), rgba(183, 109, 247, 0.08)) 0%,
+      transparent 68%
+    );
+
   /* Deep Orchid -> Lavender Haze. Reserved for hero/major brand moments; kept
      deliberately more contained (and darker) on dark so no large saturated
      purple area dominates the interface. */
@@ -399,6 +415,12 @@ h6 {
   background-image: var(--gradient-brand);
 }
 
+/* Soft brand glow behind the chromeless screens. Gradients aren't colours, so
+   this is a plain class rather than a Tailwind colour utility. */
+.screen-glow {
+  background-image: var(--screen-glow);
+}
+
 /* ===========================================================================
    5. THEME-CONDITIONAL DISPLAY
    ===========================================================================
@@ -426,6 +448,48 @@ h6 {
 
 :root[data-theme="dark"] .theme-when-dark {
   display: inline-flex;
+}
+
+/* ===========================================================================
+   5b. PROGRESSIVE ENHANCEMENT
+   ===========================================================================
+   The app is server-rendered and its CSP (`script-src 'self'`, no nonce)
+   refuses inline scripts, so nothing here may depend on React hydration.
+   public/enhance.js sets `data-enhanced` on <html> once it runs; until then --
+   and forever, if scripts are blocked -- every control that only works with
+   JavaScript stays hidden rather than sitting there dead. Hiding via a custom
+   class instead of the `hidden` attribute on purpose: a Tailwind `display`
+   utility on the same element would out-cascade `[hidden]`. */
+.enhance-only {
+  display: none;
+}
+
+:root[data-enhanced] .enhance-only {
+  display: inline-flex;
+}
+
+/* Show/hide password: `aria-pressed` is the single source of truth for the
+   control's state, so the script only flips that attribute and CSS decides
+   which icon shows. */
+[data-password-toggle][aria-pressed="false"] [data-when="shown"],
+[data-password-toggle][aria-pressed="true"] [data-when="hidden"] {
+  display: none;
+}
+
+/* Submit feedback. The spinner is purely additive -- the button keeps its
+   "Sign in" text and accessible name while it is in flight. */
+.submit-spinner {
+  display: none;
+}
+
+[data-submitting] .submit-spinner {
+  display: inline-flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submit-spinner {
+    animation: none;
+  }
 }
 
 /* ===========================================================================
