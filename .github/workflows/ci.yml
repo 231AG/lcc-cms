@@ -36,7 +36,15 @@ jobs:
       # resolve to a real project: cookies() short-circuits the prerender
       # before any network call happens. Real values live only in the
       # actual deploy target's environment, never here.
-      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      # Deliberately NOT a *.supabase.co host: src/lib/db/testFixtures.ts
+      # refuses to run when this value contains "supabase.co", because that
+      # fixture writes an app_user row with no backing Auth user and must
+      # never touch a real project. A placeholder ending in .supabase.co
+      # tripped that guard, so `test:fixtures` failed on every run this
+      # repository has ever had. `.invalid` is a reserved TLD that can never
+      # resolve, so the guard stays exactly as strict -- it just stops
+      # mistaking the decoy for the real thing.
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.invalid
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
 
     steps:

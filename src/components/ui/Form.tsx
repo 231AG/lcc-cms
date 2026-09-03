@@ -9,13 +9,16 @@ import { cn } from "./cn";
  * element's accessible name/role (constraint 2).
  */
 
+// Focus is a Deep Orchid border *plus* a 2px Lavender Haze ring. The ring is
+// the part that carries the state -- a border colour shift on its own is close
+// to invisible against a dark surface.
 const fieldBase =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 " +
-  "placeholder:text-neutral-400 focus:border-brand-500 focus:outline focus:outline-2 focus:outline-brand-100 " +
-  "disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500";
+  "w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-fg " +
+  "placeholder:text-fg-subtle focus:border-brand focus:outline focus:outline-2 focus:outline-focus-ring " +
+  "disabled:cursor-not-allowed disabled:border-disabled-line disabled:bg-disabled-surface disabled:text-disabled-fg";
 
 export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
-  return <label className={cn("mb-1 block text-sm font-medium text-neutral-800", className)} {...props} />;
+  return <label className={cn("mb-1 block text-sm font-medium text-fg", className)} {...props} />;
 }
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {

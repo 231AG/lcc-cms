@@ -4,12 +4,12 @@ import { cn } from "./cn";
 export type Tone = "neutral" | "brand" | "success" | "warning" | "danger" | "info";
 
 const tones: Record<Tone, string> = {
-  neutral: "bg-neutral-100 text-neutral-700 border-neutral-200",
-  brand: "bg-brand-50 text-brand-700 border-brand-200",
-  success: "bg-success-50 text-success-800 border-success-200",
-  warning: "bg-warning-50 text-warning-800 border-warning-200",
-  danger: "bg-danger-50 text-danger-800 border-danger-200",
-  info: "bg-info-50 text-info-800 border-info-200",
+  neutral: "bg-surface-subtle text-fg-secondary border-line",
+  brand: "bg-brand-subtle text-brand-fg border-brand-line",
+  success: "bg-success-surface text-success-fg border-success-line",
+  warning: "bg-warning-surface text-warning-fg border-warning-line",
+  danger: "bg-danger-surface text-danger-fg border-danger-line",
+  info: "bg-info-surface text-info-fg border-info-line",
 };
 
 /**

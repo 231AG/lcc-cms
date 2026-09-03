@@ -1,151 +1,407 @@
 @import "tailwindcss";
 
 /*
- * Design tokens for the LCC E-Portal UI. Tailwind 4 has no
- * tailwind.config.js -- this @theme block IS the config. Palette: LCC's
- * institutional purple as `primary` (matching the seal in
- * public/lcc-logo.png) with a gold `accent`, plus warm neutrals and a
- * small set of semantic status colors reused everywhere a badge/alert
- * appears (grade status, semester state, correction status, provisional
- * warnings) instead of ad hoc red-50/amber-50 utility classes per page.
- * The existing `brand-*` scale (used across every page already) is kept
- * as the token NAME -- only its values change, anchored on primary/
- * primary-dark/primary-light at brand-600/700/300 -- so this is a
- * token-value pass, not a rename or a restructure.
+ * ===========================================================================
+ * LCC E-Portal design tokens
+ * ===========================================================================
+ *
+ * Tailwind 4 has no tailwind.config.js -- the `@theme inline` block near the
+ * bottom of this file IS the config. The colour system is deliberately split
+ * into three layers so a component never has to know which theme is active:
+ *
+ *   1. PRIMITIVES  -- raw ramps (orchid/gold/gray/ink). Fixed values, no
+ *                     theme awareness, never referenced by a component.
+ *   2. SEMANTIC    -- what a thing IS ("surface", "line", "brand", "danger-fg").
+ *                     Every semantic token carries BOTH its light and its dark
+ *                     value in a single `light-dark()` declaration.
+ *   3. UTILITIES   -- `@theme inline` maps each semantic token to a Tailwind
+ *                     colour utility (`bg-surface`, `text-fg`, `border-line`).
+ *
+ * Components only ever use layer 3. There are no `dark:` variants anywhere in
+ * the app and no per-component light/dark branches: switching themes swaps the
+ * *values* behind the utilities, not the classes on the elements.
+ *
+ * How the two themes are selected
+ * -------------------------------
+ * `light-dark()` resolves against the used `color-scheme`, so the whole theme
+ * switch is three declarations:
+ *
+ *   :root                      -> color-scheme: light        (the default)
+ *   :root[data-theme="light"]  -> color-scheme: light        (explicit choice)
+ *   :root[data-theme="dark"]   -> color-scheme: dark         (explicit choice)
+ *
+ * Light is the default, deliberately, rather than following the OS: this is a
+ * records system that people also print and read next to paper, and everyone
+ * should see the same thing on a first visit regardless of how their laptop
+ * happens to be configured. Dark is opt-in, per browser, via the header toggle.
+ *
+ * With no stored preference the `data-theme` attribute is simply absent, so the
+ * default applies with no JavaScript involved at all. The script in the root
+ * layout only writes the attribute when the user has made an explicit choice,
+ * which is what keeps the first paint flash-free -- and it means the theme is
+ * still correct with JavaScript disabled, and that native UI (scrollbars, date
+ * pickers, autofill) is themed correctly for free.
+ *
+ * Brand palette: Deep Orchid #932CCC (primary), Lavender Haze #B76DF7
+ * (secondary/interaction), Gold Yellow #FFD700 and Honey Gold #F0E68C
+ * (accents). Status colours are deliberately kept outside the brand ramp.
  */
+
+/* ===========================================================================
+   1. PRIMITIVES -- fixed ramps, identical under both themes.
+   =========================================================================== */
 :root {
-  --background: hsl(260 33% 97%); /* near-white, faint lavender tint */
-  --foreground: hsl(260 20% 14%); /* near-black plum */
+  /* Orchid ramp, anchored on Deep Orchid (600) and Lavender Haze (400). */
+  --orchid-50: #f8f0fe;
+  --orchid-100: #f2e2fc;
+  --orchid-200: #e1c3f8;
+  --orchid-300: #ce9ef3;
+  --orchid-400: #b76df7; /* Lavender Haze */
+  --orchid-500: #a544de;
+  --orchid-600: #932ccc; /* Deep Orchid */
+  --orchid-700: #7b22ac;
+  --orchid-800: #601a85;
+  --orchid-900: #3f1159;
 
-  /* Brand / primary -- LCC purple, anchored on primary/primary-dark/primary-light. */
-  --color-brand-50: hsl(264 60% 96%);
-  --color-brand-100: hsl(264 60% 91%);
-  --color-brand-200: hsl(264 62% 84%);
-  --color-brand-300: hsl(264 65% 65%); /* primary-light */
-  --color-brand-400: hsl(264 68% 56%);
-  --color-brand-500: hsl(264 70% 51%);
-  --color-brand-600: hsl(264 71% 47%); /* primary, #6723CD */
-  --color-brand-700: hsl(264 75% 35%); /* primary-dark, #4C169C */
-  --color-brand-800: hsl(264 78% 27%);
-  --color-brand-900: hsl(264 82% 18%);
+  /* Orchid mixed into the dark neutrals -- the dark theme's "lavender tint".
+     Deep Orchid itself is never used as a large dark-theme background. */
+  --orchid-ink-subtle: #241a33;
+  --orchid-ink-strong: #2f2142;
+  --orchid-ink-line: #4a3168;
 
-  /* Named aliases for the brand brief's own vocabulary, same values as above. */
-  --color-primary: var(--color-brand-600);
-  --color-primary-dark: var(--color-brand-700);
-  --color-primary-light: var(--color-brand-300);
+  /* Gold Yellow / Honey Gold accents, plus their dark-theme counterparts.
+     The literal Honey Gold hex is a light-theme surface only; on dark it
+     becomes a tint + a desaturated text/border pair. */
+  --gold-400: #ffd700; /* Gold Yellow */
+  --gold-700: #8a6d00;
+  --gold-950: #3a2e00;
+  --honey-200: #f0e68c; /* Honey Gold */
+  --honey-500: #b9ab4a;
+  --honey-900: #4a3f00;
+  --honey-ink-surface: #2a2612;
+  --honey-ink-line: #5c5326;
+  --honey-ink-fg: #e4dba0;
 
-  /* Accent / gold -- CTAs, badges, highlights. */
-  --color-accent: hsl(47 90% 58%); /* #F4CB34 */
-  --color-accent-dark: hsl(45 100% 43%); /* #DBA400 */
-  --color-accent-light: hsl(45 100% 82%);
+  /* Neutral ramp -- light theme. */
+  --gray-0: #ffffff;
+  --gray-25: #fafafa;
+  --gray-50: #f5f5f5;
+  --gray-100: #ededed;
+  --gray-200: #e4e4e7;
+  --gray-300: #d4d4d8;
+  --gray-400: #a1a1aa;
+  --gray-500: #888888;
+  --gray-600: #6b6b70;
+  --gray-700: #555555;
+  --gray-900: #111111;
 
-  /* Warm neutrals for surfaces, borders, body text. */
-  --color-neutral-0: #ffffff;
-  --color-neutral-50: #f7f7f5;
-  --color-neutral-100: #efeeea;
-  --color-neutral-200: #e2e0d9;
-  --color-neutral-300: #cbc8bd;
-  --color-neutral-400: #a6a296;
-  --color-neutral-500: #837e70;
-  --color-neutral-600: #635f54;
-  --color-neutral-700: #494539;
-  --color-neutral-800: #302d24;
-  --color-neutral-900: #1c1a15;
+  /* Neutral ramp -- dark theme. Layered lightness, never pure black: each
+     step reads as visibly lighter than the one beneath it, which is how
+     elevation is expressed on dark (rather than heavier shadows). */
+  --ink-950: #0f0f12; /* page background          */
+  --ink-900: #18181d; /* secondary background     */
+  --ink-850: #1a1a20; /* subtle/sunken surface    */
+  --ink-800: #202027; /* card / default surface   */
+  --ink-750: #24242c; /* elevated surface         */
+  --ink-700: #2c2c35; /* default border           */
+  --ink-600: #3a3a46; /* strong border            */
+  --ink-500: #4a4a58; /* border hover             */
+  --ink-400: #6e6e78; /* subtle text/placeholder  */
+  --ink-300: #8a8a94; /* muted text               */
+  --ink-200: #b8b8c0; /* secondary text           */
+  --ink-50: #f5f5f5; /* primary text -- not pure white */
 
-  /* Semantic status colors -- one scale each, used by Badge/Alert, anchored
-     on the brand brief's success/warning/destructive/info values at the
-     -600 step (the shade solid buttons/fills use). */
-  --color-success-50: hsl(142 65% 95%);
-  --color-success-200: hsl(142 55% 82%);
-  --color-success-600: hsl(142 71% 45%);
-  --color-success-800: hsl(142 75% 22%);
+  /* Status ramps. Independent of the brand palette in both themes; the two
+     values per token differ so each stays legible on its own background. */
+  --success-surface-light: #ecfdf3;
+  --success-surface-dark: #10261c;
+  --success-line-light: #a7e9c4;
+  --success-line-dark: #24583d;
+  --success-fg-light: #0b6b37;
+  --success-fg-dark: #7fe0a8;
+  --success-solid-light: #12a150;
+  --success-solid-dark: #1fa95c;
 
-  --color-warning-50: hsl(38 90% 95%);
-  --color-warning-200: hsl(38 85% 80%);
-  --color-warning-600: hsl(38 92% 50%);
-  --color-warning-800: hsl(38 95% 25%);
+  --warning-surface-light: #fff7e6;
+  --warning-surface-dark: #2a2008;
+  --warning-line-light: #f3d48a;
+  --warning-line-dark: #6b5015;
+  --warning-fg-light: #7a4e00;
+  --warning-fg-dark: #f2c462;
+  --warning-solid-light: #d9880b;
+  --warning-solid-dark: #e0a32b;
 
-  /* "destructive" in the brand brief -- kept as the existing `danger` token name. */
-  --color-danger-50: hsl(0 70% 96%);
-  --color-danger-200: hsl(0 65% 85%);
-  --color-danger-600: hsl(0 72% 51%);
-  --color-danger-800: hsl(0 75% 28%);
+  --danger-surface-light: #fef2f2;
+  --danger-surface-dark: #2b1416;
+  --danger-line-light: #f5bebe;
+  --danger-line-dark: #6e2b2f;
+  --danger-fg-light: #a31616;
+  --danger-fg-dark: #f49b9b;
+  --danger-solid-light: #dc2626;
+  --danger-solid-dark: #e04a4a;
+  --danger-solid-hover-light: #b91c1c;
+  --danger-solid-hover-dark: #c93636;
+  --danger-solid-active-light: #991b1b;
+  --danger-solid-active-dark: #b02c2c;
 
-  --color-info-50: hsl(217 85% 96%);
-  --color-info-200: hsl(217 80% 85%);
-  --color-info-600: hsl(217 91% 60%);
-  --color-info-800: hsl(217 85% 30%);
+  --info-surface-light: #eff6ff;
+  --info-surface-dark: #101b30;
+  --info-line-light: #b7d5fe;
+  --info-line-dark: #2b4a86;
+  --info-fg-light: #1d4ed8;
+  --info-fg-dark: #93b8f8;
+  --info-solid-light: #2563eb;
+  --info-solid-dark: #3b82f6;
 }
 
+/* ===========================================================================
+   2. SEMANTIC TOKENS -- one declaration per token, both themes inside it.
+   =========================================================================== */
+:root {
+  /* Light unless the user opts into dark; see the note at the top of the file
+     for why this does not follow `prefers-color-scheme`. */
+  color-scheme: light;
+
+  /* --- Global: backgrounds & surfaces ----------------------------------- */
+  --background: light-dark(var(--gray-25), var(--ink-950));
+  --background-secondary: light-dark(var(--gray-50), var(--ink-900));
+  --surface: light-dark(var(--gray-0), var(--ink-800));
+  --surface-raised: light-dark(var(--gray-0), var(--ink-750));
+  --surface-subtle: light-dark(var(--gray-50), var(--ink-850));
+  /* Row/list hover -- a subtle lavender tint rather than plain gray. */
+  --surface-hover: light-dark(var(--orchid-50), var(--orchid-ink-subtle));
+
+  /* --- Global: text ------------------------------------------------------ */
+  --fg: light-dark(var(--gray-900), var(--ink-50));
+  --fg-secondary: light-dark(var(--gray-700), var(--ink-200));
+  --fg-muted: light-dark(var(--gray-500), var(--ink-300));
+  --fg-subtle: light-dark(var(--gray-400), var(--ink-400));
+  /* Text/icons sitting on a filled brand or status colour. */
+  --on-solid: #ffffff;
+
+  /* --- Global: borders --------------------------------------------------- */
+  --line: light-dark(var(--gray-200), var(--ink-700));
+  --line-subtle: light-dark(var(--gray-100), var(--ink-750));
+  --line-strong: light-dark(var(--gray-300), var(--ink-600));
+  --line-hover: light-dark(var(--gray-400), var(--ink-500));
+
+  /* --- Brand ------------------------------------------------------------- */
+  /* Deep Orchid stays the primary brand colour under both themes. */
+  --brand: light-dark(var(--orchid-600), var(--orchid-600));
+  /* Lavender Haze -- supporting colour; does more of the work on dark. */
+  --brand-secondary: light-dark(var(--orchid-400), var(--orchid-400));
+  /* Brand as *text* on a page/surface background (links, brand figures). */
+  --brand-fg: light-dark(var(--orchid-700), var(--orchid-300));
+  --brand-fg-hover: light-dark(var(--orchid-800), var(--orchid-200));
+  /* Tinted brand surfaces: hover, selected rows, soft brand chips. */
+  --brand-subtle: light-dark(var(--orchid-50), var(--orchid-ink-subtle));
+  --brand-subtle-strong: light-dark(var(--orchid-100), var(--orchid-ink-strong));
+  --brand-line: light-dark(var(--orchid-200), var(--orchid-ink-line));
+
+  /* --- Accents ----------------------------------------------------------- */
+  /* Gold Yellow: high-attention, small surfaces only -- never a large fill. */
+  --accent: light-dark(var(--gold-400), var(--gold-400));
+  --accent-on: light-dark(var(--gold-950), var(--gold-950));
+  --accent-fg: light-dark(var(--gold-700), var(--gold-400));
+  /* Honey Gold: soft accent. On dark the literal hex would be a huge bright
+     fill, so it becomes a tint with a desaturated text/border pair instead. */
+  --accent-soft: light-dark(var(--honey-200), var(--honey-ink-surface));
+  --accent-soft-fg: light-dark(var(--honey-900), var(--honey-ink-fg));
+  --accent-soft-line: light-dark(var(--honey-500), var(--honey-ink-line));
+
+  /* --- Interaction: primary action --------------------------------------- */
+  --primary: light-dark(var(--orchid-600), var(--orchid-600));
+  /* Light: richer/darker on hover. Dark: darker purple reads as dead against
+     a dark surface, so hover lifts toward Lavender Haze instead and the
+     pressed state settles back down. Same behaviour, per-theme values. */
+  --primary-hover: light-dark(var(--orchid-700), var(--orchid-500));
+  --primary-active: light-dark(var(--orchid-800), var(--orchid-700));
+  --on-primary: #ffffff;
+
+  /* --- Interaction: secondary action (outlined) -------------------------- */
+  --secondary-surface: light-dark(var(--gray-0), var(--ink-800));
+  --secondary-surface-hover: light-dark(var(--orchid-50), var(--orchid-ink-subtle));
+  --secondary-surface-active: light-dark(var(--orchid-100), var(--orchid-ink-strong));
+  --secondary-fg: light-dark(var(--orchid-700), var(--orchid-300));
+  --secondary-line: light-dark(var(--orchid-200), var(--orchid-ink-line));
+  --secondary-line-hover: light-dark(var(--orchid-500), var(--orchid-400));
+
+  /* --- Interaction: focus ------------------------------------------------ */
+  /* Lavender Haze focus ring -- always a visible ring, never a border shift
+     alone, which would disappear on dark surfaces. */
+  --focus-ring: light-dark(var(--orchid-400), var(--orchid-300));
+
+  /* --- Interaction: disabled --------------------------------------------- */
+  /* Muted/desaturated neutral -- never a dimmed brand colour. */
+  --disabled-surface: light-dark(var(--gray-100), #212128);
+  --disabled-fg: light-dark(var(--gray-400), var(--ink-400));
+  --disabled-line: light-dark(var(--gray-200), var(--ink-700));
+
+  /* --- Status ------------------------------------------------------------ */
+  --success-surface: light-dark(var(--success-surface-light), var(--success-surface-dark));
+  --success-line: light-dark(var(--success-line-light), var(--success-line-dark));
+  --success-fg: light-dark(var(--success-fg-light), var(--success-fg-dark));
+  --success-solid: light-dark(var(--success-solid-light), var(--success-solid-dark));
+
+  --warning-surface: light-dark(var(--warning-surface-light), var(--warning-surface-dark));
+  --warning-line: light-dark(var(--warning-line-light), var(--warning-line-dark));
+  --warning-fg: light-dark(var(--warning-fg-light), var(--warning-fg-dark));
+  --warning-solid: light-dark(var(--warning-solid-light), var(--warning-solid-dark));
+
+  /* "destructive/error" in the brief -- kept under the existing `danger`
+     name, which the Alert/Badge/Button tone APIs already use. */
+  --danger-surface: light-dark(var(--danger-surface-light), var(--danger-surface-dark));
+  --danger-line: light-dark(var(--danger-line-light), var(--danger-line-dark));
+  --danger-fg: light-dark(var(--danger-fg-light), var(--danger-fg-dark));
+  --danger-solid: light-dark(var(--danger-solid-light), var(--danger-solid-dark));
+  --danger-solid-hover: light-dark(var(--danger-solid-hover-light), var(--danger-solid-hover-dark));
+  --danger-solid-active: light-dark(var(--danger-solid-active-light), var(--danger-solid-active-dark));
+
+  --info-surface: light-dark(var(--info-surface-light), var(--info-surface-dark));
+  --info-line: light-dark(var(--info-line-light), var(--info-line-dark));
+  --info-fg: light-dark(var(--info-fg-light), var(--info-fg-dark));
+  --info-solid: light-dark(var(--info-solid-light), var(--info-solid-dark));
+
+  /* --- Chrome ------------------------------------------------------------ */
+  /* The institutional seal is artwork with a light ground, so it keeps a
+     near-white chip behind it under both themes (32px, not a "large fill"). */
+  --seal-backdrop: light-dark(var(--gray-0), var(--gray-100));
+
+  /* Backdrop for the chromeless screens (sign-in, 404, 403): a single very
+     soft brand-tinted glow behind an otherwise plain page. Deliberately low
+     opacity -- it should read as depth, not as decoration competing with the
+     card in front of it. */
+  --screen-glow: radial-gradient(
+      60rem 32rem at 50% -6rem,
+      light-dark(rgba(147, 44, 204, 0.09), rgba(147, 44, 204, 0.22)) 0%,
+      light-dark(rgba(183, 109, 247, 0.04), rgba(183, 109, 247, 0.07)) 45%,
+      transparent 72%
+    ),
+    radial-gradient(
+      44rem 28rem at 88% 108%,
+      light-dark(rgba(183, 109, 247, 0.06), rgba(183, 109, 247, 0.08)) 0%,
+      transparent 68%
+    );
+
+  /* Deep Orchid -> Lavender Haze. Reserved for hero/major brand moments; kept
+     deliberately more contained (and darker) on dark so no large saturated
+     purple area dominates the interface. */
+  --gradient-brand: linear-gradient(
+    100deg,
+    light-dark(var(--orchid-800), var(--orchid-900)) 0%,
+    light-dark(var(--orchid-600), var(--orchid-700)) 55%,
+    light-dark(var(--orchid-400), var(--orchid-500)) 100%
+  );
+}
+
+/* An explicit user choice, written to <html> by public/theme.js before first
+   paint. `[data-theme="light"]` is redundant against the default today, but it
+   is what makes "I chose light" distinguishable from "I have not chosen", so
+   the default can change later without silently overriding people. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* ===========================================================================
+   3. TAILWIND UTILITY MAPPING
+   =========================================================================== */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-body);
   --font-heading: var(--font-heading);
   --font-mono: var(--font-geist-mono);
 
-  --color-primary: var(--color-primary);
-  --color-primary-dark: var(--color-primary-dark);
-  --color-primary-light: var(--color-primary-light);
-  --color-accent: var(--color-accent);
-  --color-accent-dark: var(--color-accent-dark);
-  --color-accent-light: var(--color-accent-light);
+  /* Global */
+  --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-hover: var(--surface-hover);
 
-  --color-brand-50: var(--color-brand-50);
-  --color-brand-100: var(--color-brand-100);
-  --color-brand-200: var(--color-brand-200);
-  --color-brand-300: var(--color-brand-300);
-  --color-brand-400: var(--color-brand-400);
-  --color-brand-500: var(--color-brand-500);
-  --color-brand-600: var(--color-brand-600);
-  --color-brand-700: var(--color-brand-700);
-  --color-brand-800: var(--color-brand-800);
-  --color-brand-900: var(--color-brand-900);
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-on-solid: var(--on-solid);
 
-  --color-neutral-0: var(--color-neutral-0);
-  --color-neutral-50: var(--color-neutral-50);
-  --color-neutral-100: var(--color-neutral-100);
-  --color-neutral-200: var(--color-neutral-200);
-  --color-neutral-300: var(--color-neutral-300);
-  --color-neutral-400: var(--color-neutral-400);
-  --color-neutral-500: var(--color-neutral-500);
-  --color-neutral-600: var(--color-neutral-600);
-  --color-neutral-700: var(--color-neutral-700);
-  --color-neutral-800: var(--color-neutral-800);
-  --color-neutral-900: var(--color-neutral-900);
+  --color-line: var(--line);
+  --color-line-subtle: var(--line-subtle);
+  --color-line-strong: var(--line-strong);
+  --color-line-hover: var(--line-hover);
 
-  --color-success-50: var(--color-success-50);
-  --color-success-200: var(--color-success-200);
-  --color-success-600: var(--color-success-600);
-  --color-success-800: var(--color-success-800);
+  /* Brand */
+  --color-brand: var(--brand);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-fg-hover: var(--brand-fg-hover);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-subtle-strong: var(--brand-subtle-strong);
+  --color-brand-line: var(--brand-line);
 
-  --color-warning-50: var(--color-warning-50);
-  --color-warning-200: var(--color-warning-200);
-  --color-warning-600: var(--color-warning-600);
-  --color-warning-800: var(--color-warning-800);
+  /* Accents */
+  --color-accent: var(--accent);
+  --color-accent-on: var(--accent-on);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-fg: var(--accent-soft-fg);
+  --color-accent-soft-line: var(--accent-soft-line);
 
-  --color-danger-50: var(--color-danger-50);
-  --color-danger-200: var(--color-danger-200);
-  --color-danger-600: var(--color-danger-600);
-  --color-danger-800: var(--color-danger-800);
+  /* Interaction */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-on-primary: var(--on-primary);
 
-  --color-info-50: var(--color-info-50);
-  --color-info-200: var(--color-info-200);
-  --color-info-600: var(--color-info-600);
-  --color-info-800: var(--color-info-800);
+  --color-secondary-surface: var(--secondary-surface);
+  --color-secondary-surface-hover: var(--secondary-surface-hover);
+  --color-secondary-surface-active: var(--secondary-surface-active);
+  --color-secondary-fg: var(--secondary-fg);
+  --color-secondary-line: var(--secondary-line);
+  --color-secondary-line-hover: var(--secondary-line-hover);
+
+  --color-focus-ring: var(--focus-ring);
+
+  --color-disabled-surface: var(--disabled-surface);
+  --color-disabled-fg: var(--disabled-fg);
+  --color-disabled-line: var(--disabled-line);
+
+  /* Status */
+  --color-success-surface: var(--success-surface);
+  --color-success-line: var(--success-line);
+  --color-success-fg: var(--success-fg);
+  --color-success-solid: var(--success-solid);
+
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-line: var(--warning-line);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-solid: var(--warning-solid);
+
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-line: var(--danger-line);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-hover: var(--danger-solid-hover);
+  --color-danger-solid-active: var(--danger-solid-active);
+
+  --color-info-surface: var(--info-surface);
+  --color-info-line: var(--info-line);
+  --color-info-fg: var(--info-fg);
+  --color-info-solid: var(--info-solid);
+
+  /* Chrome */
+  --color-seal-backdrop: var(--seal-backdrop);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Same primary/accent as light mode -- only the neutral background/foreground invert. */
-    --background: hsl(260 20% 10%);
-    --foreground: hsl(260 15% 92%);
-  }
-}
-
+/* ===========================================================================
+   4. BASE ELEMENTS
+   =========================================================================== */
 body {
   background: var(--background);
-  color: var(--foreground);
+  color: var(--fg);
   font-family: var(--font-body), "Source Sans 3", Arial, Helvetica, sans-serif;
 }
 
@@ -161,16 +417,98 @@ h6 {
   font-family: var(--font-heading), "Playfair Display", Georgia, serif;
 }
 
-/*
- * Print stylesheet for the server-rendered semester grade sheet
- * (constraint 7: dedicated @media print CSS against server-rendered HTML,
- * not a client-side PDF library). Chrome that shouldn't print (the app
- * header/nav, buttons) uses Tailwind's built-in `print:hidden` variant at
- * the call site, matching the existing PrintButton convention -- this
- * block only resets page-level layout so printed content isn't clipped by
- * screen-only max-width/padding.
- */
+/* Deep Orchid -> Lavender Haze, for hero/major brand moments only. Not a
+   Tailwind colour utility because it is a gradient, not a colour. */
+.bg-gradient-brand {
+  background-image: var(--gradient-brand);
+}
+
+/* Soft brand glow behind the chromeless screens. Gradients aren't colours, so
+   this is a plain class rather than a Tailwind colour utility. */
+.screen-glow {
+  background-image: var(--screen-glow);
+}
+
+/* ===========================================================================
+   5. THEME-CONDITIONAL DISPLAY
+   ===========================================================================
+   Lets the theme toggle render both of its states in the server HTML and let
+   CSS pick one, instead of resolving the active theme in JavaScript after
+   mount -- no hydration mismatch and no wrong icon on first paint. Mirrors
+   the `color-scheme` cascade above exactly, so the icon can never disagree
+   with the theme actually being rendered: light unless `data-theme="dark"`. */
+.theme-when-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-when-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-when-dark {
+  display: inline-flex;
+}
+
+/* ===========================================================================
+   5b. PROGRESSIVE ENHANCEMENT
+   ===========================================================================
+   The app is server-rendered and its CSP (`script-src 'self'`, no nonce)
+   refuses inline scripts, so nothing here may depend on React hydration.
+   public/enhance.js sets `data-enhanced` on <html> once it runs; until then --
+   and forever, if scripts are blocked -- every control that only works with
+   JavaScript stays hidden rather than sitting there dead. Hiding via a custom
+   class instead of the `hidden` attribute on purpose: a Tailwind `display`
+   utility on the same element would out-cascade `[hidden]`. */
+.enhance-only {
+  display: none;
+}
+
+:root[data-enhanced] .enhance-only {
+  display: inline-flex;
+}
+
+/* Show/hide password: `aria-pressed` is the single source of truth for the
+   control's state, so the script only flips that attribute and CSS decides
+   which icon shows. */
+[data-password-toggle][aria-pressed="false"] [data-when="shown"],
+[data-password-toggle][aria-pressed="true"] [data-when="hidden"] {
+  display: none;
+}
+
+/* Submit feedback. The spinner is purely additive -- the button keeps its
+   "Sign in" text and accessible name while it is in flight. */
+.submit-spinner {
+  display: none;
+}
+
+[data-submitting] .submit-spinner {
+  display: inline-flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submit-spinner {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   6. PRINT
+   ===========================================================================
+   Print stylesheet for the server-rendered semester grade sheet (constraint 7:
+   dedicated @media print CSS against server-rendered HTML, not a client-side
+   PDF library). Chrome that shouldn't print (the app header/nav, buttons) uses
+   Tailwind's built-in `print:hidden` variant at the call site, matching the
+   existing PrintButton convention -- this block only resets page-level layout
+   so printed content isn't clipped by screen-only max-width/padding.
+
+   Forcing `color-scheme: light` makes every `light-dark()` token resolve to its
+   light value, so a dark-theme session still prints on white paper without any
+   per-component print overrides. */
 @media print {
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: light;
+  }
   body {
     background: #ffffff;
     color: #000000;
