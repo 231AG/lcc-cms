@@ -99,20 +99,20 @@ export default async function PortalPage() {
           <CardBody>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-neutral-500">Department</dt>
-                <dd className="mt-0.5 font-medium text-neutral-900">{department ? `${department.code} — ${department.name}` : "—"}</dd>
+                <dt className="text-fg-muted">Department</dt>
+                <dd className="mt-0.5 font-medium text-fg">{department ? `${department.code} — ${department.name}` : "—"}</dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Enrolment year</dt>
-                <dd className="mt-0.5 font-medium text-neutral-900">{record.enrolmentYear}</dd>
+                <dt className="text-fg-muted">Enrolment year</dt>
+                <dd className="mt-0.5 font-medium text-fg">{record.enrolmentYear}</dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Status</dt>
-                <dd className="mt-0.5 font-medium text-neutral-900">{record.status}</dd>
+                <dt className="text-fg-muted">Status</dt>
+                <dd className="mt-0.5 font-medium text-fg">{record.status}</dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Current semester</dt>
-                <dd className="mt-0.5 font-medium text-neutral-900">
+                <dt className="text-fg-muted">Current semester</dt>
+                <dd className="mt-0.5 font-medium text-fg">
                   {currentSemesterLabel ? `${currentSemesterLabel} (${currentSemester!.state})` : "No semester is currently open."}
                 </dd>
               </div>
@@ -139,34 +139,34 @@ export default async function PortalPage() {
             )}
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-neutral-500">CGPA</dt>
-                <dd className="mt-0.5 text-lg font-semibold text-brand-700">{cumulative?.cgpa ?? "—"}</dd>
+                <dt className="text-fg-muted">CGPA</dt>
+                <dd className="mt-0.5 text-lg font-semibold text-brand-fg">{cumulative?.cgpa ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Academic standing</dt>
-                <dd className="mt-0.5 font-medium text-neutral-900">
+                <dt className="text-fg-muted">Academic standing</dt>
+                <dd className="mt-0.5 font-medium text-fg">
                   {cumulative?.standing ? STANDING_LABEL[cumulative.standing] : "Not yet available"}
                 </dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Credits earned</dt>
-                <dd className="mt-0.5 font-medium text-neutral-900">
+                <dt className="text-fg-muted">Credits earned</dt>
+                <dd className="mt-0.5 font-medium text-fg">
                   {cumulative ? `${cumulative.totalCreditsEarned} of 132 -- ${cumulative.creditsToGraduation} remaining` : "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Credits attempted</dt>
-                <dd className="mt-0.5 font-medium text-neutral-900">{cumulative?.totalCreditsAttempted ?? "—"}</dd>
+                <dt className="text-fg-muted">Credits attempted</dt>
+                <dd className="mt-0.5 font-medium text-fg">{cumulative?.totalCreditsAttempted ?? "—"}</dd>
               </div>
             </dl>
           </CardBody>
         </Card>
 
         {obligations.length > 0 && (
-          <Card className="mb-6 border-warning-200 bg-warning-50">
+          <Card className="mb-6 border-warning-line bg-warning-surface">
             <CardBody>
               <CardTitle className="mb-2">Outstanding repeats</CardTitle>
-              <ul className="list-disc pl-5 text-sm text-warning-800">
+              <ul className="list-disc pl-5 text-sm text-warning-fg">
                 {obligations.map((o) => (
                   <li key={o.recordId}>
                     {o.courseCode} — {o.courseTitle} ({o.letter})
@@ -182,16 +182,16 @@ export default async function PortalPage() {
             <CardTitle>Semesters</CardTitle>
           </CardHeader>
           <CardBody>
-            {history.length === 0 && <p className="text-sm text-neutral-500">No results yet.</p>}
+            {history.length === 0 && <p className="text-sm text-fg-muted">No results yet.</p>}
             {[...new Set(history.map((r) => r.semesterId))].map((semesterId, index) => {
               const info = semesterInfo(semesterId);
               const summary = semesterSummaryFor(semesterId);
               const courses = history.filter((r) => r.semesterId === semesterId);
               return (
-                <div key={semesterId} className={index > 0 ? "mt-6 border-t border-neutral-100 pt-6" : ""}>
+                <div key={semesterId} className={index > 0 ? "mt-6 border-t border-line-subtle pt-6" : ""}>
                   <div className="mb-2 flex items-baseline justify-between">
-                    <h3 className="text-sm font-semibold text-neutral-900">{info?.label ?? semesterId}</h3>
-                    <span className="flex items-center gap-2 text-xs text-neutral-500">
+                    <h3 className="text-sm font-semibold text-fg">{info?.label ?? semesterId}</h3>
+                    <span className="flex items-center gap-2 text-xs text-fg-muted">
                       GPA {summary?.gpa ?? "—"} {summary?.isProvisional && "(provisional)"}
                       <PrintButton semesterId={semesterId} />
                     </span>
@@ -208,7 +208,7 @@ export default async function PortalPage() {
                             {c.letter}
                             {c.isRepeatDropped && " (R)"}
                             {c.letter === "I" && info && (
-                              <span className="ml-1 text-xs text-warning-600">
+                              <span className="ml-1 text-xs text-warning-fg">
                                 -- must be resolved by end of {formatSemesterSortKey(computeIncompleteDeadlineSemester(info.sortKey))}
                               </span>
                             )}
@@ -240,16 +240,16 @@ export default async function PortalPage() {
           </CardHeader>
           <CardBody>
             {nothingWaiting ? (
-              <p className="text-sm text-neutral-500">Nothing is awaiting your approval.</p>
+              <p className="text-sm text-fg-muted">Nothing is awaiting your approval.</p>
             ) : (
               <ul className="flex flex-col gap-2 text-sm">
                 <li>
-                  <Link href="/admin/grade-review" className="font-medium text-brand-700 hover:underline">
+                  <Link href="/admin/grade-review" className="font-medium text-brand-fg hover:underline">
                     {summary.submissionsAwaitingApproval} grade submission(s) awaiting approval
                   </Link>
                 </li>
                 <li>
-                  <Link href="/admin/grade-corrections" className="font-medium text-brand-700 hover:underline">
+                  <Link href="/admin/grade-corrections" className="font-medium text-brand-fg hover:underline">
                     {summary.correctionsAwaitingDecision} correction(s) awaiting decision
                   </Link>
                 </li>
@@ -264,12 +264,12 @@ export default async function PortalPage() {
           </CardHeader>
           <CardBody>
             {summary.semesterStates.length === 0 ? (
-              <p className="text-sm text-neutral-500">No semesters exist yet.</p>
+              <p className="text-sm text-fg-muted">No semesters exist yet.</p>
             ) : (
-              <ul className="flex flex-col divide-y divide-neutral-100 text-sm">
+              <ul className="flex flex-col divide-y divide-line-subtle text-sm">
                 {summary.semesterStates.map((s) => (
                   <li key={s.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                    <span className="text-neutral-800">{s.label}</span>
+                    <span className="text-fg">{s.label}</span>
                     <Badge tone={semesterStateTone(s.state)}>{s.state}</Badge>
                   </li>
                 ))}
@@ -296,26 +296,26 @@ export default async function PortalPage() {
         </CardHeader>
         <CardBody>
           {nothingWaiting ? (
-            <p className="text-sm text-neutral-500">Nothing is waiting for you.</p>
+            <p className="text-sm text-fg-muted">Nothing is waiting for you.</p>
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {summary.plansAwaitingApproval > 0 && (
                 <li>
-                  <Link href="/admin/planning" className="font-medium text-brand-700 hover:underline">
+                  <Link href="/admin/planning" className="font-medium text-brand-fg hover:underline">
                     {summary.plansAwaitingApproval} plan(s) awaiting approval
                   </Link>
                 </li>
               )}
               {summary.classesNotYetSubmitted > 0 && (
                 <li>
-                  <Link href="/admin/grades" className="font-medium text-brand-700 hover:underline">
+                  <Link href="/admin/grades" className="font-medium text-brand-fg hover:underline">
                     {summary.classesNotYetSubmitted} class(es) with grades not yet submitted
                   </Link>
                 </li>
               )}
               {summary.rejectedGradesNeedingRework > 0 && (
                 <li>
-                  <Link href="/admin/grades" className="font-medium text-brand-700 hover:underline">
+                  <Link href="/admin/grades" className="font-medium text-brand-fg hover:underline">
                     {summary.rejectedGradesNeedingRework} grade(s) rejected and needing rework
                   </Link>
                 </li>
@@ -330,15 +330,15 @@ export default async function PortalPage() {
           <CardTitle>Historical import</CardTitle>
         </CardHeader>
         <CardBody>
-          <ul className="flex flex-col divide-y divide-neutral-100 text-sm">
+          <ul className="flex flex-col divide-y divide-line-subtle text-sm">
             {Object.entries(summary.importByStatus).map(([status, count]) => (
               <li key={status} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                <span className="text-neutral-800">{status}</span>
-                <span className="font-medium text-neutral-900">{count}</span>
+                <span className="text-fg">{status}</span>
+                <span className="font-medium text-fg">{count}</span>
               </li>
             ))}
           </ul>
-          <Link href="/admin/historical/progress" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+          <Link href="/admin/historical/progress" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-fg hover:underline">
             Full progress report
           </Link>
         </CardBody>

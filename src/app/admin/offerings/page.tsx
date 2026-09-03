@@ -126,7 +126,7 @@ export default async function OfferingsPage({
           {isAdmin && (
             <Card className="mb-6">
               <CardBody>
-                <h2 className="mb-3 font-medium text-neutral-900">Add an offering</h2>
+                <h2 className="mb-3 font-medium text-fg">Add an offering</h2>
                 <form action={createOfferingAction} className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="semesterId" value={semesterId} />
                   <div>
@@ -166,7 +166,7 @@ export default async function OfferingsPage({
           )}
 
           <section>
-            <h2 className="mb-3 font-medium text-neutral-900">Offerings for {yearLabel(semesterId)}</h2>
+            <h2 className="mb-3 font-medium text-fg">Offerings for {yearLabel(semesterId)}</h2>
             <form method="GET" className="mb-4 flex flex-wrap items-end gap-2">
               <input type="hidden" name="semesterId" value={semesterId} />
               <div>
@@ -179,13 +179,13 @@ export default async function OfferingsPage({
                 Search
               </Button>
               {q && (
-                <Link href={`/admin/offerings?semesterId=${semesterId}`} className="text-sm text-neutral-500 hover:underline">
+                <Link href={`/admin/offerings?semesterId=${semesterId}`} className="text-sm text-fg-muted hover:underline">
                   Clear
                 </Link>
               )}
             </form>
-            {offerings.length === 0 && <p className="text-sm text-neutral-500">No offerings yet.</p>}
-            {offerings.length > 0 && filteredOfferings.length === 0 && <p className="text-sm text-neutral-500">No offerings match this search.</p>}
+            {offerings.length === 0 && <p className="text-sm text-fg-muted">No offerings yet.</p>}
+            {offerings.length > 0 && filteredOfferings.length === 0 && <p className="text-sm text-fg-muted">No offerings match this search.</p>}
             <div className="flex flex-col gap-4">
               {pagedOfferings.map((o) => {
                 const c = courseFor(o.courseId);
@@ -195,12 +195,12 @@ export default async function OfferingsPage({
                     <CardBody>
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <span className="font-medium text-neutral-900">{c ? `${c.code} — ${c.title}` : o.courseId}</span>{" "}
-                          <span className="text-sm text-neutral-500">Section {o.section}</span>
+                          <span className="font-medium text-fg">{c ? `${c.code} — ${c.title}` : o.courseId}</span>{" "}
+                          <span className="text-sm text-fg-muted">Section {o.section}</span>
                         </div>
                         <Badge tone={o.status === "PUBLISHED" ? "success" : o.status === "CANCELLED" ? "danger" : "neutral"}>{o.status}</Badge>
                       </div>
-                      <p className="mb-2 text-sm text-neutral-600">
+                      <p className="mb-2 text-sm text-fg-secondary">
                         {o.instructorName || "No instructor set"} — {o.frozenCreditHours} credit hours
                         {o.capacity ? ` — capacity ${o.capacity}` : ""}
                       </p>
@@ -209,18 +209,18 @@ export default async function OfferingsPage({
                         <table className="mb-2 w-full border-collapse text-xs">
                           <tbody>
                             {meetings.map((m) => (
-                              <tr key={m.id} className="border-b border-neutral-100">
-                                <td className="py-1 pr-2 text-neutral-700">{DAY_NAMES[m.dayOfWeek]}</td>
-                                <td className="py-1 pr-2 text-neutral-700">
+                              <tr key={m.id} className="border-b border-line-subtle">
+                                <td className="py-1 pr-2 text-fg-secondary">{DAY_NAMES[m.dayOfWeek]}</td>
+                                <td className="py-1 pr-2 text-fg-secondary">
                                   {m.startTime}–{m.endTime}
                                 </td>
-                                <td className="py-1 pr-2 text-neutral-700">{m.room ?? ""}</td>
+                                <td className="py-1 pr-2 text-fg-secondary">{m.room ?? ""}</td>
                                 {isAdmin && (
                                   <td className="py-1">
                                     <form action={removeMeetingAction}>
                                       <input type="hidden" name="semesterId" value={semesterId} />
                                       <input type="hidden" name="meetingId" value={m.id} />
-                                      <button type="submit" className="font-medium text-danger-600 hover:underline">
+                                      <button type="submit" className="font-medium text-danger-fg hover:underline">
                                         Remove
                                       </button>
                                     </form>
@@ -234,13 +234,13 @@ export default async function OfferingsPage({
 
                       {isAdmin && (
                         <details className="mb-2">
-                          <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Add meeting time</summary>
+                          <summary className="cursor-pointer text-xs font-medium text-brand-fg hover:underline">Add meeting time</summary>
                           <form action={addMeetingAction} className="mt-2 flex flex-wrap items-end gap-2">
                             <input type="hidden" name="semesterId" value={semesterId} />
                             <input type="hidden" name="offeringId" value={o.id} />
                             <div>
                               <Label className="text-xs">Day</Label>
-                              <select name="dayOfWeek" required className="rounded-md border border-neutral-300 px-2 py-1 text-xs">
+                              <select name="dayOfWeek" required className="rounded-md border border-line-strong px-2 py-1 text-xs">
                                 {DAY_NAMES.slice(1).map((d, i) => (
                                   <option key={d} value={i + 1}>
                                     {d}
@@ -250,15 +250,15 @@ export default async function OfferingsPage({
                             </div>
                             <div>
                               <Label className="text-xs">Start</Label>
-                              <input name="startTime" type="time" required className="rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                              <input name="startTime" type="time" required className="rounded-md border border-line-strong px-2 py-1 text-xs" />
                             </div>
                             <div>
                               <Label className="text-xs">End</Label>
-                              <input name="endTime" type="time" required className="rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                              <input name="endTime" type="time" required className="rounded-md border border-line-strong px-2 py-1 text-xs" />
                             </div>
                             <div>
                               <Label className="text-xs">Room</Label>
-                              <input name="room" className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                              <input name="room" className="w-24 rounded-md border border-line-strong px-2 py-1 text-xs" />
                             </div>
                             <Button type="submit" variant="secondary" size="sm">
                               Add
@@ -270,12 +270,12 @@ export default async function OfferingsPage({
                       {isAdmin && (
                         <div className="flex flex-wrap items-center gap-3">
                           <details>
-                            <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Edit instructor/capacity</summary>
+                            <summary className="cursor-pointer text-xs font-medium text-brand-fg hover:underline">Edit instructor/capacity</summary>
                             <form action={updateOfferingAction} className="mt-2 flex flex-wrap items-end gap-2">
                               <input type="hidden" name="semesterId" value={semesterId} />
                               <input type="hidden" name="offeringId" value={o.id} />
-                              <input name="instructorName" defaultValue={o.instructorName ?? ""} placeholder="Instructor" className="w-40 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
-                              <input name="capacity" type="number" min={1} defaultValue={o.capacity ?? ""} placeholder="Capacity" className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                              <input name="instructorName" defaultValue={o.instructorName ?? ""} placeholder="Instructor" className="w-40 rounded-md border border-line-strong px-2 py-1 text-xs" />
+                              <input name="capacity" type="number" min={1} defaultValue={o.capacity ?? ""} placeholder="Capacity" className="w-24 rounded-md border border-line-strong px-2 py-1 text-xs" />
                               <Button type="submit" variant="secondary" size="sm">
                                 Save
                               </Button>
@@ -285,7 +285,7 @@ export default async function OfferingsPage({
                             <form action={publishOfferingAction}>
                               <input type="hidden" name="semesterId" value={semesterId} />
                               <input type="hidden" name="offeringId" value={o.id} />
-                              <button type="submit" className="text-xs font-medium text-brand-700 hover:underline">
+                              <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
                                 Publish
                               </button>
                             </form>
@@ -294,7 +294,7 @@ export default async function OfferingsPage({
                             <form action={cancelOfferingAction}>
                               <input type="hidden" name="semesterId" value={semesterId} />
                               <input type="hidden" name="offeringId" value={o.id} />
-                              <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                              <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
                                 Cancel
                               </button>
                             </form>
@@ -312,18 +312,18 @@ export default async function OfferingsPage({
                 {pageNum > 1 && (
                   <Link
                     href={`/admin/offerings?semesterId=${semesterId}&q=${encodeURIComponent(q ?? "")}&page=${pageNum - 1}`}
-                    className="font-medium text-brand-700 hover:underline"
+                    className="font-medium text-brand-fg hover:underline"
                   >
                     Previous
                   </Link>
                 )}
-                <span className="text-neutral-600">
+                <span className="text-fg-secondary">
                   Page {pageNum} of {totalPages}
                 </span>
                 {pageNum < totalPages && (
                   <Link
                     href={`/admin/offerings?semesterId=${semesterId}&q=${encodeURIComponent(q ?? "")}&page=${pageNum + 1}`}
-                    className="font-medium text-brand-700 hover:underline"
+                    className="font-medium text-brand-fg hover:underline"
                   >
                     Next
                   </Link>

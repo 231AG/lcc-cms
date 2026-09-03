@@ -49,7 +49,7 @@ export default async function ExportPage() {
         description="A full copy of a semester's academic data leaves the system when you download it. Every export is recorded in the audit log."
       />
 
-      {semesters.length === 0 && <p className="text-sm text-neutral-500">No semesters exist yet.</p>}
+      {semesters.length === 0 && <p className="text-sm text-fg-muted">No semesters exist yet.</p>}
 
       <ul className="flex flex-col gap-2">
         {semesters.map((s, i) => {
@@ -59,16 +59,16 @@ export default async function ExportPage() {
               <Card>
                 <CardBody className="flex flex-col gap-1 py-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-neutral-800">
-                      {yearLabel(s.academicYearId)} — {s.name} <span className="text-xs text-neutral-500">({s.state})</span>
+                    <span className="text-sm text-fg">
+                      {yearLabel(s.academicYearId)} — {s.name} <span className="text-xs text-fg-muted">({s.state})</span>
                     </span>
-                    <a href={`/admin/export/${s.id}`} className="flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+                    <a href={`/admin/export/${s.id}`} className="flex items-center gap-1 text-sm font-medium text-brand-fg hover:underline">
                       <Download className="h-3.5 w-3.5" aria-hidden="true" />
                       Download CSV
                     </a>
                   </div>
                   {unpublished > 0 && (
-                    <p className="text-xs text-warning-700">
+                    <p className="text-xs text-warning-fg">
                       {unpublished} registered student{unpublished === 1 ? "" : "s"} in this semester still {unpublished === 1 ? "has" : "have"} no
                       published grade -- this export will not include a final result for them.
                     </p>

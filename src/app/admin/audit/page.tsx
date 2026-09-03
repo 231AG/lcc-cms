@@ -106,7 +106,7 @@ export default async function AuditLogPage({
             Filter
           </Button>
           {hasFilters && (
-            <a href="/admin/audit" className="text-sm font-medium text-brand-700 hover:underline">
+            <a href="/admin/audit" className="text-sm font-medium text-brand-fg hover:underline">
               Clear
             </a>
           )}
@@ -114,7 +114,7 @@ export default async function AuditLogPage({
       </Card>
 
       {groups.length === 0 && (
-        <p className="text-sm text-neutral-500">{hasFilters ? "No entries match this filter." : "No audit entries yet."}</p>
+        <p className="text-sm text-fg-muted">{hasFilters ? "No entries match this filter." : "No audit entries yet."}</p>
       )}
 
       <ul className="flex flex-col gap-3">
@@ -122,30 +122,30 @@ export default async function AuditLogPage({
           <li key={group.requestId ?? `single-${i}`}>
             <Card className="p-3 text-sm">
               {group.entries.length > 1 && (
-                <p className="mb-2 text-xs font-medium text-neutral-500">
+                <p className="mb-2 text-xs font-medium text-fg-muted">
                   {group.entries.length} correlated entries (request {group.requestId})
                 </p>
               )}
               <ul className="flex flex-col gap-2">
                 {group.entries.map((entry) => (
-                  <li key={entry.id} className="border-t border-neutral-100 pt-2 first:border-t-0 first:pt-0">
+                  <li key={entry.id} className="border-t border-line-subtle pt-2 first:border-t-0 first:pt-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-neutral-100 px-2 py-0.5 font-mono text-xs text-neutral-700">{entry.action}</span>
-                      <span className="text-xs text-neutral-500">{new Date(entry.occurredAt).toISOString()}</span>
-                      <span className="text-xs text-neutral-500">
+                      <span className="rounded bg-surface-subtle px-2 py-0.5 font-mono text-xs text-fg-secondary">{entry.action}</span>
+                      <span className="text-xs text-fg-muted">{new Date(entry.occurredAt).toISOString()}</span>
+                      <span className="text-xs text-fg-muted">
                         actor: {entry.actorUserId ?? "system"} ({entry.actorRoleSnapshot ?? "—"})
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-neutral-600">
+                    <p className="mt-1 text-xs text-fg-secondary">
                       {entry.entityType}
                       {entry.entityId ? ` #${entry.entityId}` : ""}
                       {entry.studentId ? ` · student ${entry.studentId}` : ""}
                     </p>
-                    {entry.reason && <p className="mt-1 text-xs italic text-neutral-700">Reason: {entry.reason}</p>}
+                    {entry.reason && <p className="mt-1 text-xs italic text-fg-secondary">Reason: {entry.reason}</p>}
                     {(entry.oldValue !== null || entry.newValue !== null) && (
                       <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
-                        <pre className="overflow-x-auto rounded bg-danger-50 p-1 text-danger-800">{entry.oldValue ? JSON.stringify(entry.oldValue) : "—"}</pre>
-                        <pre className="overflow-x-auto rounded bg-success-50 p-1 text-success-800">{entry.newValue ? JSON.stringify(entry.newValue) : "—"}</pre>
+                        <pre className="overflow-x-auto rounded bg-danger-surface p-1 text-danger-fg">{entry.oldValue ? JSON.stringify(entry.oldValue) : "—"}</pre>
+                        <pre className="overflow-x-auto rounded bg-success-surface p-1 text-success-fg">{entry.newValue ? JSON.stringify(entry.newValue) : "—"}</pre>
                       </div>
                     )}
                   </li>
@@ -158,14 +158,14 @@ export default async function AuditLogPage({
 
       <div className="mt-6 flex items-center justify-between text-sm">
         {page > 0 ? (
-          <a href={qs({ page: page - 1 })} className="font-medium text-brand-700 hover:underline">
+          <a href={qs({ page: page - 1 })} className="font-medium text-brand-fg hover:underline">
             Newer
           </a>
         ) : (
           <span />
         )}
         {hasMore && (
-          <a href={qs({ page: page + 1 })} className="font-medium text-brand-700 hover:underline">
+          <a href={qs({ page: page + 1 })} className="font-medium text-brand-fg hover:underline">
             Older
           </a>
         )}

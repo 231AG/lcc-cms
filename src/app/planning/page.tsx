@@ -55,7 +55,7 @@ export default async function PlanningPage({
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 outline-none">
         <PageHeader title="Course planning" />
-        <p className="text-sm text-neutral-500">Course planning is not currently open.</p>
+        <p className="text-sm text-fg-muted">Course planning is not currently open.</p>
       </main>
     );
   }
@@ -101,10 +101,10 @@ export default async function PlanningPage({
       {plan && (plan.status === "DRAFT" || plan.status === "REJECTED") && (
         <>
           {plan.status === "REJECTED" && (
-            <Card className="mb-6 border-danger-200 bg-danger-50">
+            <Card className="mb-6 border-danger-line bg-danger-surface">
               <CardBody>
-                <CardTitle className="mb-1 text-danger-800">Rejected</CardTitle>
-                <p className="mb-3 text-sm text-danger-800">{plan.rejectionReason}</p>
+                <CardTitle className="mb-1 text-danger-fg">Rejected</CardTitle>
+                <p className="mb-3 text-sm text-danger-fg">{plan.rejectionReason}</p>
                 <form action={revisePlanAction}>
                   <input type="hidden" name="semesterId" value={semesterId} />
                   <input type="hidden" name="planId" value={plan.id} />
@@ -121,20 +121,20 @@ export default async function PlanningPage({
               <CardTitle>Your plan -- {totalCredits} credit hours</CardTitle>
             </CardHeader>
             <CardBody>
-              {items.length === 0 && <p className="mb-3 text-sm text-neutral-500">No courses added yet.</p>}
+              {items.length === 0 && <p className="mb-3 text-sm text-fg-muted">No courses added yet.</p>}
               <ul className="mb-4 flex flex-col gap-2">
                 {items.map((i) => {
                   const c = courseFor(i.courseId);
                   const o = offeringFor(i.offeringId);
                   return (
-                    <li key={i.id} className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm">
+                    <li key={i.id} className="flex items-center justify-between rounded-md border border-line px-3 py-2 text-sm">
                       <span>
                         {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section}){i.isRetake && " — retake"}
                       </span>
                       <form action={removePlanItemAction}>
                         <input type="hidden" name="semesterId" value={semesterId} />
                         <input type="hidden" name="planItemId" value={i.id} />
-                        <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                        <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
                           Remove
                         </button>
                       </form>
@@ -152,7 +152,7 @@ export default async function PlanningPage({
                   <form action={deleteDraftPlanAction}>
                     <input type="hidden" name="semesterId" value={semesterId} />
                     <input type="hidden" name="planId" value={plan.id} />
-                    <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                    <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
                       Delete plan
                     </button>
                   </form>
@@ -172,25 +172,25 @@ export default async function PlanningPage({
                   const meetings = meetingsByOffering.get(o.id) ?? [];
                   const already = plannedOfferingIds.has(o.id);
                   return (
-                    <div key={o.id} className="rounded-md border border-neutral-200 p-3 text-sm">
+                    <div key={o.id} className="rounded-md border border-line p-3 text-sm">
                       <div className="mb-1 flex items-center justify-between">
-                        <span className="font-medium text-neutral-900">
+                        <span className="font-medium text-fg">
                           {c ? `${c.code} — ${c.title}` : o.courseId} (Section {o.section})
                         </span>
-                        <span className="text-xs text-neutral-500">{o.frozenCreditHours}cr</span>
+                        <span className="text-xs text-fg-muted">{o.frozenCreditHours}cr</span>
                       </div>
-                      <p className="mb-2 text-xs text-neutral-500">
+                      <p className="mb-2 text-xs text-fg-muted">
                         {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}${m.room ? ` (${m.room})` : ""}`).join(", ")}
                         {o.instructorName ? ` — ${o.instructorName}` : ""}
                       </p>
                       {already ? (
-                        <span className="text-xs text-neutral-400">Already in your plan</span>
+                        <span className="text-xs text-fg-subtle">Already in your plan</span>
                       ) : (
                         <form action={addPlanItemAction}>
                           <input type="hidden" name="semesterId" value={semesterId} />
                           <input type="hidden" name="planId" value={plan.id} />
                           <input type="hidden" name="offeringId" value={o.id} />
-                          <button type="submit" className="text-xs font-medium text-brand-700 hover:underline">
+                          <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
                             Add
                           </button>
                         </form>
@@ -208,7 +208,7 @@ export default async function PlanningPage({
         <Card>
           <CardBody>
             <CardTitle className="mb-2">Submitted -- awaiting a decision</CardTitle>
-            <p className="mb-3 text-sm text-neutral-500">
+            <p className="mb-3 text-sm text-fg-muted">
               {totalCredits} credit hours, submitted {plan.submittedAt?.toISOString().slice(0, 10)}.
             </p>
             <ul className="flex flex-col gap-1 text-sm">
@@ -217,7 +217,7 @@ export default async function PlanningPage({
                 return (
                   <li key={i.id} className="flex items-center justify-between">
                     <span>{c ? `${c.code} — ${c.title}` : i.courseId}</span>
-                    <span className="text-xs text-neutral-500">
+                    <span className="text-xs text-fg-muted">
                       {i.status === "PENDING" ? "Awaiting decision" : i.status === "APPROVED" ? "Approved" : "Rejected"}
                     </span>
                   </li>
@@ -229,11 +229,11 @@ export default async function PlanningPage({
       )}
 
       {plan && plan.status === "APPROVED" && (
-        <Card className="border-success-200 bg-success-50">
+        <Card className="border-success-line bg-success-surface">
           <CardBody>
-            <CardTitle className="mb-2 text-success-800">Approved</CardTitle>
-            <p className="mb-3 text-sm text-success-800">{totalCredits} credit hours registered.</p>
-            <ul className="flex flex-col gap-1 text-sm text-success-800">
+            <CardTitle className="mb-2 text-success-fg">Approved</CardTitle>
+            <p className="mb-3 text-sm text-success-fg">{totalCredits} credit hours registered.</p>
+            <ul className="flex flex-col gap-1 text-sm text-success-fg">
               {registrations.filter((r) => r.status === "REGISTERED").map((r) => {
                 const o = offeringFor(r.offeringId);
                 const c = o ? courseFor(o.courseId) : undefined;
@@ -250,20 +250,20 @@ export default async function PlanningPage({
       )}
 
       {plan && plan.status === "PARTIALLY_APPROVED" && (
-        <Card className="border-warning-200 bg-warning-50">
+        <Card className="border-warning-line bg-warning-surface">
           <CardBody>
-            <CardTitle className="mb-2 text-warning-800">Partially approved</CardTitle>
-            <p className="mb-3 text-sm text-warning-800">Some courses were approved and registered; others were rejected.</p>
+            <CardTitle className="mb-2 text-warning-fg">Partially approved</CardTitle>
+            <p className="mb-3 text-sm text-warning-fg">Some courses were approved and registered; others were rejected.</p>
             <ul className="flex flex-col gap-1 text-sm">
               {items.map((i) => {
                 const c = courseFor(i.courseId);
                 return (
                   <li key={i.id} className="flex items-center justify-between">
-                    <span className="text-warning-800">{c ? `${c.code} — ${c.title}` : i.courseId}</span>
+                    <span className="text-warning-fg">{c ? `${c.code} — ${c.title}` : i.courseId}</span>
                     {i.status === "APPROVED" ? (
-                      <span className="text-xs font-medium text-success-700">Approved</span>
+                      <span className="text-xs font-medium text-success-fg">Approved</span>
                     ) : (
-                      <span className="text-xs font-medium text-danger-700">Rejected{i.rejectionReason ? `: ${i.rejectionReason}` : ""}</span>
+                      <span className="text-xs font-medium text-danger-fg">Rejected{i.rejectionReason ? `: ${i.rejectionReason}` : ""}</span>
                     )}
                   </li>
                 );

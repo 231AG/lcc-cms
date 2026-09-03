@@ -59,9 +59,9 @@ export default async function HistoricalEntryPage({
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
         <PageHeader title="Historical import" />
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-fg-secondary">
           Open a student&apos;s record from{" "}
-          <Link href="/admin/students" className="font-medium text-brand-700 hover:underline">
+          <Link href="/admin/students" className="font-medium text-brand-fg hover:underline">
             Students
           </Link>{" "}
           and use &quot;Enter historical record&quot; to get here with a student selected.
@@ -107,7 +107,7 @@ export default async function HistoricalEntryPage({
         description={
           <>
             Student ID {record.studentNumber} — {department ? `${department.code} — ${department.name}` : "—"} —{" "}
-            <Link href={`/admin/students/${record.id}`} className="font-medium text-brand-700 hover:underline">
+            <Link href={`/admin/students/${record.id}`} className="font-medium text-brand-fg hover:underline">
               Back to profile
             </Link>
           </>
@@ -131,8 +131,8 @@ export default async function HistoricalEntryPage({
           <CardTitle>Import status</CardTitle>
         </CardHeader>
         <CardBody>
-          <p className="mb-3 text-sm text-neutral-700">
-            Current status: <strong className="text-neutral-900">{record.historicalImportStatus}</strong>
+          <p className="mb-3 text-sm text-fg-secondary">
+            Current status: <strong className="text-fg">{record.historicalImportStatus}</strong>
             {record.historicalImportStatus !== "COMPLETE" && " -- GPA/CGPA figures for this student are marked provisional everywhere they appear."}
           </p>
           {isAdmin && record.historicalImportStatus !== "COMPLETE" && (
@@ -185,7 +185,7 @@ export default async function HistoricalEntryPage({
             </form>
 
             <details className="mb-4">
-              <summary className="cursor-pointer text-sm font-medium text-brand-700 hover:underline">
+              <summary className="cursor-pointer text-sm font-medium text-brand-fg hover:underline">
                 Create a new past semester (created directly Closed)
               </summary>
               <form action={createRetrospectiveSemesterAction} className="mt-3 flex flex-wrap items-end gap-2">
@@ -239,7 +239,7 @@ export default async function HistoricalEntryPage({
               <form action={enterHistoricalSemesterAction} className="flex flex-col gap-3">
                 <input type="hidden" name="studentId" value={studentId} />
                 <input type="hidden" name="semesterId" value={selectedSemester.id} />
-                <p className="text-sm text-neutral-600">
+                <p className="text-sm text-fg-secondary">
                   Entering courses for {yearLabel(selectedSemester.academicYearId)} — {selectedSemester.name}
                 </p>
                 <Table>
@@ -292,7 +292,7 @@ export default async function HistoricalEntryPage({
           <CardTitle>Entered history</CardTitle>
         </CardHeader>
         <CardBody>
-          {history.length === 0 && <p className="text-sm text-neutral-500">Nothing entered yet.</p>}
+          {history.length === 0 && <p className="text-sm text-fg-muted">Nothing entered yet.</p>}
           {history.length > 0 && (
             <Table>
               <Thead>
@@ -313,7 +313,7 @@ export default async function HistoricalEntryPage({
                       <Td>{sem ? `${yearLabel(sem.academicYearId)} — ${sem.name}` : r.semesterId}</Td>
                       <Td>
                         {r.courseCodeSnapshot} — {r.courseTitleSnapshot}
-                        {!r.courseId && <span className="ml-1 text-xs text-warning-700">(not in catalogue)</span>}
+                        {!r.courseId && <span className="ml-1 text-xs text-warning-fg">(not in catalogue)</span>}
                       </Td>
                       <Td>{r.creditHours}</Td>
                       <Td>{r.letter}</Td>
@@ -321,23 +321,23 @@ export default async function HistoricalEntryPage({
                       {isAdmin && (
                         <Td>
                           <details>
-                            <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Correct / void</summary>
+                            <summary className="cursor-pointer text-xs font-medium text-brand-fg hover:underline">Correct / void</summary>
                             <form action={correctHistoricalRecordAction} className="mt-2 flex flex-wrap items-end gap-1">
                               <input type="hidden" name="studentId" value={studentId} />
                               <input type="hidden" name="recordId" value={r.id} />
-                              <input name="letter" placeholder="New grade" defaultValue={r.letter} className="w-16 rounded border border-neutral-300 px-1 py-0.5 text-xs" />
-                              <input name="creditHours" type="number" step="0.5" placeholder="Credits" defaultValue={r.creditHours} className="w-16 rounded border border-neutral-300 px-1 py-0.5 text-xs" />
-                              <input name="score" type="number" placeholder="Score" defaultValue={r.score ?? ""} className="w-16 rounded border border-neutral-300 px-1 py-0.5 text-xs" />
-                              <input name="reason" required placeholder="Reason (required)" className="w-32 rounded border border-neutral-300 px-1 py-0.5 text-xs" />
-                              <button type="submit" className="font-medium text-brand-700 hover:underline">
+                              <input name="letter" placeholder="New grade" defaultValue={r.letter} className="w-16 rounded border border-line-strong px-1 py-0.5 text-xs" />
+                              <input name="creditHours" type="number" step="0.5" placeholder="Credits" defaultValue={r.creditHours} className="w-16 rounded border border-line-strong px-1 py-0.5 text-xs" />
+                              <input name="score" type="number" placeholder="Score" defaultValue={r.score ?? ""} className="w-16 rounded border border-line-strong px-1 py-0.5 text-xs" />
+                              <input name="reason" required placeholder="Reason (required)" className="w-32 rounded border border-line-strong px-1 py-0.5 text-xs" />
+                              <button type="submit" className="font-medium text-brand-fg hover:underline">
                                 Save correction
                               </button>
                             </form>
                             <form action={voidHistoricalRecordAction} className="mt-1 flex items-center gap-1">
                               <input type="hidden" name="studentId" value={studentId} />
                               <input type="hidden" name="recordId" value={r.id} />
-                              <input name="reason" required placeholder="Reason to void" className="w-32 rounded border border-neutral-300 px-1 py-0.5 text-xs" />
-                              <button type="submit" className="font-medium text-danger-600 hover:underline">
+                              <input name="reason" required placeholder="Reason to void" className="w-32 rounded border border-line-strong px-1 py-0.5 text-xs" />
+                              <button type="submit" className="font-medium text-danger-fg hover:underline">
                                 Void
                               </button>
                             </form>

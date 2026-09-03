@@ -48,16 +48,16 @@ export default async function GradeReviewQueuePage() {
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
       <PageHeader title="Grade submission review" />
-      {queue.length === 0 && <p className="text-sm text-neutral-500">No submissions awaiting a decision.</p>}
+      {queue.length === 0 && <p className="text-sm text-fg-muted">No submissions awaiting a decision.</p>}
       <ul className="flex flex-col gap-2">
         {queue.map((s) => (
           <li key={s.id}>
             <Card className="flex items-center justify-between px-3 py-2 text-sm">
               <span>
                 {label(s.offeringId)} — {s.undecidedCount} of {s.gradeCount} undecided
-                {s.status === "PARTIALLY_DECIDED" && <span className="ml-1 text-xs text-warning-700">(partially decided)</span>}
+                {s.status === "PARTIALLY_DECIDED" && <span className="ml-1 text-xs text-warning-fg">(partially decided)</span>}
               </span>
-              <Link href={`/admin/grade-review/${s.id}`} className="font-medium text-brand-700 hover:underline">
+              <Link href={`/admin/grade-review/${s.id}`} className="font-medium text-brand-fg hover:underline">
                 Review
               </Link>
             </Card>

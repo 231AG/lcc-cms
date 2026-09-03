@@ -66,7 +66,7 @@ export default async function PlanDetailPage({
   if (!plan) {
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
-        <p className="text-sm text-neutral-500">Plan not found.</p>
+        <p className="text-sm text-fg-muted">Plan not found.</p>
       </main>
     );
   }
@@ -111,31 +111,31 @@ export default async function PlanDetailPage({
 
       <Card className="mb-6">
         <CardBody>
-          <h2 className="mb-3 font-medium text-neutral-900">Items</h2>
+          <h2 className="mb-3 font-medium text-fg">Items</h2>
           <div className="flex flex-col gap-3">
             {items.map((i) => {
               const c = courseFor(i.courseId);
               const o = offeringFor(i.offeringId);
               const meetings = o ? meetingsByOffering.get(o.id) ?? [] : [];
               return (
-                <div key={i.id} className="rounded-md border border-neutral-200 p-3 text-sm">
+                <div key={i.id} className="rounded-md border border-line p-3 text-sm">
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="font-medium text-neutral-900">
+                    <span className="font-medium text-fg">
                       {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section})
                     </span>
-                    <span className="flex items-center gap-2 text-xs text-neutral-500">
+                    <span className="flex items-center gap-2 text-xs text-fg-muted">
                       {o?.frozenCreditHours}cr{i.isRetake && " — retake"}
                       <Badge tone={ITEM_STATUS_TONE[i.status] ?? "neutral"}>{i.status}</Badge>
                     </span>
                   </div>
-                  <p className="mb-2 text-xs text-neutral-500">
+                  <p className="mb-2 text-xs text-fg-muted">
                     {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}`).join(", ")}
                   </p>
-                  {i.status === "REJECTED" && i.rejectionReason && <p className="mb-2 text-xs text-danger-700">Rejected: {i.rejectionReason}</p>}
-                  {i.prereqOverrideReason && <p className="mb-2 text-xs text-warning-700">Prerequisite overridden: {i.prereqOverrideReason}</p>}
+                  {i.status === "REJECTED" && i.rejectionReason && <p className="mb-2 text-xs text-danger-fg">Rejected: {i.rejectionReason}</p>}
+                  {i.prereqOverrideReason && <p className="mb-2 text-xs text-warning-fg">Prerequisite overridden: {i.prereqOverrideReason}</p>}
 
                   {i.status === "PENDING" && (
-                    <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-2">
+                    <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle pt-2">
                       {plan.status === "SUBMITTED" && (
                         <>
                           <form action={approvePlanItemAction}>
@@ -148,7 +148,7 @@ export default async function PlanDetailPage({
                           <form action={rejectPlanItemAction} className="flex items-end gap-2">
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
-                            <input name="reason" required placeholder="Reason" className="w-56 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                            <input name="reason" required placeholder="Reason" className="w-56 rounded-md border border-line-strong px-2 py-1 text-xs" />
                             <Button type="submit" variant="danger" size="sm">
                               Reject
                             </Button>
@@ -157,11 +157,11 @@ export default async function PlanDetailPage({
                       )}
                       {!i.prereqOverrideReason && (
                         <details>
-                          <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Override a failed prerequisite</summary>
+                          <summary className="cursor-pointer text-xs font-medium text-brand-fg hover:underline">Override a failed prerequisite</summary>
                           <form action={overridePrerequisiteAction} className="mt-2 flex flex-wrap items-end gap-2">
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
-                            <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                            <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-line-strong px-2 py-1 text-xs" />
                             <Button type="submit" variant="secondary" size="sm">
                               Override
                             </Button>
@@ -179,7 +179,7 @@ export default async function PlanDetailPage({
 
       {plan.status === "SUBMITTED" && items.some((i) => i.status === "PENDING") && (
         <section>
-          <p className="mb-2 text-xs text-neutral-500">Convenience actions -- apply to every course still pending above.</p>
+          <p className="mb-2 text-xs text-fg-muted">Convenience actions -- apply to every course still pending above.</p>
           <div className="flex flex-wrap items-start gap-4">
             <form action={approvePlanAction}>
               <input type="hidden" name="planId" value={planId} />
@@ -187,7 +187,7 @@ export default async function PlanDetailPage({
             </form>
             <form action={rejectPlanAction} className="flex items-end gap-2">
               <input type="hidden" name="planId" value={planId} />
-              <input name="reason" required placeholder="Reason for rejection" className="w-64 rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+              <input name="reason" required placeholder="Reason for rejection" className="w-64 rounded-md border border-line-strong px-3 py-2 text-sm" />
               <Button type="submit" variant="danger">
                 Reject all pending
               </Button>

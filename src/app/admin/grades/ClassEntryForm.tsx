@@ -95,8 +95,8 @@ export default function ClassEntryForm({
                 return (
                   <Tr key={r.registrationId}>
                     <Td>
-                      {r.studentName} <span className="text-xs text-neutral-400">({r.studentNumber})</span>
-                      {r.isRetake && <span className="ml-1 text-xs text-warning-700">retake</span>}
+                      {r.studentName} <span className="text-xs text-fg-subtle">({r.studentNumber})</span>
+                      {r.isRetake && <span className="ml-1 text-xs text-warning-fg">retake</span>}
                     </Td>
                     <Td>
                       <input type="hidden" name="registrationId" value={r.registrationId} />
@@ -120,7 +120,7 @@ export default function ClassEntryForm({
                             focusNext(r.registrationId);
                           }
                         }}
-                        className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline focus:outline-2 focus:outline-brand-100 disabled:bg-neutral-100"
+                        className="w-20 rounded-md border border-line-strong px-2 py-1 text-sm focus:border-brand focus:outline focus:outline-2 focus:outline-focus-ring disabled:bg-disabled-surface"
                       />
                     </Td>
                     <Td>
@@ -131,12 +131,12 @@ export default function ClassEntryForm({
                         disabled={locked}
                         defaultChecked={r.currentLetter === "I"}
                         onChange={(e) => setIncomplete((p) => ({ ...p, [r.registrationId]: e.target.checked }))}
-                        className="h-4 w-4 rounded border-neutral-300"
+                        className="h-4 w-4 rounded border-line-strong"
                       />
                     </Td>
-                    <Td className="text-xs text-neutral-600">
+                    <Td className="text-xs text-fg-secondary">
                       {preview[r.registrationId] || (r.currentLetter ? `${r.currentLetter} — ${r.currentScore ?? ""}` : "")}
-                      {locked && <span className="ml-1 text-neutral-400">({r.status})</span>}
+                      {locked && <span className="ml-1 text-fg-subtle">({r.status})</span>}
                     </Td>
                   </Tr>
                 );
@@ -149,7 +149,7 @@ export default function ClassEntryForm({
 
       {clearable.length > 0 && (
         <details className="mt-4">
-          <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Clear a draft grade</summary>
+          <summary className="cursor-pointer text-xs font-medium text-brand-fg hover:underline">Clear a draft grade</summary>
           <ul className="mt-2 flex flex-col gap-1">
             {clearable.map((r) => (
               <li key={r.registrationId} className="flex items-center gap-2 text-xs">
@@ -157,7 +157,7 @@ export default function ClassEntryForm({
                 <form action={clearDraftGradeAction}>
                   <input type="hidden" name="offeringId" value={offeringId} />
                   <input type="hidden" name="gradeRecordId" value={r.gradeId!} />
-                  <button type="submit" className="font-medium text-danger-600 hover:underline">
+                  <button type="submit" className="font-medium text-danger-fg hover:underline">
                     Clear
                   </button>
                 </form>

@@ -72,7 +72,7 @@ export default async function CalendarPage({
 
       {/* Academic years */}
       <section className="mb-10">
-        <h2 className="mb-3 font-medium text-neutral-900">Academic years</h2>
+        <h2 className="mb-3 font-medium text-fg">Academic years</h2>
 
         {actor.role === "ADMIN" && (
           <form action={createAcademicYearAction} className="mb-4 flex flex-wrap items-end gap-2">
@@ -110,7 +110,7 @@ export default async function CalendarPage({
             <tbody>
               {years.map((y) => (
                 <Tr key={y.id}>
-                  <Td className="font-medium text-neutral-900">{y.label}</Td>
+                  <Td className="font-medium text-fg">{y.label}</Td>
                   <Td>{y.startDate}</Td>
                   <Td>{y.endDate}</Td>
                 </Tr>
@@ -122,7 +122,7 @@ export default async function CalendarPage({
 
       {/* Semesters */}
       <section>
-        <h2 className="mb-3 font-medium text-neutral-900">Semesters</h2>
+        <h2 className="mb-3 font-medium text-fg">Semesters</h2>
 
         {actor.role === "ADMIN" && (
           <form action={createSemesterAction} className="mb-4 flex flex-wrap items-end gap-2">
@@ -188,13 +188,13 @@ export default async function CalendarPage({
                   <Tr key={s.id} className="align-top">
                     <Td>{yearLabel(s.academicYearId)}</Td>
                     <Td>{s.sequence}</Td>
-                    <Td className="font-medium text-neutral-900">{s.name}</Td>
+                    <Td className="font-medium text-fg">{s.name}</Td>
                     <Td>
                       <Badge tone={STATE_TONE[s.state] ?? "neutral"}>{s.state}</Badge>
                     </Td>
                     <Td>
                       {availableRules.length === 0 && (
-                        <span className="text-neutral-400">
+                        <span className="text-fg-subtle">
                           {actor.role === "ADMIN" ? "No forward move available" : "No backward move available"}
                         </span>
                       )}
@@ -208,7 +208,7 @@ export default async function CalendarPage({
                                 name="reason"
                                 required
                                 placeholder="Reason (required)"
-                                className="w-48 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                                className="w-48 rounded-md border border-line-strong px-2 py-1 text-xs"
                               />
                             )}
                             <Button type="submit" variant="secondary" size="sm">

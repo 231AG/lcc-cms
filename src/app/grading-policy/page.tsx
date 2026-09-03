@@ -42,7 +42,7 @@ export default async function GradingPolicyPage() {
           <tbody>
             {policy.scale.map((row) => (
               <Tr key={row.letter}>
-                <Td className="font-mono font-medium text-neutral-900">{row.letter}</Td>
+                <Td className="font-mono font-medium text-fg">{row.letter}</Td>
                 <Td>{row.minScore !== null && row.maxScore !== null ? `${row.minScore}–${row.maxScore}` : "—"}</Td>
                 <Td>{row.gradePoint ?? "—"}</Td>
                 <Td>{row.isPassing ? "Yes" : "No"}</Td>
@@ -53,23 +53,23 @@ export default async function GradingPolicyPage() {
         </Table>
       </Card>
 
-      <h2 className="mb-2 text-sm font-semibold text-neutral-700">Institution settings</h2>
+      <h2 className="mb-2 text-sm font-semibold text-fg-secondary">Institution settings</h2>
       <Card className="mb-8">
         <Table>
           <tbody>
             {policy.settings.map((s) => (
               <Tr key={s.key}>
-                <Td className="pr-4 font-mono text-xs text-neutral-500">{s.key}</Td>
+                <Td className="pr-4 font-mono text-xs text-fg-muted">{s.key}</Td>
                 <Td className="pr-4">{JSON.stringify(s.value)}</Td>
-                <Td className="text-xs text-neutral-500">{s.description}</Td>
+                <Td className="text-xs text-fg-muted">{s.description}</Td>
               </Tr>
             ))}
           </tbody>
         </Table>
       </Card>
 
-      <h2 className="mb-2 text-sm font-semibold text-neutral-700">Version history</h2>
-      <p className="mb-3 text-xs text-neutral-500">
+      <h2 className="mb-2 text-sm font-semibold text-fg-secondary">Version history</h2>
+      <p className="mb-3 text-xs text-fg-muted">
         Every academic record was computed under the policy version in effect at the time -- an older version
         is never edited, only superseded.
       </p>
@@ -78,8 +78,8 @@ export default async function GradingPolicyPage() {
           <li key={v.policyVersion}>
             <Card>
               <CardBody className="flex items-center justify-between py-2.5">
-                <span className="font-medium text-neutral-900">Version {v.policyVersion}</span>
-                <span className="flex items-center gap-2 text-xs text-neutral-500">
+                <span className="font-medium text-fg">Version {v.policyVersion}</span>
+                <span className="flex items-center gap-2 text-xs text-fg-muted">
                   effective from {new Date(v.effectiveFrom).toISOString().slice(0, 10)}
                   {v.isActive && <Badge tone="success">Active</Badge>}
                 </span>

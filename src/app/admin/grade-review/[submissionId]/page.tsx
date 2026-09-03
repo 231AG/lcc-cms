@@ -46,7 +46,7 @@ export default async function GradeReviewDetailPage({
   if (!detail) {
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
-        <p className="text-sm text-neutral-500">Submission not found.</p>
+        <p className="text-sm text-fg-muted">Submission not found.</p>
       </main>
     );
   }
@@ -114,7 +114,7 @@ export default async function GradeReviewDetailPage({
                           value={g.id}
                           form="decision-form"
                           aria-label={`Select ${s ? `${s.firstName} ${s.lastName}` : g.registrationId} for this decision`}
-                          className="h-4 w-4 rounded border-neutral-300"
+                          className="h-4 w-4 rounded border-line-strong"
                         />
                       )}
                     </Td>
@@ -123,9 +123,9 @@ export default async function GradeReviewDetailPage({
                       {g.letter}
                       {g.score ? ` (${g.score})` : ""}
                     </Td>
-                    <Td className="text-xs text-neutral-500">
+                    <Td className="text-xs text-fg-muted">
                       {g.status}
-                      {g.decisionReason && <span className="ml-1 text-danger-600">— {g.decisionReason}</span>}
+                      {g.decisionReason && <span className="ml-1 text-danger-fg">— {g.decisionReason}</span>}
                     </Td>
                   </Tr>
                 );
@@ -140,7 +140,7 @@ export default async function GradeReviewDetailPage({
           <input type="hidden" name="submissionId" value={submissionId} />
           <div className="flex-1">
             <Label className="text-xs">Reason (required to reject)</Label>
-            <input name="reason" placeholder="Reason for rejection" className="w-64 rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <input name="reason" placeholder="Reason for rejection" className="w-64 rounded-md border border-line-strong px-3 py-2 text-sm" />
           </div>
           <Button type="submit" formAction={approveSubmissionAction}>
             Approve checked (or all, if none checked)

@@ -135,18 +135,18 @@ async function AdminRequestSection({
 
       {offeringId && (
         <section>
-          <h2 className="mb-3 font-medium text-neutral-900">Published grades</h2>
-          {publishedGrades.length === 0 && <p className="text-sm text-neutral-500">No published grades in this class.</p>}
+          <h2 className="mb-3 font-medium text-fg">Published grades</h2>
+          {publishedGrades.length === 0 && <p className="text-sm text-fg-muted">No published grades in this class.</p>}
           <ul className="flex flex-col gap-3">
             {publishedGrades.map((g) => (
               <li key={g.id}>
                 <Card className="p-3 text-sm">
-                  <p className="mb-2 text-neutral-800">
+                  <p className="mb-2 text-fg">
                     Current: {g.letter}
                     {g.score ? ` (${g.score})` : ""}
                   </p>
                   <details>
-                    <summary className="cursor-pointer text-xs font-medium text-brand-700 hover:underline">Request a correction</summary>
+                    <summary className="cursor-pointer text-xs font-medium text-brand-fg hover:underline">Request a correction</summary>
                     <form action={requestCorrectionAction} className="mt-2 flex flex-wrap items-end gap-2">
                       <input type="hidden" name="gradeRecordId" value={g.id} />
                       <input
@@ -156,12 +156,12 @@ async function AdminRequestSection({
                         max={100}
                         step={0.1}
                         placeholder="New score"
-                        className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                        className="w-24 rounded-md border border-line-strong px-2 py-1 text-xs"
                       />
-                      <label className="flex items-center gap-1 text-xs text-neutral-700">
-                        <input type="checkbox" name="isIncomplete" className="h-3.5 w-3.5 rounded border-neutral-300" /> Incomplete
+                      <label className="flex items-center gap-1 text-xs text-fg-secondary">
+                        <input type="checkbox" name="isIncomplete" className="h-3.5 w-3.5 rounded border-line-strong" /> Incomplete
                       </label>
-                      <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                      <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-line-strong px-2 py-1 text-xs" />
                       <Button type="submit" variant="secondary" size="sm">
                         Request
                       </Button>
@@ -182,18 +182,18 @@ async function SuperAdminDecideSection({ actor }: { actor: NonNullable<Awaited<R
 
   return (
     <section>
-      <h2 className="mb-3 font-medium text-neutral-900">Pending correction requests</h2>
-      {queue.length === 0 && <p className="text-sm text-neutral-500">No corrections awaiting a decision.</p>}
+      <h2 className="mb-3 font-medium text-fg">Pending correction requests</h2>
+      {queue.length === 0 && <p className="text-sm text-fg-muted">No corrections awaiting a decision.</p>}
       <ul className="flex flex-col gap-3">
         {queue.map((r) => (
           <li key={r.id}>
             <Card className="p-3 text-sm">
-              <p className="mb-1 text-neutral-800">
+              <p className="mb-1 text-fg">
                 {r.oldLetter}
                 {r.oldScore ? ` (${r.oldScore})` : ""} → {r.newLetter}
                 {r.newScore ? ` (${r.newScore})` : ""}
               </p>
-              <p className="mb-2 text-xs text-neutral-500">Reason: {r.reason}</p>
+              <p className="mb-2 text-xs text-fg-muted">Reason: {r.reason}</p>
               <div className="flex flex-wrap items-end gap-2">
                 <form action={decideCorrectionAction}>
                   <input type="hidden" name="correctionRequestId" value={r.id} />
@@ -205,7 +205,7 @@ async function SuperAdminDecideSection({ actor }: { actor: NonNullable<Awaited<R
                 <form action={decideCorrectionAction} className="flex items-end gap-2">
                   <input type="hidden" name="correctionRequestId" value={r.id} />
                   <input type="hidden" name="decision" value="REJECT" />
-                  <input name="note" placeholder="Note" className="w-48 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
+                  <input name="note" placeholder="Note" className="w-48 rounded-md border border-line-strong px-2 py-1 text-xs" />
                   <Button type="submit" variant="danger" size="sm">
                     Reject
                   </Button>

@@ -10,7 +10,7 @@ export default function PrintButton({ semesterId }: { semesterId: string }) {
   return (
     <button
       type="button"
-      className="text-xs font-medium text-brand-700 hover:underline print:hidden"
+      className="text-xs font-medium text-brand-fg hover:underline print:hidden"
       onClick={async () => {
         await logSemesterPrintAction(semesterId);
         window.print();

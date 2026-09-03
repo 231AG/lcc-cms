@@ -126,11 +126,11 @@ export default async function GradesPage({
 
       {offeringId && (
         <>
-          <p className="mb-3 text-sm text-neutral-500">
+          <p className="mb-3 text-sm text-fg-muted">
             {enteredCount} of {rosterRows.length} entered
           </p>
           {rosterRows.length === 0 ? (
-            <p className="text-sm text-neutral-500">No registered students in this class.</p>
+            <p className="text-sm text-fg-muted">No registered students in this class.</p>
           ) : (
             <>
               <ClassEntryForm offeringId={offeringId} roster={rosterRows} scale={activeScale} />
@@ -139,14 +139,14 @@ export default async function GradesPage({
                   <CardTitle className="mb-2">Submit for approval</CardTitle>
                   <form action={submitClassAction} className="flex flex-col gap-2">
                     <input type="hidden" name="offeringId" value={offeringId} />
-                    <label className="flex items-center gap-2 text-sm text-neutral-700">
-                      <input type="checkbox" name="confirmPartial" className="h-4 w-4 rounded border-neutral-300" />
+                    <label className="flex items-center gap-2 text-sm text-fg-secondary">
+                      <input type="checkbox" name="confirmPartial" className="h-4 w-4 rounded border-line-strong" />
                       Confirm submitting with missing grades
                     </label>
                     <input
                       name="partialNote"
                       placeholder="Note (required if submitting with missing grades)"
-                      className="w-96 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                      className="w-96 rounded-md border border-line-strong px-3 py-2 text-sm"
                     />
                     <Button type="submit" className="w-fit">
                       Submit

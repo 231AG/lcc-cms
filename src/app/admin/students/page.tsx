@@ -60,7 +60,7 @@ export default async function StudentsPage({
       <PageHeader
         title="Students"
         actions={
-          <Link href="/admin/historical/progress" className="text-sm font-medium text-brand-700 hover:underline">
+          <Link href="/admin/historical/progress" className="text-sm font-medium text-brand-fg hover:underline">
             Historical import progress
           </Link>
         }
@@ -114,8 +114,8 @@ export default async function StudentsPage({
           <tbody>
             {results.rows.map((s) => (
               <Tr key={s.id}>
-                <Td className="font-mono text-xs text-neutral-700">{s.studentNumber}</Td>
-                <Td className="font-medium text-neutral-900">
+                <Td className="font-mono text-xs text-fg-secondary">{s.studentNumber}</Td>
+                <Td className="font-medium text-fg">
                   {s.lastName}, {s.firstName}
                 </Td>
                 <Td>{s.status}</Td>
@@ -124,15 +124,15 @@ export default async function StudentsPage({
                 <Td>
                   {actor.role === "ADMIN" ? (
                     <span className="flex gap-3">
-                      <Link href={`/admin/students/${s.id}?mode=view`} className="font-medium text-brand-700 hover:underline">
+                      <Link href={`/admin/students/${s.id}?mode=view`} className="font-medium text-brand-fg hover:underline">
                         View
                       </Link>
-                      <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-700 hover:underline">
+                      <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-fg hover:underline">
                         Edit
                       </Link>
                     </span>
                   ) : (
-                    <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-700 hover:underline">
+                    <Link href={`/admin/students/${s.id}`} className="font-medium text-brand-fg hover:underline">
                       View
                     </Link>
                   )}
@@ -144,7 +144,7 @@ export default async function StudentsPage({
       </Card>
 
       {results.rows.length === 0 && (
-        <p className="mt-4 text-sm text-neutral-500">
+        <p className="mt-4 text-sm text-fg-muted">
           {q || status ? "No students match this search." : "No students enrolled yet."}
         </p>
       )}
@@ -154,18 +154,18 @@ export default async function StudentsPage({
           {pageNum > 1 && (
             <Link
               href={`/admin/students?q=${encodeURIComponent(q ?? "")}&status=${encodeURIComponent(status ?? "")}&page=${pageNum - 1}`}
-              className="font-medium text-brand-700 hover:underline"
+              className="font-medium text-brand-fg hover:underline"
             >
               Previous
             </Link>
           )}
-          <span className="text-neutral-600">
+          <span className="text-fg-secondary">
             Page {pageNum} of {totalPages}
           </span>
           {pageNum < totalPages && (
             <Link
               href={`/admin/students?q=${encodeURIComponent(q ?? "")}&status=${encodeURIComponent(status ?? "")}&page=${pageNum + 1}`}
-              className="font-medium text-brand-700 hover:underline"
+              className="font-medium text-brand-fg hover:underline"
             >
               Next
             </Link>

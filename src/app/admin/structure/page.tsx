@@ -86,7 +86,7 @@ export default async function AcademicStructurePage({
 
       {/* Colleges */}
       <section className="mb-10">
-        <h2 className="mb-3 font-medium text-neutral-900">Colleges</h2>
+        <h2 className="mb-3 font-medium text-fg">Colleges</h2>
         <form action={createCollegeAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
             <Label className="text-xs" htmlFor="college-code">
@@ -115,8 +115,8 @@ export default async function AcademicStructurePage({
             <tbody>
               {colleges.map((c) => (
                 <Tr key={c.id}>
-                  <Td className="font-mono text-xs text-neutral-700">{c.code}</Td>
-                  <Td className="font-medium text-neutral-900">{c.name}</Td>
+                  <Td className="font-mono text-xs text-fg-secondary">{c.code}</Td>
+                  <Td className="font-medium text-fg">{c.name}</Td>
                   <Td>
                     <Badge tone={c.isActive ? "success" : "neutral"}>{c.isActive ? "ACTIVE" : "INACTIVE"}</Badge>
                   </Td>
@@ -124,7 +124,7 @@ export default async function AcademicStructurePage({
                     <form action={toggleCollegeActiveAction}>
                       <input type="hidden" name="collegeId" value={c.id} />
                       <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
-                      <button type="submit" className="font-medium text-brand-700 hover:underline">
+                      <button type="submit" className="font-medium text-brand-fg hover:underline">
                         {c.isActive ? "Deactivate" : "Reactivate"}
                       </button>
                     </form>
@@ -138,7 +138,7 @@ export default async function AcademicStructurePage({
 
       {/* Departments */}
       <section id="departments" className="mb-10">
-        <h2 className="mb-3 font-medium text-neutral-900">Departments</h2>
+        <h2 className="mb-3 font-medium text-fg">Departments</h2>
         <form action={createDepartmentAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
             <Label className="text-xs" htmlFor="dept-college">
@@ -186,8 +186,8 @@ export default async function AcademicStructurePage({
             <tbody>
               {pagedDepartments.map((d) => (
                 <Tr key={d.id}>
-                  <Td className="font-mono text-xs text-neutral-700">{d.code}</Td>
-                  <Td className="font-medium text-neutral-900">{d.name}</Td>
+                  <Td className="font-mono text-xs text-fg-secondary">{d.code}</Td>
+                  <Td className="font-medium text-fg">{d.name}</Td>
                   <Td>{collegeName(d.collegeId)}</Td>
                   <Td>
                     <Badge tone={d.isActive ? "success" : "neutral"}>{d.isActive ? "ACTIVE" : "INACTIVE"}</Badge>
@@ -196,7 +196,7 @@ export default async function AcademicStructurePage({
                     <form action={toggleDepartmentActiveAction}>
                       <input type="hidden" name="departmentId" value={d.id} />
                       <input type="hidden" name="isActive" value={(!d.isActive).toString()} />
-                      <button type="submit" className="font-medium text-brand-700 hover:underline">
+                      <button type="submit" className="font-medium text-brand-fg hover:underline">
                         {d.isActive ? "Deactivate" : "Reactivate"}
                       </button>
                     </form>
@@ -209,15 +209,15 @@ export default async function AcademicStructurePage({
         {totalDeptPages > 1 && (
           <div className="mt-3 flex items-center gap-3 text-sm">
             {deptPageNum > 1 && (
-              <Link href={`/admin/structure?deptPage=${deptPageNum - 1}#departments`} className="font-medium text-brand-700 hover:underline">
+              <Link href={`/admin/structure?deptPage=${deptPageNum - 1}#departments`} className="font-medium text-brand-fg hover:underline">
                 Previous
               </Link>
             )}
-            <span className="text-neutral-600">
+            <span className="text-fg-secondary">
               Page {deptPageNum} of {totalDeptPages}
             </span>
             {deptPageNum < totalDeptPages && (
-              <Link href={`/admin/structure?deptPage=${deptPageNum + 1}#departments`} className="font-medium text-brand-700 hover:underline">
+              <Link href={`/admin/structure?deptPage=${deptPageNum + 1}#departments`} className="font-medium text-brand-fg hover:underline">
                 Next
               </Link>
             )}
@@ -227,7 +227,7 @@ export default async function AcademicStructurePage({
 
       {/* Courses */}
       <section id="courses" className="mb-10">
-        <h2 className="mb-3 font-medium text-neutral-900">Courses</h2>
+        <h2 className="mb-3 font-medium text-fg">Courses</h2>
         <form action={createCourseAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
             <Label className="text-xs" htmlFor="course-dept">
@@ -276,8 +276,8 @@ export default async function AcademicStructurePage({
             <tbody>
               {pagedCourses.map((c) => (
                 <Tr key={c.id}>
-                  <Td className="font-mono text-xs text-neutral-700">{c.code}</Td>
-                  <Td className="font-medium text-neutral-900">{c.title}</Td>
+                  <Td className="font-mono text-xs text-fg-secondary">{c.code}</Td>
+                  <Td className="font-medium text-fg">{c.title}</Td>
                   <Td>{departmentName(c.departmentId)}</Td>
                   <Td>{c.creditHours}</Td>
                   <Td>
@@ -287,7 +287,7 @@ export default async function AcademicStructurePage({
                     <form action={toggleCourseActiveAction}>
                       <input type="hidden" name="courseId" value={c.id} />
                       <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
-                      <button type="submit" className="font-medium text-brand-700 hover:underline">
+                      <button type="submit" className="font-medium text-brand-fg hover:underline">
                         {c.isActive ? "Deactivate" : "Reactivate"}
                       </button>
                     </form>
@@ -300,15 +300,15 @@ export default async function AcademicStructurePage({
         {totalCoursePages > 1 && (
           <div className="mt-3 flex items-center gap-3 text-sm">
             {coursePageNum > 1 && (
-              <Link href={`/admin/structure?coursePage=${coursePageNum - 1}#courses`} className="font-medium text-brand-700 hover:underline">
+              <Link href={`/admin/structure?coursePage=${coursePageNum - 1}#courses`} className="font-medium text-brand-fg hover:underline">
                 Previous
               </Link>
             )}
-            <span className="text-neutral-600">
+            <span className="text-fg-secondary">
               Page {coursePageNum} of {totalCoursePages}
             </span>
             {coursePageNum < totalCoursePages && (
-              <Link href={`/admin/structure?coursePage=${coursePageNum + 1}#courses`} className="font-medium text-brand-700 hover:underline">
+              <Link href={`/admin/structure?coursePage=${coursePageNum + 1}#courses`} className="font-medium text-brand-fg hover:underline">
                 Next
               </Link>
             )}
@@ -318,7 +318,7 @@ export default async function AcademicStructurePage({
 
       {/* Prerequisites */}
       <section>
-        <h2 className="mb-3 font-medium text-neutral-900">Prerequisites</h2>
+        <h2 className="mb-3 font-medium text-fg">Prerequisites</h2>
         <form action={addPrerequisiteAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
             <Label className="text-xs" htmlFor="prereq-course">
@@ -358,13 +358,13 @@ export default async function AcademicStructurePage({
             <tbody>
               {prerequisites.map((p) => (
                 <Tr key={`${p.courseId}:${p.prerequisiteCourseId}`}>
-                  <Td className="font-mono text-xs text-neutral-700">{courseCode(p.courseId)}</Td>
-                  <Td className="font-mono text-xs text-neutral-700">{courseCode(p.prerequisiteCourseId)}</Td>
+                  <Td className="font-mono text-xs text-fg-secondary">{courseCode(p.courseId)}</Td>
+                  <Td className="font-mono text-xs text-fg-secondary">{courseCode(p.prerequisiteCourseId)}</Td>
                   <Td>
                     <form action={removePrerequisiteAction}>
                       <input type="hidden" name="courseId" value={p.courseId} />
                       <input type="hidden" name="prerequisiteCourseId" value={p.prerequisiteCourseId} />
-                      <button type="submit" className="font-medium text-danger-600 hover:underline">
+                      <button type="submit" className="font-medium text-danger-fg hover:underline">
                         Remove
                       </button>
                     </form>

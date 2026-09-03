@@ -62,7 +62,7 @@ export default async function AdminAccountsPage({
 
       <CreateAccountForm />
 
-      <h2 className="mb-3 font-medium text-neutral-900">Existing accounts</h2>
+      <h2 className="mb-3 font-medium text-fg">Existing accounts</h2>
       <Card>
         <Table>
           <Thead>
@@ -77,7 +77,7 @@ export default async function AdminAccountsPage({
           <tbody>
             {staffAccounts.map((row) => (
               <Tr key={row.id}>
-                <Td className="font-medium text-neutral-900">{row.displayName}</Td>
+                <Td className="font-medium text-fg">{row.displayName}</Td>
                 <Td>{row.loginIdentifier}</Td>
                 <Td>{row.role}</Td>
                 <Td>
@@ -87,14 +87,14 @@ export default async function AdminAccountsPage({
                   {row.status === "ACTIVE" ? (
                     <form action={disableAccountAction}>
                       <input type="hidden" name="targetUserId" value={row.id} />
-                      <button type="submit" className="font-medium text-danger-600 hover:underline">
+                      <button type="submit" className="font-medium text-danger-fg hover:underline">
                         Disable
                       </button>
                     </form>
                   ) : (
                     <form action={enableAccountAction}>
                       <input type="hidden" name="targetUserId" value={row.id} />
-                      <button type="submit" className="font-medium text-success-600 hover:underline">
+                      <button type="submit" className="font-medium text-success-fg hover:underline">
                         Enable
                       </button>
                     </form>

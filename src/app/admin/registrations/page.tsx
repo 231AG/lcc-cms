@@ -91,7 +91,7 @@ export default async function RegistrationsPage({
         <>
           <Card className="mb-6">
             <CardBody>
-              <h2 className="mb-3 font-medium text-neutral-900">Register a student directly</h2>
+              <h2 className="mb-3 font-medium text-fg">Register a student directly</h2>
               <form action={registerDirectAction} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="offeringId" value={offeringId} />
                 <div>
@@ -114,8 +114,8 @@ export default async function RegistrationsPage({
           </Card>
 
           <section>
-            <h2 className="mb-3 font-medium text-neutral-900">Class list</h2>
-            {registrations.length === 0 && <p className="text-sm text-neutral-500">No registrations yet.</p>}
+            <h2 className="mb-3 font-medium text-fg">Class list</h2>
+            {registrations.length === 0 && <p className="text-sm text-fg-muted">No registrations yet.</p>}
             <ul className="flex flex-col gap-2">
               {registrations.map((r) => (
                 <li key={r.id}>
@@ -129,8 +129,8 @@ export default async function RegistrationsPage({
                       <form action={dropRegistrationAction} className="flex items-center gap-2">
                         <input type="hidden" name="offeringId" value={offeringId} />
                         <input type="hidden" name="registrationId" value={r.id} />
-                        <input name="reason" required placeholder="Reason" className="w-40 rounded-md border border-neutral-300 px-2 py-1 text-xs" />
-                        <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                        <input name="reason" required placeholder="Reason" className="w-40 rounded-md border border-line-strong px-2 py-1 text-xs" />
+                        <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
                           Drop
                         </button>
                       </form>

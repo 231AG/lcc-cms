@@ -175,7 +175,7 @@ export default async function StudentDetailPage({
                 ))}
               </Select>
             </div>
-            <p className="text-xs text-neutral-500">Import status: {record.historicalImportStatus}</p>
+            <p className="text-xs text-fg-muted">Import status: {record.historicalImportStatus}</p>
             {canEdit && (
               <Button type="submit" className="w-fit">
                 Save changes
@@ -191,7 +191,7 @@ export default async function StudentDetailPage({
             <CardTitle>Reset password</CardTitle>
           </CardHeader>
           <CardBody>
-            <p className="text-xs text-neutral-500">Issues a new temporary password and forces a change on next login.</p>
+            <p className="text-xs text-fg-muted">Issues a new temporary password and forces a change on next login.</p>
             <ResetPasswordForm studentId={record.id} />
           </CardBody>
         </Card>
@@ -208,20 +208,20 @@ export default async function StudentDetailPage({
             </Alert>
           )}
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-neutral-500">CGPA</dt>
-            <dd className="font-medium text-neutral-900">{cumulative?.cgpa ?? "—"}</dd>
-            <dt className="text-neutral-500">Academic standing</dt>
-            <dd className="font-medium text-neutral-900">{cumulative?.standing ? STANDING_LABEL[cumulative.standing] : "Not yet available"}</dd>
-            <dt className="text-neutral-500">Credits earned</dt>
-            <dd className="font-medium text-neutral-900">
+            <dt className="text-fg-muted">CGPA</dt>
+            <dd className="font-medium text-fg">{cumulative?.cgpa ?? "—"}</dd>
+            <dt className="text-fg-muted">Academic standing</dt>
+            <dd className="font-medium text-fg">{cumulative?.standing ? STANDING_LABEL[cumulative.standing] : "Not yet available"}</dd>
+            <dt className="text-fg-muted">Credits earned</dt>
+            <dd className="font-medium text-fg">
               {cumulative ? `${cumulative.totalCreditsEarned} of 132 -- ${cumulative.creditsToGraduation} remaining` : "—"}
             </dd>
-            <dt className="text-neutral-500">Credits attempted</dt>
-            <dd className="font-medium text-neutral-900">{cumulative?.totalCreditsAttempted ?? "—"}</dd>
+            <dt className="text-fg-muted">Credits attempted</dt>
+            <dd className="font-medium text-fg">{cumulative?.totalCreditsAttempted ?? "—"}</dd>
           </dl>
           {obligations.length > 0 && (
             <div className="mt-3">
-              <p className="text-xs font-medium text-warning-800">Outstanding mandatory repeats:</p>
+              <p className="text-xs font-medium text-warning-fg">Outstanding mandatory repeats:</p>
               <ul className="list-disc pl-5 text-sm">
                 {obligations.map((o) => (
                   <li key={o.recordId}>
@@ -240,18 +240,18 @@ export default async function StudentDetailPage({
             <CardTitle>Planned courses</CardTitle>
           </CardHeader>
           <CardBody>
-            {plans.length === 0 && <p className="text-sm text-neutral-500">No course plans on record.</p>}
+            {plans.length === 0 && <p className="text-sm text-fg-muted">No course plans on record.</p>}
             {plans.length > 0 && (
               <div className="flex flex-col gap-4">
                 {plans.map((p) => (
                   <div key={p.id}>
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-sm font-medium text-neutral-900">{yearLabel(p.semesterId)}</span>
+                      <span className="text-sm font-medium text-fg">{yearLabel(p.semesterId)}</span>
                       <Badge tone={p.status === "APPROVED" ? "success" : p.status === "REJECTED" ? "danger" : p.status === "PARTIALLY_APPROVED" ? "warning" : "brand"}>
                         {p.status}
                       </Badge>
                     </div>
-                    <ul className="list-disc pl-5 text-sm text-neutral-700">
+                    <ul className="list-disc pl-5 text-sm text-fg-secondary">
                       {p.items.map((i) => (
                         <li key={i.id}>
                           {courseLabel(i.courseId)}
@@ -273,14 +273,14 @@ export default async function StudentDetailPage({
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Academic history</CardTitle>
           {canEdit && (
-            <Link href={`/admin/historical?studentId=${record.id}`} className="text-sm font-medium text-brand-700 hover:underline">
+            <Link href={`/admin/historical?studentId=${record.id}`} className="text-sm font-medium text-brand-fg hover:underline">
               Enter historical record
             </Link>
           )}
         </CardHeader>
         <CardBody>
           {history.length === 0 && (
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-fg-muted">
               Empty -- the import status above explains why nothing appears here yet.
             </p>
           )}

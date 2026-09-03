@@ -24,12 +24,19 @@ export default async function LoginPage({
     <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-4 py-12 outline-none">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Image src="/lcc-logo.png" alt="Liberia Christian College seal" width={70} height={79} className="mb-3 h-16 w-auto" priority />
-          <h1 className="text-xl font-semibold text-neutral-900">Liberia Christian College</h1>
-          <p className="mt-1 text-sm text-neutral-600">E-Portal sign in</p>
+          {/* The sign-in page is the app's one hero moment, so it gets the
+              Deep Orchid -> Lavender Haze gradient -- contained to the seal
+              tile rather than run across the page. */}
+          <span className="bg-gradient-brand mb-3 flex h-20 w-20 items-center justify-center rounded-2xl shadow-sm">
+            <span className="bg-seal-backdrop flex h-16 w-16 items-center justify-center rounded-xl">
+              <Image src="/lcc-logo.png" alt="Liberia Christian College seal" width={70} height={79} className="h-12 w-auto" priority />
+            </span>
+          </span>
+          <h1 className="text-xl font-semibold text-fg">Liberia Christian College</h1>
+          <p className="mt-1 text-sm text-fg-secondary">E-Portal sign in</p>
         </div>
 
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
           {error === "disabled" && (
             <Alert tone="danger" className="mb-4">
               This account has been disabled. Contact the Admin office.

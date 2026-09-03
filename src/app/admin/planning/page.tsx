@@ -97,7 +97,7 @@ export default async function PlanningQueuePage({
 
       {semesterId && (
         <section className="mb-8">
-          <h2 className="mb-3 font-medium text-neutral-900">Awaiting a decision -- {yearLabel(semesterId)}</h2>
+          <h2 className="mb-3 font-medium text-fg">Awaiting a decision -- {yearLabel(semesterId)}</h2>
           <form method="GET" className="mb-3 flex flex-wrap items-end gap-2">
             <input type="hidden" name="semesterId" value={semesterId} />
             <div>
@@ -110,13 +110,13 @@ export default async function PlanningQueuePage({
               Search
             </Button>
             {q && (
-              <Link href={`/admin/planning?semesterId=${semesterId}`} className="text-sm text-neutral-500 hover:underline">
+              <Link href={`/admin/planning?semesterId=${semesterId}`} className="text-sm text-fg-muted hover:underline">
                 Clear
               </Link>
             )}
           </form>
           {filteredQueue.length === 0 && (
-            <p className="text-sm text-neutral-500">{q ? "No matching plans." : "No plans awaiting approval."}</p>
+            <p className="text-sm text-fg-muted">{q ? "No matching plans." : "No plans awaiting approval."}</p>
           )}
           <ul className="flex flex-col gap-2">
             {filteredQueue.map((p) => (
@@ -125,7 +125,7 @@ export default async function PlanningQueuePage({
                   <span>
                     {studentLabel(p.studentId)} — {p.totalCredits} credit hours
                   </span>
-                  <Link href={`/admin/planning/${p.id}`} className="font-medium text-brand-700 hover:underline">
+                  <Link href={`/admin/planning/${p.id}`} className="font-medium text-brand-fg hover:underline">
                     Review
                   </Link>
                 </Card>
@@ -137,7 +137,7 @@ export default async function PlanningQueuePage({
 
       <Card>
         <CardBody>
-          <h2 className="mb-3 font-medium text-neutral-900">Look up a specific plan</h2>
+          <h2 className="mb-3 font-medium text-fg">Look up a specific plan</h2>
           <form action={findPlanAction} className="flex flex-wrap items-end gap-2">
             <div>
               <Label className="text-xs">Student ID</Label>

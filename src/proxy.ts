@@ -115,5 +115,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/health).*)"],
+  // `theme.js` is exempt for the same reason as `_next/static`: it is a static,
+  // auth-irrelevant asset, and it blocks first paint, so running a Supabase
+  // getUser() plus a DB lookup on every fetch of it would delay every page
+  // render for no enforcement benefit.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|theme.js|api/health).*)"],
 };

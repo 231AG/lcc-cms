@@ -14,17 +14,17 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function Thead({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500", className)} {...props} />;
+  return <thead className={cn("bg-surface-subtle text-left text-xs font-semibold uppercase tracking-wide text-fg-muted", className)} {...props} />;
 }
 
 export function Th({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className={cn("border-b border-neutral-200 px-3 py-2 font-semibold", className)} {...props} />;
+  return <th className={cn("border-b border-line px-3 py-2 font-semibold", className)} {...props} />;
 }
 
 export function Td({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("border-b border-neutral-100 px-3 py-2 align-top", className)} {...props} />;
+  return <td className={cn("border-b border-line-subtle px-3 py-2 align-top", className)} {...props} />;
 }
 
 export function Tr({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("hover:bg-neutral-50/60", className)} {...props} />;
+  return <tr className={cn("hover:bg-surface-hover", className)} {...props} />;
 }

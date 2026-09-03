@@ -30,18 +30,18 @@ export default async function ChangePasswordPage({
     <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-4 py-12 outline-none">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50">
-            <KeyRound className="h-6 w-6 text-brand-700" aria-hidden="true" />
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-subtle">
+            <KeyRound className="h-6 w-6 text-brand-fg" aria-hidden="true" />
           </span>
-          <h1 className="text-xl font-semibold text-neutral-900">Change your password</h1>
-          <p className="mt-1 text-sm text-neutral-600">
+          <h1 className="text-xl font-semibold text-fg">Change your password</h1>
+          <p className="mt-1 text-sm text-fg-secondary">
             {actor.mustChangePassword
               ? "You must set a new password before continuing."
               : `Signed in as ${actor.displayName}.`}
           </p>
         </div>
 
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
           {error === "1" && (
             <Alert tone="danger" className="mb-4">
               Passwords must match and be at least 10 characters.
