@@ -66,7 +66,7 @@ test("Admin creates a year and semester and advances it; Super Admin moves it ba
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(admin.username);
-  await page.getByLabel("Password").fill(admin.password);
+  await page.getByLabel("Password", { exact: true }).fill(admin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -106,7 +106,7 @@ test("Admin creates a year and semester and advances it; Super Admin moves it ba
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(superAdmin.username);
-  await page.getByLabel("Password").fill(superAdmin.password);
+  await page.getByLabel("Password", { exact: true }).fill(superAdmin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -129,7 +129,7 @@ test("a Student sees 'not available to your role' instead of the calendar forms"
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(student.username);
-  await page.getByLabel("Password").fill(student.password);
+  await page.getByLabel("Password", { exact: true }).fill(student.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 

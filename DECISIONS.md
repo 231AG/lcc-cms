@@ -531,3 +531,237 @@ end-to-end in a browser -- flagged as a gap for the owner to spot-check against 
 SUBMITTED demo plans (DEV-18) in `/admin/planning`.
 **Approval status:** Schema change and the PARTIALLY_APPROVED workflow design were confirmed with the owner
 before the migration was applied to the live database.
+
+### DEV-20 — An Admin may enter and submit a course plan on a student's behalf
+
+**Date:** 3 Sep 2026, requested directly by the project owner: some students have no Android phone and so
+cannot do their own course planning in the app at all. Until now the only routes into `registration` were a
+student-submitted plan or Admin direct registration (DEC-14), and direct registration deliberately bypasses
+every validator -- so a phoneless student either got no plan or got one that skipped prerequisite, credit-
+ceiling and schedule-conflict checking entirely. This closes that gap.
+
+**What changed — authorization, not logic.** The ownership test that appeared four times in
+`planning.ts` (`if (plan.studentId !== actor.userId) throw`) is replaced by one `authorizePlanSubject(actor,
+studentId)` helper: acting on your own plan needs `planning.manageOwnPlan` (Student, unchanged), acting on
+someone else's needs a new `planning.manageStudentPlan` (ADMIN true, STUDENT false, SUPER_ADMIN false --
+Section 9.4.9 keeps Super Admin out of course planning entirely). `getOrCreateDraftPlan` gained an optional
+third argument for the student being planned for; **no other service signature changed**, because every other
+entry point is keyed by `planId`/`planItemId` and derives the subject from the row. All six validators (V1
+prerequisites, V2 credit ceiling, V3 already-passed/retake, V4 duplicates, V5 availability/capacity, V6
+schedule conflict), V7's warning, the DRAFT -> SUBMITTED transition, and the approval queue are therefore
+literally the same code on the same rows -- there is no second implementation to drift.
+
+**Schema:** migration `0021_course_plan_entered_by.sql` adds `course_plan.entered_by uuid NULL` (FK to
+`app_user`, RESTRICT, matching `reviewed_by`/`decided_by`/`prereq_override_by`) plus a partial index. NULL
+means the student entered their own plan, so every pre-existing row is already correct and no backfill was
+needed. It is a provenance marker only -- nothing in the lifecycle branches on it. No RLS change: writes in
+this domain already run through the raw superuser connection (DEV-03's pattern) and the policies are
+read-only for `authenticated`. A student can see the column on their own plan, which is intended: it tells
+them the office entered it for them.
+
+**Audit:** submission stays `COURSE_PLAN_SUBMITTED` regardless of who did it, so every existing audit query,
+dashboard count and export keeps working; `enteredOnBehalf: true` in the payload distinguishes the two cases.
+One new action name, `COURSE_PLAN_STARTED_FOR_STUDENT`, records the office opening a plan for a student.
+
+**Segregation of duties — a deliberate, named trade-off.** Course planning previously had two humans in the
+loop by construction: a student submits, an Admin approves. An admin-entered plan collapses that to one, and
+nothing stops the entering Admin from then approving it. Two options were considered: block the entering
+Admin from approving that plan (a real second pair of eyes), or accept it and make the fact visible. **The
+second was chosen**, because LCC's Admin office may realistically be one person, and the first option would
+make the feature unusable for exactly the office that needs it. The mitigation is visibility, not
+enforcement: `entered_by` is shown as an "Admin-entered" badge in the review queue and stated in full on the
+plan detail page at the point of decision ("Entered by <name> on the student's behalf, not submitted by the
+student"), and the audit log records both the entry and the approval with their actors. **This is weaker
+than the grade-management two-key control (Stage 10) and is not claimed to be equivalent.** If the Registrar
+wants a hard rule once the office has two or more Admins, `entered_by` already carries everything the check
+would need -- it would be a few lines in `approvePlan`/`approvePlanItem`, no schema change.
+
+**Verification.** As with DEV-19, `planning.integration.test.ts` still cannot run: its `beforeAll` moves a
+fixture semester into REGISTRATION and the real 2026/2027 First Semester already holds that slot
+institution-wide (Section 13.6 allows one at a time) -- a pre-existing consequence of DEV-01's single shared
+Supabase project, **confirmed by running the suite on the commit before this change and getting the identical
+failure**, not a regression from it. Six new tests covering this behaviour were added to that file regardless,
+so they run whenever the environment allows. Verified for now by (1) a throwaway script exercising the same
+assertions against the real REGISTRATION semester and its 154 real published offerings -- 16/16 checks
+passed, including that an Admin's plan lands in the ordinary queue, that the credit ceiling and schedule-
+conflict validators still fire, that a Super Admin is refused, that a non-ACTIVE student is refused, and that
+a student still cannot touch another student's plan by any mutating entry point; (2) a full browser
+click-path as a real Admin through /admin/student-plan: nav -> student search -> start plan -> offering
+search -> add -> submit -> plan appears in /admin/planning badged "Admin-entered" -> detail page states the
+provenance; (3) `tsc --noEmit` and `eslint` clean. Every fixture created by both scripts was deleted.
+
+**One regression caught and fixed during verification.** The first cut of `authorizePlanSubject` refused a
+student reaching for another student's plan with `ForbiddenError: Not available to your role:
+planning.manageStudentPlan`. The code it replaced deliberately used the *same* `"Plan not found."` message
+for "does not exist" and "is not yours" -- a non-disclosure choice, repeated identically in four places. The
+new message turned the refusal into an existence oracle for plan ids. Practically unexploitable (v4 UUIDs),
+but it was an existing security property being silently traded away, so it was restored: a caller holding
+`manageOwnPlan` but not `manageStudentPlan` now gets `"Plan not found."` again, while staff still get the
+informative `ForbiddenError`. Pinned by an assertion in the new tests.
+
+**Approval status:** The schema change, the new permission row, and the segregation-of-duties trade-off were
+all put to the owner before implementation. The owner approved proceeding and delegated the open preferences
+("do 1-4, do any of 5-9 based on professional standards and your recommendations"); the accept-and-audit
+option above was the recommendation made at that point.
+
+### DEV-21 — Second performance pass, and a CSP change forced by it
+
+**Date:** 3-4 Sep 2026, requested by the project owner ("adding a course, adding a student, and similar
+flows" felt slow, beyond the offerings/plan-review pages already fixed).
+
+**The measurement that reframed the problem.** Before changing anything, round-trip latency to the live
+Supabase project was measured directly: one round trip ~224ms, one `assertCan()` ~452ms, and one `asUser()`
+wrapper **~1180ms** (it opens a transaction, sets a claim, sets a role, queries, commits -- five round
+trips). Against that, no page's SQL was the problem. The cost was the per-request auth/authorization
+plumbing, which is why every admin page felt equally slow regardless of what it did. Baseline, median of 5
+warm loads in dev against real data: 4.3-11.9s per page, 47.9s total across eight admin routes.
+
+**What changed (each independently verified):**
+1. `getCurrentActor()` wrapped in React `cache()`. Every page called it twice per navigation -- once in the
+   root layout for the header, once in the page -- at ~1.4s each. Deduplicated per render only; no
+   cross-request or cross-user caching, and no change to what is checked.
+2. `asUser()` sets the JWT claim and downgrades the role in ONE statement instead of two (`SET LOCAL ROLE x`
+   is exactly `set_config('role', x, true)`). Five round trips become four. Both orderings were tested
+   against the live database first and produce identical results -- role downgraded, claim set, a student
+   seeing exactly their own row and not all 158.
+3. The permission matrix is cached in-process for 60s. It is a few dozen rows of seeded reference data and
+   the only writer anywhere in the codebase is `db:seed`. **The trade-off is real and stated: a permission
+   change now takes up to a minute, or a restart, to take effect.** `invalidatePermissionCache()` exists and
+   must be called if a UI for editing permissions is ever added.
+4. The proxy, which runs on every request, no longer calls `auth.getUser()` (~397ms, a network call to the
+   Auth API). This project signs JWTs with ES256, so `getClaims()` verifies the signature and expiry locally
+   against cached JWKS in ~1ms. **Safe here specifically** because the proxy is not the authorization
+   boundary: it decides one redirect, from a cryptographically verified subject, against a live DB read, and
+   the page behind it still runs the full `getCurrentActor()` (a real `getUser()` plus an `app_user` status
+   check). Nothing previously enforced stopped being enforced. It also now short-circuits entirely when no
+   Supabase auth cookie is present (no cookie, no session, nothing to enforce) and selects one column
+   instead of the whole row. Measured: proxy time ~1200ms -> ~436ms median.
+5. The Admin home dashboard counted pending plans with one round trip PER active semester, fetching whole
+   rows to read `.length`, and awaited its four independent figures in series. Now one `COUNT` and one
+   `Promise.all`. This was the slowest page in the app.
+6. `<select>`s enumerating whole tables replaced with search: `/admin/registrations` (177 offerings AND 158
+   students in two dropdowns), `/admin/planning`'s plan lookup (158 students -> a typed Student ID),
+   `/admin/structure`'s two prerequisite pickers (178 courses rendered twice -> one shared `<datalist>`).
+   These are as much a usability fix as a performance one -- you cannot find a student in a 158-item native
+   dropdown.
+7. Migration `0022_performance_indexes.sql`: `course(department_id)`, `department(college_id)`,
+   `student(last_name, first_name)`. **Recorded honestly as insurance, not as a measured win** -- these
+   tables are small enough today that Postgres scans them happily. They are FK/sort columns that will matter
+   later and are cheap now.
+8. Pending-state feedback on submitting forms (`SubmitButton`/`SubmitTextButton` via `useFormStatus`) and
+   route-level `loading.tsx` skeletons. The app previously had neither: a click on "Add course" left the
+   button enabled and idle for several seconds, which reads as "nothing happened."
+
+**Result:** median of 9 warm loads, 47.9s -> 35.0s across the same eight routes (-27%); the Admin home page
+11.9s -> 6.3s (-47%). These are dev-mode numbers against a live cross-region database from a home
+connection, and run-to-run variance is significant (one route showed a 13.5s outlier in a five-sample run) --
+the nine-sample medians above are the honest figure, not the best one observed.
+
+**A wrong assumption, caught by measuring rather than reasoning.** `/admin/planning` was changed to fetch
+only the students appearing in its approval queue instead of all 158. That made the page **slower** (4.8s ->
+6.1s): the narrowed query needs the queue first, so it costs an extra `asUser()` round trip (~950ms) to
+avoid reading 158 small rows inside a transaction that was already open. On this database the round trip is
+the cost, not the row count. The change was reverted and the reason left in a comment so it is not
+"re-optimised" back later.
+
+**A real bug this pass introduced and then fixed -- and the CSP change it forced.** Adding `loading.tsx`
+introduced the app's first Suspense boundaries, and therefore its first streamed responses. React streams
+late content into `<div hidden>` and emits a tiny inline script to move it into place. The app's CSP was
+`script-src 'self'`, which blocks exactly that -- so every page under a `loading.tsx` rendered correctly and
+then stayed **permanently invisible**, with the content present in the DOM but hidden. Caught in a browser,
+not in review. **`script-src` is now nonce-based** (a fresh nonce per request, set on the request's own CSP
+header, which is where Next.js reads it), following the framework's documented approach. This is strictly
+stronger than the alternative of adding `'unsafe-inline'`, and it unblocks streaming permanently rather than
+for one page. Deliberately WITHOUT `'strict-dynamic'`, which would make `'self'` inert and is a larger
+change than the gap requires. `style-src` still keeps `'unsafe-inline'`: several pages use inline `style`
+ATTRIBUTES for per-row values (the A-16 progress chart), which a nonce cannot cover -- unchanged, and called
+out rather than glossed over. **This modifies a security control and should be reviewed as such**, though
+note the previous policy was silently breaking a supported framework feature.
+
+**Two further levers deliberately NOT taken -- owner's call, not the agent's.** Both trade against explicit,
+documented security choices, so they are recorded here rather than decided unilaterally:
+- **`getClaims()` inside `getCurrentActor()` as well** (~400ms/page). The app re-reads `app_user` status and
+  role from the database on every request, so a disabled account is still refused immediately; the only real
+  loss is that a *Supabase-side session revocation* would not be noticed until the token expires. No feature
+  in the app currently performs such a revocation.
+- **Reading the actor's own `app_user` row through the superuser connection** instead of `asUser()`
+  (~700ms/page). The query already filters by an id taken from a verified JWT, so RLS is defense-in-depth
+  here -- but that was a deliberate choice with a comment explaining it, and removing it is a posture change.
+
+**Verification:** all 22 RLS/permission/transaction integration tests pass (these cover exactly what items 2
+and 3 touch); a browser smoke test of all 23 admin/super-admin routes across both roles renders every page
+with an h1 visible, HTTP 200, zero console errors and zero CSP violations; `tsc --noEmit` and `eslint` clean.
+Every fixture created by the throwaway measurement and smoke scripts was deleted.
+
+### DEV-22 — Student listing page redesigned (interface only, data flow untouched)
+
+**Date:** 4 Sep 2026, requested by the project owner as a UI/UX redesign of the **existing** `/admin/students`
+page, explicitly not a rebuild of student management.
+
+**What was deliberately NOT changed**, having been inspected first: `searchStudents()` is the same
+server-side, RLS-scoped, `LIMIT/OFFSET` query with a `count(*)` that it has been since Stage 5;
+`enrollStudent` / `updateStudentProfile` and their validation are untouched; the View/Edit split from the
+earlier admin pass (`?mode=view` vs the plain detail route) is reused as-is; routing, auth and permissions
+are unchanged. **No schema change** -- every column the new table shows already existed. `searchStudents`
+gained two optional filter fields (`departmentId`, `enrolmentYear`) appended to its existing `and(...)`
+builder, and one new read (`getEnrolmentYears`) derives the year filter's options from the existing
+`enrolment_year` column with a `SELECT DISTINCT`; there is no new year table and no duplicated field.
+
+**Interface:** breadcrumb (Home / Students) over an `<h1>`, a primary "+ Add Student" top right, and the
+table inside a card headed "Students Information". Columns in the order requested: selection checkbox,
+Student ID (the real `student_number`, never a row index), Name (with initials -- **the model stores no
+photo and this pass did not add one**), Status, Department, Enrolment Year, Actions. Search plus Status /
+Department / Enrolment-year filters that combine with AND, with "Clear filters". Server-side pagination
+showing "Showing X-Y of Z students", numbered pages with ellipsis, and a page-size control (10/25/50 --
+`searchStudents` already supported `pageSize`, the page simply never passed it).
+
+**Decisions worth recording:**
+- **Status colours use only the five statuses `STUDENT_STATUSES` actually defines.** The brief's example
+  list mentioned "pending", which does not exist in this system. `ADMISSION_FORFEITED` is the one that reads
+  as a warning; `SUSPENDED` is the destructive one. No status was invented to fill the palette.
+- **The table is the page's one client component**, purely because the header checkbox needs an
+  `indeterminate` state -- a DOM property with no HTML attribute, so it cannot be server-rendered. Everything
+  else stays a Server Component. Noted against DEV-14's JS budget: it is a few KB.
+- **The checkboxes are deliberately inert.** No bulk action exists in the app, and none was invented; the
+  selection is tracked (and announced to screen readers) so the control is not silently dead, and is what a
+  future bulk action would consume.
+- **"+ Add Student" toggles the existing `EnrollStudentForm`** rather than opening a modal or a new route.
+  That form uses `useActionState` to show the one-time temporary password in place, which must never travel
+  through a URL (Section 18.1, established in Stage 2) -- so a panel on the page is the only correct shape
+  for it. Same fields, same labels, same action.
+- **Filter changes reset to page 1 by construction**, not by a rule: the filter form has no `page` field, so
+  submitting it drops the parameter. The pagination links carry every active filter, so paging cannot
+  silently widen the result set.
+- **Loading and error states.** `loading.tsx` renders skeleton rows matching the real column structure --
+  structural bars only, never plausible-looking fake values, since a greyed-out Student ID that turns out
+  not to exist is worse than an obvious placeholder in a system of record. `error.tsx` is the app's **first**
+  error boundary, with a "Try again" that calls `reset()`; it deliberately does not print the error message
+  (which can carry connection strings and query text) and logs it to the console instead.
+
+**A responsive defect found by measuring, not by looking.** The first cut hid Department and Enrolment Year
+below `md`/`sm` and relied on the table's existing horizontal scroll. Measured at 390px, the Actions column
+was pushed off-screen -- reachable by scrolling, but not visible, which the brief explicitly required. Fixed
+by also dropping the selection checkbox and the initials avatar below `sm` (neither is load-bearing: there
+is no bulk action, and the avatar is decorative) and tightening cell padding. Re-measured: the Edit icon's
+right edge sits at 329px inside a 390px viewport with no horizontal overflow at all.
+
+**Two e2e assertions in `admin-students.spec.ts` were adjusted, and neither weakens the test.** (1) The
+enrolment form now lives behind "+ Add Student", so the test clicks it first. (2) `getByRole("heading", {
+name: "Students" })` became ambiguous once the card gained its "Students Information" heading, and the
+enrolment form's "Department" / "Enrolment year" labels became ambiguous once the filter row gained controls
+with the same names -- so the heading match is now exact and the form fields are scoped to the panel. Two
+assertions were **added** while there: that a Super Admin sees neither "Enrol student" nor "Add Student"
+(REQ-R04), and that the read-only list itself is still rendered (X-07).
+
+**Verification:** the 2 Playwright tests in `admin-students.spec.ts` pass; a browser pass as a real Admin
+and a real Super Admin confirmed column order, "Showing 1-25 of 158 students", breadcrumb, select-all ->
+25 selected -> indeterminate after unchecking one, the Add panel opening the existing form, filters
+combining (ACTIVE + 2020 -> 87) and surviving a page change, the filtered-empty state offering "Clear
+filters", View/Edit reaching the existing detail routes with accessible labels, mobile priority columns, and
+Super Admin seeing 25 View icons but zero Edit icons and no Add Student. `tsc --noEmit` and `eslint` clean.
+
+**One non-issue, recorded so it is not chased later:** a React hydration warning appears in Playwright runs
+that take screenshots, naming `style={{caret-color:"transparent"}}` on the checkboxes. That attribute is not
+in the code -- it is injected by Playwright's own default `caret: "hide"` screenshot behaviour, which mutates
+the DOM mid-hydration. Confirmed by loading the same page without taking a screenshot: zero console errors
+and no inline style on the element.

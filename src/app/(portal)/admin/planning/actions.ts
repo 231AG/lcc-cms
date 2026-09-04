@@ -77,14 +77,27 @@ export async function overridePrerequisiteAction(formData: FormData): Promise<vo
 
 export async function findPlanAction(formData: FormData): Promise<void> {
   const actor = await requireActor();
-  const studentId = String(formData.get("studentId") ?? "");
+  const studentNumber = String(formData.get("studentNumber") ?? "").trim();
   const semesterId = String(formData.get("semesterId") ?? "");
   const { assertCan } = await import("@/lib/permissions/kernel");
   await assertCan(actor, "planning.reviewPlan");
   const { db } = await import("@/lib/db/client");
-  const { coursePlan } = await import("@/lib/db/schema");
-  const { and, eq } = await import("drizzle-orm");
-  const plan = await db.query.coursePlan.findFirst({ where: and(eq(coursePlan.studentId, studentId), eq(coursePlan.semesterId, semesterId)) });
+  const { coursePlan, student } = await import("@/lib/db/schema");
+  const { and, eq, sql } = await import("drizzle-orm");
+
+  // The form now takes a typed Student ID rather than a picked row, so the
+  // ID has to be resolved -- and a mistyped one told apart from a real
+  // student with no plan, which are different problems for the office.
+  const studentRow = await db.query.student.findFirst({
+    where: sql`trim(${student.studentNumber}) = ${studentNumber}`,
+  });
+  if (!studentRow) {
+    redirect(`/admin/planning?error=${encodeURIComponent(`No student has the ID "${studentNumber}".`)}`);
+  }
+
+  const plan = await db.query.coursePlan.findFirst({
+    where: and(eq(coursePlan.studentId, studentRow.id), eq(coursePlan.semesterId, semesterId)),
+  });
   if (!plan) {
     redirect(`/admin/planning?error=${encodeURIComponent("No plan exists for that student in that semester.")}`);
   }

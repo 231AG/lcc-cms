@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, type Tx } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import {
@@ -284,47 +284,128 @@ async function assertSemesterOpenForRegistration(tx: Tx, semesterId: string): Pr
   }
 }
 
-/** Fetches the student's own plan for a semester, creating an empty DRAFT
- * row on first touch -- a plan only ever exists in that sense once a
- * student starts building one. Writes run through the raw connection
- * (DEV-03's pattern, same as every other write in this domain): RLS on
- * course_plan is read-only for `authenticated`, so `asUser()` could never
- * INSERT here even for a student's own row -- `assertCan` above plus the
- * ownership checks below stand in for RLS. */
-export async function getOrCreateDraftPlan(actor: Actor, semesterId: string) {
-  await assertCan(actor, "planning.manageOwnPlan");
+/**
+ * Decides whose plan a call is acting on, and authorizes accordingly
+ * (DEV-20). Acting on your own plan is `planning.manageOwnPlan` -- the
+ * Student's own permission. Acting on someone else's is
+ * `planning.manageStudentPlan`, an Admin entering a plan for a student
+ * who cannot use the app themselves (Section 17.8's year-one reality: no
+ * Android phone, no self-service).
+ *
+ * This is the ONLY difference between the two paths. Everything after it
+ * -- the six validators, the credit ceiling, the state machine, the
+ * approval queue -- is the same code on the same rows, so the two cannot
+ * drift apart (REQ-P03's "same enforcement at both points" applied to the
+ * authoring side as well).
+ *
+ * Deny-by-default still does the real work: a Student calling this for
+ * another student's plan has no manageStudentPlan row and is refused, so
+ * this is not a weaker check than the `studentId !== actor.userId`
+ * comparison it replaces -- it is the same check with a second, explicitly
+ * permitted case.
+ */
+async function authorizePlanSubject(actor: Actor, studentId: string): Promise<{ onBehalf: boolean }> {
+  if (studentId === actor.userId) {
+    await assertCan(actor, "planning.manageOwnPlan");
+    return { onBehalf: false };
+  }
+
+  try {
+    await assertCan(actor, "planning.manageStudentPlan");
+  } catch (err) {
+    // Preserve the pre-DEV-20 non-disclosure: a student reaching for
+    // someone else's plan gets the SAME "Plan not found." as for a plan id
+    // that does not exist, so the refusal is not an existence oracle. That
+    // was deliberate in the code this replaces (the identical message
+    // appeared on both branches in four places) and is kept here rather
+    // than quietly traded for a more informative message. Staff still get
+    // the real ForbiddenError, which is useful to them and discloses
+    // nothing they cannot already read.
+    const { can } = await import("@/lib/permissions/kernel");
+    if (await can(actor, "planning.manageOwnPlan")) throw new ValidationError("Plan not found.");
+    throw err;
+  }
+  return { onBehalf: true };
+}
+
+/** Fetches a student's plan for a semester, creating an empty DRAFT row on
+ * first touch -- a plan only ever exists in that sense once someone starts
+ * building one. `forStudentId` defaults to the actor, i.e. a student's own
+ * plan; an Admin passes the student they are entering it for. Writes run
+ * through the raw connection (DEV-03's pattern, same as every other write
+ * in this domain): RLS on course_plan is read-only for `authenticated`, so
+ * `asUser()` could never INSERT here even for a student's own row --
+ * `authorizePlanSubject` stands in for RLS. */
+export async function getOrCreateDraftPlan(actor: Actor, semesterId: string, forStudentId?: string) {
+  const studentId = forStudentId ?? actor.userId;
+  const { onBehalf } = await authorizePlanSubject(actor, studentId);
 
   return db.transaction(async (tx) => {
+    if (onBehalf) {
+      const subject = await tx.query.student.findFirst({ where: eq(student.id, studentId) });
+      if (!subject) throw new ValidationError("Student not found.");
+      if (subject.status !== "ACTIVE") {
+        throw new ValidationError(`Only an active student can be registered for courses (this student is ${subject.status}).`);
+      }
+    }
+
     const existing = await tx.query.coursePlan.findFirst({
-      where: and(eq(coursePlan.studentId, actor.userId), eq(coursePlan.semesterId, semesterId)),
+      where: and(eq(coursePlan.studentId, studentId), eq(coursePlan.semesterId, semesterId)),
     });
-    if (existing) return existing;
+    if (existing) {
+      // A plan the student started themselves, now being continued by the
+      // office: record that the office touched it.
+      if (onBehalf && existing.enteredBy !== actor.userId) {
+        const [updated] = await tx
+          .update(coursePlan)
+          .set({ enteredBy: actor.userId })
+          .where(eq(coursePlan.id, existing.id))
+          .returning();
+        return updated;
+      }
+      return existing;
+    }
 
     await assertSemesterOpenForRegistration(tx, semesterId);
     const [row] = await tx
       .insert(coursePlan)
-      .values({ studentId: actor.userId, semesterId, status: "DRAFT" })
+      .values({ studentId, semesterId, status: "DRAFT", enteredBy: onBehalf ? actor.userId : null })
       .returning();
+
+    if (onBehalf) {
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "COURSE_PLAN_STARTED_FOR_STUDENT",
+        entityType: "course_plan",
+        entityId: row.id,
+        studentId,
+        newValue: { semesterId, enteredBy: actor.userId },
+      });
+    }
     return row;
   });
 }
 
-async function loadOwnEditablePlan(tx: Tx, actor: Actor, planId: string) {
+/** Loads a plan that the actor may edit -- their own, or (Admin, DEV-20) a
+ * student's that they are entering on that student's behalf. */
+async function loadEditablePlan(tx: Tx, actor: Actor, planId: string) {
   const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
   if (!plan) throw new ValidationError("Plan not found.");
-  if (plan.studentId !== actor.userId) throw new ValidationError("Plan not found.");
+  const { onBehalf } = await authorizePlanSubject(actor, plan.studentId);
   if (plan.status !== "DRAFT" && plan.status !== "REJECTED") {
     throw new StateError(`This plan cannot be edited while ${plan.status}.`);
   }
   await assertSemesterOpenForRegistration(tx, plan.semesterId);
-  return plan;
+  return { plan, onBehalf };
 }
 
 export async function addPlanItem(actor: Actor, planId: string, offeringId: string) {
-  await assertCan(actor, "planning.manageOwnPlan");
-
   return db.transaction(async (tx) => {
-    const plan = await loadOwnEditablePlan(tx, actor, planId);
+    const { plan, onBehalf } = await loadEditablePlan(tx, actor, planId);
+    if (onBehalf && plan.enteredBy !== actor.userId) {
+      await tx.update(coursePlan).set({ enteredBy: actor.userId }).where(eq(coursePlan.id, planId));
+    }
 
     const offering = await tx.query.courseOffering.findFirst({ where: eq(courseOffering.id, offeringId) });
     if (!offering) throw new ValidationError("Offering not found.");
@@ -350,37 +431,31 @@ export async function addPlanItem(actor: Actor, planId: string, offeringId: stri
 }
 
 export async function removePlanItem(actor: Actor, planItemId: string) {
-  await assertCan(actor, "planning.manageOwnPlan");
-
   return db.transaction(async (tx) => {
     const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
     if (!item) throw new ValidationError("Plan item not found.");
-    await loadOwnEditablePlan(tx, actor, item.planId);
+    await loadEditablePlan(tx, actor, item.planId);
     await tx.delete(coursePlanItem).where(eq(coursePlanItem.id, planItemId));
   });
 }
 
 export async function setPlanItemRetake(actor: Actor, planItemId: string, isRetake: boolean) {
-  await assertCan(actor, "planning.manageOwnPlan");
-
   return db.transaction(async (tx) => {
     const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
     if (!item) throw new ValidationError("Plan item not found.");
-    await loadOwnEditablePlan(tx, actor, item.planId);
+    await loadEditablePlan(tx, actor, item.planId);
     const [row] = await tx.update(coursePlanItem).set({ isRetake }).where(eq(coursePlanItem.id, planItemId)).returning();
     return row;
   });
 }
 
-/** A DRAFT plan may be deleted by its student; once submitted, never
- * (Section 9.4.9). */
+/** A DRAFT plan may be deleted by its student, or by an Admin who entered
+ * it for them (DEV-20); once submitted, never (Section 9.4.9). */
 export async function deleteDraftPlan(actor: Actor, planId: string) {
-  await assertCan(actor, "planning.manageOwnPlan");
-
   return db.transaction(async (tx) => {
     const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
     if (!plan) throw new ValidationError("Plan not found.");
-    if (plan.studentId !== actor.userId) throw new ValidationError("Plan not found.");
+    await authorizePlanSubject(actor, plan.studentId);
     if (plan.status !== "DRAFT") throw new StateError("Only a Draft plan can be deleted.");
     await tx.delete(coursePlanItem).where(eq(coursePlanItem.planId, planId));
     await tx.delete(coursePlan).where(eq(coursePlan.id, planId));
@@ -398,17 +473,15 @@ export interface SubmitPlanResult {
  * not just the first (Section 14.4).
  */
 export async function submitPlan(actor: Actor, planId: string): Promise<SubmitPlanResult> {
-  await assertCan(actor, "planning.manageOwnPlan");
-
   // Validation needs cross-student visibility (another student's
   // registration count against a shared offering) that RLS cannot grant
   // a student, so this runs through the raw connection like every other
-  // complex write in this domain (DEV-03's pattern) -- assertCan above
-  // and the ownership check below stand in for RLS here.
+  // complex write in this domain (DEV-03's pattern) -- authorizePlanSubject
+  // below stands in for RLS here.
   return db.transaction(async (tx) => {
     const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
     if (!plan) throw new ValidationError("Plan not found.");
-    if (plan.studentId !== actor.userId) throw new ValidationError("Plan not found.");
+    const { onBehalf } = await authorizePlanSubject(actor, plan.studentId);
     if (plan.status !== "DRAFT" && plan.status !== "REJECTED") {
       throw new StateError(`This plan cannot be submitted while ${plan.status}.`);
     }
@@ -450,6 +523,9 @@ export async function submitPlan(actor: Actor, planId: string): Promise<SubmitPl
         submittedAt: new Date(),
         rejectionReason: null,
         version: plan.version + 1,
+        // DEV-20: an Admin submitting for a student stamps the row here,
+        // so the approval queue can show it without reading the audit log.
+        ...(onBehalf ? { enteredBy: actor.userId } : {}),
       })
       .where(eq(coursePlan.id, planId))
       .returning();
@@ -457,11 +533,14 @@ export async function submitPlan(actor: Actor, planId: string): Promise<SubmitPl
     await auditWrite(tx, {
       actorUserId: actor.userId,
       actorRole: actor.role,
+      // Kept as the same action name so every existing audit query,
+      // dashboard count and export keeps working; `enteredOnBehalf`
+      // distinguishes the two cases within it.
       action: "COURSE_PLAN_SUBMITTED",
       entityType: "course_plan",
       entityId: planId,
       studentId: plan.studentId,
-      newValue: { totalCredits, itemCount: items.length, version: row.version },
+      newValue: { totalCredits, itemCount: items.length, version: row.version, enteredOnBehalf: onBehalf },
       requestId,
     });
 
@@ -481,12 +560,10 @@ async function sumPlanCredits(tx: Tx, items: PlanItemForValidation[]): Promise<n
  * stay on the row until the next decision overwrites them; the audit log
  * keeps the original regardless. */
 export async function revisePlan(actor: Actor, planId: string) {
-  await assertCan(actor, "planning.manageOwnPlan");
-
   return db.transaction(async (tx) => {
     const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
     if (!plan) throw new ValidationError("Plan not found.");
-    if (plan.studentId !== actor.userId) throw new ValidationError("Plan not found.");
+    await authorizePlanSubject(actor, plan.studentId);
     if (plan.status !== "REJECTED") throw new StateError("Only a rejected plan can be revised.");
 
     const [row] = await tx.update(coursePlan).set({ status: "DRAFT" }).where(eq(coursePlan.id, planId)).returning();
@@ -1022,10 +1099,42 @@ export async function getPlanItems(actor: Actor, planId: string) {
   return asUser(actor.userId, (tx) => tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) }));
 }
 
+/** One student's plan for one semester, read by staff (DEV-20's entry
+ * screen, and the existing "look up a specific plan" lookup). Gated on
+ * either planning permission an Admin may hold -- reviewing a plan and
+ * entering one are separate grants, but both legitimately need to read
+ * this row. RLS grants Admin all-rows read on course_plan anyway; this
+ * gate is the service-layer half of Section 18.4's "service-layer scoping
+ * plus RLS". */
+export async function getPlanForStudentSemester(actor: Actor, studentId: string, semesterId: string) {
+  const { can } = await import("@/lib/permissions/kernel");
+  if (!(await can(actor, "planning.manageStudentPlan")) && !(await can(actor, "planning.reviewPlan"))) {
+    await assertCan(actor, "planning.manageStudentPlan"); // throws with the standard message
+  }
+  return asUser(actor.userId, (tx) =>
+    tx.query.coursePlan.findFirst({ where: and(eq(coursePlan.studentId, studentId), eq(coursePlan.semesterId, semesterId)) }),
+  );
+}
+
 /** A-11's queue: plans awaiting a decision. */
 export async function getPlanQueue(actor: Actor, semesterId: string) {
   await assertCan(actor, "planning.reviewPlan");
   return db.query.coursePlan.findMany({ where: and(eq(coursePlan.semesterId, semesterId), eq(coursePlan.status, "SUBMITTED")) });
+}
+
+/** How many plans await a decision across several semesters, counted in
+ * the database in one query. The Admin home dashboard used to call
+ * getPlanQueue once per active semester, sequentially, and take
+ * `.length` -- a round trip per semester to fetch whole rows it then
+ * discarded. */
+export async function countPlansAwaitingApproval(actor: Actor, semesterIds: string[]): Promise<number> {
+  await assertCan(actor, "planning.reviewPlan");
+  if (semesterIds.length === 0) return 0;
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(coursePlan)
+    .where(and(inArray(coursePlan.semesterId, semesterIds), eq(coursePlan.status, "SUBMITTED")));
+  return rows[0]?.count ?? 0;
 }
 
 /** A-10's read-only "View" -- every plan a student has ever had, across semesters, with its items. Admin-only per Section 9.4.9 (Super Admin has no role in course planning). */

@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import {
@@ -100,7 +100,7 @@ export default async function AcademicStructurePage({
             </Label>
             <Input id="college-name" name="name" required />
           </div>
-          <Button type="submit">Add college</Button>
+          <SubmitButton pendingLabel="Adding…">Add college</SubmitButton>
         </form>
         <Card>
           <Table>
@@ -170,7 +170,7 @@ export default async function AcademicStructurePage({
             </Label>
             <Input id="dept-max" name="maxCreditsOverride" type="number" min={1} max={21} className="w-24" />
           </div>
-          <Button type="submit">Add department</Button>
+          <SubmitButton pendingLabel="Adding…">Add department</SubmitButton>
         </form>
         <Card>
           <Table>
@@ -259,7 +259,7 @@ export default async function AcademicStructurePage({
             </Label>
             <Input id="course-credits" name="creditHours" type="number" min={1} required className="w-20" />
           </div>
-          <Button type="submit">Add course</Button>
+          <SubmitButton pendingLabel="Adding…">Add course</SubmitButton>
         </form>
         <Card>
           <Table>
@@ -320,31 +320,32 @@ export default async function AcademicStructurePage({
       <section>
         <h2 className="mb-3 font-medium text-fg">Prerequisites</h2>
         <form action={addPrerequisiteAction} className="mb-4 flex flex-wrap items-end gap-2">
+          {/* One shared <datalist> for both fields instead of two full
+              <select>s: 178 courses rendered twice was 356 <option>
+              elements on every load of this page, and a native dropdown
+              that long is unusable for finding a code anyway. Typing
+              filters; the action resolves the code and reports an
+              unrecognised one plainly. */}
+          <datalist id="course-codes">
+            {courses.map((c) => (
+              <option key={c.id} value={c.code}>
+                {c.title}
+              </option>
+            ))}
+          </datalist>
           <div>
             <Label className="text-xs" htmlFor="prereq-course">
               Course
             </Label>
-            <Select id="prereq-course" name="courseId" required>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code}
-                </option>
-              ))}
-            </Select>
+            <Input id="prereq-course" name="courseCode" list="course-codes" required placeholder="CSC 201" className="w-40" />
           </div>
           <div>
             <Label className="text-xs" htmlFor="prereq-of">
               Requires
             </Label>
-            <Select id="prereq-of" name="prerequisiteCourseId" required>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code}
-                </option>
-              ))}
-            </Select>
+            <Input id="prereq-of" name="prerequisiteCourseCode" list="course-codes" required placeholder="CSC 101" className="w-40" />
           </div>
-          <Button type="submit">Add prerequisite</Button>
+          <SubmitButton pendingLabel="Adding…">Add prerequisite</SubmitButton>
         </form>
         <Card>
           <Table>

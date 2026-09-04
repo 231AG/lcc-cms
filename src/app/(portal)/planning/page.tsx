@@ -2,17 +2,20 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
-import { getOfferingMeetings, getOfferingsForSemester } from "@/lib/offerings/offerings";
+import { getOfferingMeetingsForOfferings, getOfferingsByIds, getOfferingsForSemester } from "@/lib/offerings/offerings";
+import { filterOfferings, pageSlice } from "@/lib/offerings/offeringSearch";
 import { getMyPlan, getPlanItems, getRegistrationsForStudent } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
+import { OfferingPicker } from "@/components/planning/OfferingPicker";
 import { startPlanAction, addPlanItemAction, removePlanItemAction, submitPlanAction, revisePlanAction, deleteDraftPlanAction } from "./actions";
 
 export const metadata: Metadata = { title: "Course planning" };
 
-const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const PAGE_SIZE = 20;
 
 /**
  * S-07/S-08 (plan Section 20.3/20.4, Stage 9), combined into one page --
@@ -25,7 +28,7 @@ const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export default async function PlanningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semesterId?: string; error?: string }>;
+  searchParams: Promise<{ semesterId?: string; error?: string; q?: string; page?: string }>;
 }) {
   const actor = await getCurrentActor();
   if (!actor) redirect("/login");
@@ -39,10 +42,18 @@ export default async function PlanningPage({
     );
   }
 
-  const { error } = await searchParams;
+  const { error, q, page } = await searchParams;
 
-  const [semesters, academicYears] = await asUser(actor.userId, (tx) =>
-    Promise.all([tx.query.semester.findMany(), tx.query.academicYear.findMany()]),
+  // One round trip for all three reference lists rather than three
+  // separate asUser() transactions -- each one is a full BEGIN / set role
+  // / query / COMMIT against Supabase, so merging them is worth more here
+  // than any single query optimisation.
+  const [semesters, academicYears, courses] = await asUser(actor.userId, (tx) =>
+    Promise.all([
+      tx.query.semester.findMany(),
+      tx.query.academicYear.findMany(),
+      tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true) }),
+    ]),
   );
   const openSemester = semesters.find((s) => s.state === "REGISTRATION");
   const yearLabel = (semId: string) => {
@@ -63,23 +74,49 @@ export default async function PlanningPage({
   const semesterId = openSemester.id;
   const plan = await getMyPlan(actor, semesterId);
   const items = plan ? await getPlanItems(actor, plan.id) : [];
-  const offerings = await getOfferingsForSemester(actor, semesterId);
-  const courses = await asUser(actor.userId, (tx) =>
-    tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true) }),
-  );
-  const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
-  const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
-  const meetingsByOffering = new Map<string, Awaited<ReturnType<typeof getOfferingMeetings>>>();
-  for (const o of offerings) {
-    meetingsByOffering.set(o.id, await getOfferingMeetings(actor, o.id));
-  }
-  const plannedOfferingIds = new Set(items.map((i) => i.offeringId));
-  const totalCredits = items.reduce((sum, i) => sum + (offeringFor(i.offeringId)?.frozenCreditHours ?? 0), 0);
+  const isEditable = !plan || plan.status === "DRAFT" || plan.status === "REJECTED";
 
   const registrations =
     plan?.status === "APPROVED" || plan?.status === "PARTIALLY_APPROVED"
       ? await getRegistrationsForStudent(actor, actor.userId, semesterId)
       : [];
+
+  // The full semester catalogue is only needed while the plan is still
+  // being built. Once it is submitted or decided, only the handful of
+  // offerings the plan and its registrations actually reference matter.
+  const availableOfferings = isEditable ? await getOfferingsForSemester(actor, semesterId) : [];
+  const referencedOfferings = isEditable
+    ? []
+    : await getOfferingsByIds(actor, [...new Set([...items.map((i) => i.offeringId), ...registrations.map((r) => r.offeringId)])]);
+  const offeringById = new Map([...availableOfferings, ...referencedOfferings].map((o) => [o.id, o]));
+
+  const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
+  const plannedOfferingIds = new Set(items.map((i) => i.offeringId));
+  const totalCredits = items.reduce((sum, i) => sum + (offeringById.get(i.offeringId)?.frozenCreditHours ?? 0), 0);
+
+  // Search and page the catalogue, then fetch meeting times for THIS
+  // page's offerings only -- one batched query instead of one round trip
+  // per offering (177 of them in the real 2026/2027 schedule, which made
+  // this list effectively unusable before).
+  const matching = filterOfferings(availableOfferings, courses, q);
+  const { rows: pagedOfferings, page: pageNum } = pageSlice(matching, Number(page) || 1, PAGE_SIZE);
+  const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, pagedOfferings.map((o) => o.id));
+
+  const listParams = (overrides: Record<string, string | undefined> = {}) => {
+    const merged: Record<string, string | undefined> = { q, page: String(pageNum), ...overrides };
+    const params = new URLSearchParams({ semesterId });
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) params.set(key, value);
+    }
+    return params.toString();
+  };
+  // Carried on every mutating form so an add/remove returns the student to
+  // the same search and page rather than to the top of the catalogue.
+  const contextFields: Record<string, string> = {
+    semesterId,
+    ...(q ? { q } : {}),
+    ...(pageNum > 1 ? { page: String(pageNum) } : {}),
+  };
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
@@ -94,7 +131,7 @@ export default async function PlanningPage({
       {!plan && (
         <form action={startPlanAction}>
           <input type="hidden" name="semesterId" value={semesterId} />
-          <Button type="submit">Start building your plan</Button>
+          <SubmitButton pendingLabel="Starting…">Start building your plan</SubmitButton>
         </form>
       )}
 
@@ -106,7 +143,9 @@ export default async function PlanningPage({
                 <CardTitle className="mb-1 text-danger-fg">Rejected</CardTitle>
                 <p className="mb-3 text-sm text-danger-fg">{plan.rejectionReason}</p>
                 <form action={revisePlanAction}>
-                  <input type="hidden" name="semesterId" value={semesterId} />
+                  {Object.entries(contextFields).map(([name, value]) => (
+                    <input key={name} type="hidden" name={name} value={value} />
+                  ))}
                   <input type="hidden" name="planId" value={plan.id} />
                   <Button type="submit" variant="secondary">
                     Revise
@@ -125,18 +164,20 @@ export default async function PlanningPage({
               <ul className="mb-4 flex flex-col gap-2">
                 {items.map((i) => {
                   const c = courseFor(i.courseId);
-                  const o = offeringFor(i.offeringId);
+                  const o = offeringById.get(i.offeringId);
                   return (
                     <li key={i.id} className="flex items-center justify-between rounded-md border border-line px-3 py-2 text-sm">
                       <span>
                         {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section}){i.isRetake && " — retake"}
                       </span>
                       <form action={removePlanItemAction}>
-                        <input type="hidden" name="semesterId" value={semesterId} />
+                        {Object.entries(contextFields).map(([name, value]) => (
+                          <input key={name} type="hidden" name={name} value={value} />
+                        ))}
                         <input type="hidden" name="planItemId" value={i.id} />
-                        <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
+                        <SubmitTextButton pendingLabel="Removing…" className="text-xs font-medium text-danger-fg hover:underline">
                           Remove
-                        </button>
+                        </SubmitTextButton>
                       </form>
                     </li>
                   );
@@ -144,9 +185,11 @@ export default async function PlanningPage({
               </ul>
               <div className="flex items-center gap-3">
                 <form action={submitPlanAction}>
-                  <input type="hidden" name="semesterId" value={semesterId} />
+                  {Object.entries(contextFields).map(([name, value]) => (
+                    <input key={name} type="hidden" name={name} value={value} />
+                  ))}
                   <input type="hidden" name="planId" value={plan.id} />
-                  <Button type="submit">Submit</Button>
+                  <SubmitButton pendingLabel="Submitting…">Submit</SubmitButton>
                 </form>
                 {plan.status === "DRAFT" && (
                   <form action={deleteDraftPlanAction}>
@@ -161,46 +204,22 @@ export default async function PlanningPage({
             </CardBody>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Available offerings</CardTitle>
-            </CardHeader>
-            <CardBody>
-              <div className="flex flex-col gap-3">
-                {offerings.map((o) => {
-                  const c = courseFor(o.courseId);
-                  const meetings = meetingsByOffering.get(o.id) ?? [];
-                  const already = plannedOfferingIds.has(o.id);
-                  return (
-                    <div key={o.id} className="rounded-md border border-line p-3 text-sm">
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="font-medium text-fg">
-                          {c ? `${c.code} — ${c.title}` : o.courseId} (Section {o.section})
-                        </span>
-                        <span className="text-xs text-fg-muted">{o.frozenCreditHours}cr</span>
-                      </div>
-                      <p className="mb-2 text-xs text-fg-muted">
-                        {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}${m.room ? ` (${m.room})` : ""}`).join(", ")}
-                        {o.instructorName ? ` — ${o.instructorName}` : ""}
-                      </p>
-                      {already ? (
-                        <span className="text-xs text-fg-subtle">Already in your plan</span>
-                      ) : (
-                        <form action={addPlanItemAction}>
-                          <input type="hidden" name="semesterId" value={semesterId} />
-                          <input type="hidden" name="planId" value={plan.id} />
-                          <input type="hidden" name="offeringId" value={o.id} />
-                          <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
-                            Add
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </CardBody>
-          </Card>
+          <OfferingPicker
+            offerings={pagedOfferings}
+            courses={courses}
+            meetingsByOffering={meetingsByOffering}
+            plannedOfferingIds={plannedOfferingIds}
+            q={q}
+            page={pageNum}
+            pageSize={PAGE_SIZE}
+            totalMatching={matching.length}
+            totalAvailable={availableOfferings.length}
+            hrefForPage={(p) => `/planning?${listParams({ page: String(p) })}`}
+            clearSearchHref={`/planning?${listParams({ q: undefined, page: undefined })}`}
+            searchHiddenFields={{ semesterId }}
+            addAction={addPlanItemAction}
+            addHiddenFields={{ ...contextFields, planId: plan.id }}
+          />
         </>
       )}
 
@@ -235,7 +254,7 @@ export default async function PlanningPage({
             <p className="mb-3 text-sm text-success-fg">{totalCredits} credit hours registered.</p>
             <ul className="flex flex-col gap-1 text-sm text-success-fg">
               {registrations.filter((r) => r.status === "REGISTERED").map((r) => {
-                const o = offeringFor(r.offeringId);
+                const o = offeringById.get(r.offeringId);
                 const c = o ? courseFor(o.courseId) : undefined;
                 return (
                   <li key={r.id}>

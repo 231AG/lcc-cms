@@ -3,10 +3,17 @@
  * render-blocking <script src> at the top of <body> in the root layout.
  *
  * Why a separate file rather than an inline script in the layout: the app
- * ships a strict `script-src 'self'` CSP (src/proxy.ts) with no nonce and no
- * 'unsafe-inline', so an inline <script> is refused by the browser. A
- * same-origin file satisfies 'self' as-is, which keeps the theme toggle
- * working without loosening the CSP.
+ * ships a strict `script-src` CSP (src/proxy.ts) with no 'unsafe-inline', so
+ * an arbitrary inline <script> is refused by the browser. A same-origin file
+ * satisfies 'self' as-is, which keeps the theme toggle working without
+ * loosening the CSP.
+ *
+ * Note: `script-src` gained a per-request nonce in the performance pass
+ * (DEV-21) so that React's own inline streaming scripts can run -- without it,
+ * any page with a Suspense boundary rendered and then stayed invisible. That
+ * change deliberately kept `'self'` and avoided 'strict-dynamic' (which would
+ * have made `'self'` inert), so this file still loads exactly as before and
+ * needs no nonce of its own.
  *
  * Why the click handling lives here rather than in a React client component:
  * this file runs on its own, with no dependency on hydration, which suits an

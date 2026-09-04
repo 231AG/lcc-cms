@@ -61,19 +61,29 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(admin.username);
-  await page.getByLabel("Password").fill(admin.password);
+  await page.getByLabel("Password", { exact: true }).fill(admin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
   await page.goto("/admin/students");
-  await expect(page.getByRole("heading", { name: "Students" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Students", exact: true })).toBeVisible();
 
-  await page.getByLabel("Student ID").fill(studentNumber);
-  await page.getByLabel("First name").fill("Playwright");
-  await page.getByLabel("Last name").fill("Enrollee");
-  await page.getByLabel("Department").selectOption({ value: dept.id });
-  await page.getByLabel("Enrolment year").fill("2026");
-  await page.getByRole("button", { name: "Enrol student" }).click();
+  // The enrolment form is behind the "+ Add Student" primary action since
+  // the student-listing redesign; it is the same form, same fields, same
+  // action, just no longer always expanded on the page.
+  await page.getByRole("button", { name: "Add Student" }).click();
+
+  // Scoped to the panel: the page's filter row now also has "Department"
+  // and "Enrolment year" controls, so an unscoped label lookup is genuinely
+  // ambiguous and should say which one it means rather than rely on
+  // whichever happens to come first in the DOM.
+  const enrolPanel = page.locator("#enrol-student-panel");
+  await enrolPanel.getByLabel("Student ID").fill(studentNumber);
+  await enrolPanel.getByLabel("First name").fill("Playwright");
+  await enrolPanel.getByLabel("Last name").fill("Enrollee");
+  await enrolPanel.getByLabel("Department").selectOption({ value: dept.id });
+  await enrolPanel.getByLabel("Enrolment year").fill("2026");
+  await enrolPanel.getByRole("button", { name: "Enrol student" }).click();
 
   await expect(page.getByText("Student enrolled.")).toBeVisible();
   const tempPasswordLocator = page.locator("code").last();
@@ -89,7 +99,7 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
   // Log in as the newly enrolled student.
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(studentNumber);
-  await page.getByLabel("Password").fill(temporaryPassword);
+  await page.getByLabel("Password", { exact: true }).fill(temporaryPassword);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/change-password$/);
 
@@ -115,11 +125,16 @@ test("Super Admin sees the student list read-only", async ({ page }) => {
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(superAdmin.username);
-  await page.getByLabel("Password").fill(superAdmin.password);
+  await page.getByLabel("Password", { exact: true }).fill(superAdmin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
   await page.goto("/admin/students");
-  await expect(page.getByRole("heading", { name: "Students" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Students", exact: true })).toBeVisible();
+  // Neither the submit button nor the control that reveals it: a Super
+  // Admin cannot enrol a student (REQ-R04), so neither should exist.
   await expect(page.getByRole("button", { name: "Enrol student" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add Student" })).toHaveCount(0);
+  // ...but the read-only list itself is still there (X-07).
+  await expect(page.getByRole("columnheader", { name: "Student ID" })).toBeVisible();
 });

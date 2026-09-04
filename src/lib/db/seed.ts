@@ -205,6 +205,16 @@ const PERMISSIONS_STAGE_9: Array<{
   { role: "ADMIN", action: "planning.reviewPlan", allowed: true, note: "REQ-P10/P11. Approve, reject with reason, override a failed prerequisite." },
   { role: "SUPER_ADMIN", action: "planning.reviewPlan", allowed: false, note: "Section 9.4.9: Super Admin has no role in course planning at all." },
 
+  // DEV-20: entering a course plan on behalf of a student who cannot use
+  // the app themselves. Distinct from manageOwnPlan (which is a student
+  // acting on their own row) and from reviewPlan (deciding a submitted
+  // plan) -- an Admin who may review is not automatically one who may
+  // author, and this keeps the two nameable separately if that ever
+  // matters. Super Admin stays out, as in every other planning action.
+  { role: "STUDENT", action: "planning.manageStudentPlan", allowed: false, note: "A student uses planning.manageOwnPlan for their own plan." },
+  { role: "ADMIN", action: "planning.manageStudentPlan", allowed: true, note: "DEV-20. Build and submit a course plan on a student's behalf; same validators and same approval queue as a student-submitted plan." },
+  { role: "SUPER_ADMIN", action: "planning.manageStudentPlan", allowed: false, note: "Section 9.4.9: Super Admin has no role in course planning at all." },
+
   { role: "STUDENT", action: "planning.manageRegistration", allowed: false, note: "" },
   { role: "ADMIN", action: "planning.manageRegistration", allowed: true, note: "DEC-14. Direct registration and drop, bypassing the plan." },
   { role: "SUPER_ADMIN", action: "planning.manageRegistration", allowed: false, note: "Section 9.4.9: Super Admin has no role in course planning at all." },

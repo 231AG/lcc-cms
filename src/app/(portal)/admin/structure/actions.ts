@@ -155,12 +155,38 @@ export async function toggleCourseActiveAction(formData: FormData): Promise<void
   redirect("/admin/structure");
 }
 
+/**
+ * Both fields are now typed course CODES with a `<datalist>` of
+ * suggestions, rather than two `<select>`s enumerating all 178 courses --
+ * so each has to be resolved to an id here. Matching is
+ * case/whitespace-insensitive against the same expression as the
+ * `course_code_unique_idx` unique index (lower(trim(code))), so what the
+ * form accepts and what the database considers "the same code" cannot
+ * disagree.
+ */
+async function resolveCourseByCode(code: string) {
+  const { db } = await import("@/lib/db/client");
+  const { course } = await import("@/lib/db/schema");
+  const { sql } = await import("drizzle-orm");
+  return db.query.course.findFirst({ where: sql`lower(trim(${course.code})) = lower(trim(${code}))` });
+}
+
 export async function addPrerequisiteAction(formData: FormData): Promise<void> {
   const actor = await requireActor();
+  const courseCode = String(formData.get("courseCode") ?? "").trim();
+  const prerequisiteCode = String(formData.get("prerequisiteCourseCode") ?? "").trim();
+
+  const [courseRow, prerequisiteRow] = await Promise.all([
+    resolveCourseByCode(courseCode),
+    resolveCourseByCode(prerequisiteCode),
+  ]);
+  if (!courseRow) errorRedirect(`No course has the code "${courseCode}".`);
+  if (!prerequisiteRow) errorRedirect(`No course has the code "${prerequisiteCode}".`);
+
   try {
     await addPrerequisite(actor, {
-      courseId: String(formData.get("courseId") ?? ""),
-      prerequisiteCourseId: String(formData.get("prerequisiteCourseId") ?? ""),
+      courseId: courseRow.id,
+      prerequisiteCourseId: prerequisiteRow.id,
     });
   } catch (err) {
     if (err instanceof AppError) errorRedirect(err.message);

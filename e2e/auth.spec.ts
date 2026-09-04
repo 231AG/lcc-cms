@@ -66,7 +66,7 @@ test("forced password change cannot be bypassed by navigating straight to /porta
 }) => {
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(TEST_USERNAME);
-  await page.getByLabel("Password").fill(TEMP_PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(TEMP_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).toHaveURL(/\/change-password$/);
@@ -102,7 +102,7 @@ test("wrong password shows a generic error, not which field was wrong", async ({
 }) => {
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(TEST_USERNAME);
-  await page.getByLabel("Password").fill("definitely-wrong");
+  await page.getByLabel("Password", { exact: true }).fill("definitely-wrong");
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).toHaveURL(/\/login\?error=1$/);

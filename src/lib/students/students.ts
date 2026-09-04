@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import { appUser, department, student } from "@/lib/db/schema";
@@ -268,6 +268,9 @@ export async function resetStudentPassword(
 export interface SearchStudentsInput {
   query?: string;
   status?: StudentStatus;
+  /** Filters combine with AND, and with `query`/`status`. */
+  departmentId?: string;
+  enrolmentYear?: number;
   page?: number;
   pageSize?: number;
 }
@@ -297,6 +300,12 @@ export async function searchStudents(actor: Actor, input: SearchStudentsInput = 
     if (input.status) {
       conditions.push(eq(student.status, input.status));
     }
+    if (input.departmentId) {
+      conditions.push(eq(student.departmentId, input.departmentId));
+    }
+    if (input.enrolmentYear !== undefined) {
+      conditions.push(eq(student.enrolmentYear, input.enrolmentYear));
+    }
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [rows, countRows] = await Promise.all([
@@ -311,6 +320,24 @@ export async function searchStudents(actor: Actor, input: SearchStudentsInput = 
 
     return { rows, total: countRows[0]?.count ?? 0, page, pageSize };
   });
+}
+
+/**
+ * The enrolment years that actually have students, newest first -- so the
+ * Students page's year filter offers only values that can return a result,
+ * rather than a hardcoded or open-ended range. Derived from the existing
+ * `enrolment_year` column; there is no separate year table and this adds
+ * none. RLS-scoped like every other read here, so a Student sees only
+ * their own year and staff see all of them.
+ */
+export async function getEnrolmentYears(actor: Actor): Promise<number[]> {
+  const rows = await asUser(actor.userId, (tx) =>
+    tx
+      .selectDistinct({ year: student.enrolmentYear })
+      .from(student)
+      .orderBy(desc(student.enrolmentYear)),
+  );
+  return rows.map((r) => r.year);
 }
 
 export async function getStudent(actor: Actor, studentId: string) {
