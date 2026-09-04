@@ -68,15 +68,36 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
   await page.goto("/admin/students");
   await expect(page.getByRole("heading", { name: "Students", exact: true })).toBeVisible();
 
+  // The nav menu closes when an item is chosen -- including the item for
+  // the page already open, which is not a navigation and so used to leave
+  // the menu stuck open (it was a bare <details>, whose open state the
+  // shared layout carried across a client navigation).
+  const mainNav = page.locator('nav[aria-label="Main"]');
+  const studentsMenu = mainNav.getByRole("button", { name: "Students" });
+  await expect(studentsMenu).toHaveAttribute("aria-current", "true"); // the current section is marked
+  await studentsMenu.click();
+  await expect(studentsMenu).toHaveAttribute("aria-expanded", "true");
+  await mainNav.getByRole("link", { name: "Students", exact: true }).click();
+  await expect(studentsMenu).toHaveAttribute("aria-expanded", "false");
+  // ...and so does a click outside it, and Escape.
+  await studentsMenu.click();
+  await page.locator("#main-content").click({ position: { x: 5, y: 5 } });
+  await expect(studentsMenu).toHaveAttribute("aria-expanded", "false");
+  await studentsMenu.click();
+  await page.keyboard.press("Escape");
+  await expect(studentsMenu).toHaveAttribute("aria-expanded", "false");
+
   // The enrolment form is behind the "+ Add Student" primary action since
   // the student-listing redesign; it is the same form, same fields, same
   // action, just no longer always expanded on the page.
   await page.getByRole("button", { name: "Add Student" }).click();
 
-  // Scoped to the panel: the page's filter row now also has "Department"
-  // and "Enrolment year" controls, so an unscoped label lookup is genuinely
-  // ambiguous and should say which one it means rather than rely on
-  // whichever happens to come first in the DOM.
+  // Scoped to the panel: the page's filter row also has "Enrolment year"
+  // (and, since the College pass, a "College" control) so an unscoped label
+  // lookup is genuinely ambiguous and should say which one it means rather
+  // than rely on whichever happens to come first in the DOM. Enrolment is
+  // still BY DEPARTMENT -- only the listing column and filter became the
+  // college.
   const enrolPanel = page.locator("#enrol-student-panel");
   await enrolPanel.getByLabel("Student ID").fill(studentNumber);
   await enrolPanel.getByLabel("First name").fill("Playwright");
@@ -95,6 +116,21 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
   cleanupStudentUserIds.push(createdRow.id);
 
   await expect(page.getByRole("cell", { name: studentNumber, exact: true })).toBeVisible();
+
+  // The listing scans by College, not Department (there are far fewer of
+  // them); the filter offers the same dimension.
+  await expect(page.getByRole("columnheader", { name: "College" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Department" })).toHaveCount(0);
+  await expect(page.getByLabel("College")).toBeVisible();
+
+  // The profile page can be edited from the profile page itself, without
+  // going back to the listing to find the pencil -- and it is the same
+  // edit form, not a second one.
+  await page.goto(`/admin/students/${createdRow.id}?mode=view`);
+  await expect(page.getByLabel("First name")).toHaveCount(0);
+  await page.getByRole("link", { name: "Edit student" }).click();
+  await expect(page).toHaveURL(new RegExp(`/admin/students/${createdRow.id}$`));
+  await expect(page.getByLabel("First name")).toBeEditable();
 
   // Log in as the newly enrolled student.
   await page.goto("/login");

@@ -6,31 +6,22 @@ import { db } from "@/lib/db/client";
 import { appUser } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-
-const MIN_LENGTH = 10;
-
-/**
- * §18 RECOMMENDED: "Password policy -- minimum length with a rejection
- * list of obvious values." Small and deliberately so: the plan explicitly
- * rules out forced periodic rotation ("reliably produces weaker passwords
- * written on desks") and this app has no external breach-database check
- * available -- this catches the obvious case (a temporary/reset password
- * left unchanged in substance, or a keyboard-walk) without pretending to
- * be a full password-strength library.
- */
-const OBVIOUS_PASSWORDS = new Set([
-  "password", "password1", "password123", "passw0rd",
-  "12345678", "123456789", "1234567890", "qwertyuiop",
-  "letmein123", "changeme123", "welcome123", "admin1234",
-]);
-
-function isObviousPassword(password: string): boolean {
-  const normalized = password.toLowerCase().replace(/\s+/g, "");
-  return OBVIOUS_PASSWORDS.has(normalized);
-}
+import { checkPasswordPolicy, isObviousPassword, passwordPolicyFor } from "@/lib/identity/passwordPolicy";
+import type { Role } from "@/lib/permissions/kernel";
 
 /**
  * REQ-A03: forced first-login (and post-reset) password change.
+ *
+ * This one action is BOTH entry points the app has: the forced
+ * first-login/post-reset change (src/proxy.ts redirects every other route
+ * here while must_change_password is set) and the self-service change from
+ * the header's "Change password" link. They are the same route and the same
+ * form, so a rule added here necessarily applies to both -- there is no
+ * second path that could drift.
+ *
+ * The rule itself is role-dependent (see lib/identity/passwordPolicy.ts):
+ * students get the simple 6-character/one-number/one-lowercase rule,
+ * staff keep the 10-character minimum they already had.
  *
  * Clearing must_change_password is deliberately done via the superuser
  * `db` connection, not asUser() -- the `authenticated` role has no UPDATE
@@ -52,7 +43,12 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
   const newPassword = String(formData.get("newPassword") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  if (newPassword.length < MIN_LENGTH || newPassword !== confirmPassword) {
+  // The role is read from the database, never from the form: the policy a
+  // password is judged against must not be something the client can pick.
+  const [row] = await db.select({ role: appUser.role }).from(appUser).where(eq(appUser.id, user.id)).limit(1);
+  const policy = passwordPolicyFor(row?.role as Role | undefined);
+
+  if (newPassword !== confirmPassword || checkPasswordPolicy(newPassword, policy)) {
     redirect("/change-password?error=1");
   }
   if (isObviousPassword(newPassword)) {
