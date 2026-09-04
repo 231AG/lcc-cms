@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, type Tx } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import {
@@ -1120,6 +1120,21 @@ export async function getPlanForStudentSemester(actor: Actor, studentId: string,
 export async function getPlanQueue(actor: Actor, semesterId: string) {
   await assertCan(actor, "planning.reviewPlan");
   return db.query.coursePlan.findMany({ where: and(eq(coursePlan.semesterId, semesterId), eq(coursePlan.status, "SUBMITTED")) });
+}
+
+/** How many plans await a decision across several semesters, counted in
+ * the database in one query. The Admin home dashboard used to call
+ * getPlanQueue once per active semester, sequentially, and take
+ * `.length` -- a round trip per semester to fetch whole rows it then
+ * discarded. */
+export async function countPlansAwaitingApproval(actor: Actor, semesterIds: string[]): Promise<number> {
+  await assertCan(actor, "planning.reviewPlan");
+  if (semesterIds.length === 0) return 0;
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(coursePlan)
+    .where(and(inArray(coursePlan.semesterId, semesterIds), eq(coursePlan.status, "SUBMITTED")));
+  return rows[0]?.count ?? 0;
 }
 
 /** A-10's read-only "View" -- every plan a student has ever had, across semesters, with its items. Admin-only per Section 9.4.9 (Super Admin has no role in course planning). */

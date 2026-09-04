@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { OfferingPicker } from "@/components/planning/OfferingPicker";
 import { startPlanAction, addPlanItemAction, removePlanItemAction, submitPlanAction, revisePlanAction, deleteDraftPlanAction } from "./actions";
 
@@ -130,7 +131,7 @@ export default async function PlanningPage({
       {!plan && (
         <form action={startPlanAction}>
           <input type="hidden" name="semesterId" value={semesterId} />
-          <Button type="submit">Start building your plan</Button>
+          <SubmitButton pendingLabel="Starting…">Start building your plan</SubmitButton>
         </form>
       )}
 
@@ -174,9 +175,9 @@ export default async function PlanningPage({
                           <input key={name} type="hidden" name={name} value={value} />
                         ))}
                         <input type="hidden" name="planItemId" value={i.id} />
-                        <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                        <SubmitTextButton pendingLabel="Removing…" className="text-xs font-medium text-danger-600 hover:underline">
                           Remove
-                        </button>
+                        </SubmitTextButton>
                       </form>
                     </li>
                   );
@@ -188,7 +189,7 @@ export default async function PlanningPage({
                     <input key={name} type="hidden" name={name} value={value} />
                   ))}
                   <input type="hidden" name="planId" value={plan.id} />
-                  <Button type="submit">Submit</Button>
+                  <SubmitButton pendingLabel="Submitting…">Submit</SubmitButton>
                 </form>
                 {plan.status === "DRAFT" && (
                   <form action={deleteDraftPlanAction}>

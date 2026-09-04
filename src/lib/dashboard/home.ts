@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { courseOffering, gradeRecord, gradeSubmission, registration, semester } from "@/lib/db/schema";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
-import { getPlanQueue } from "@/lib/planning/planning";
+import { countPlansAwaitingApproval } from "@/lib/planning/planning";
 import { getSubmissionQueue, getCorrectionQueue } from "@/lib/grades/grades";
 import { getImportProgressReport } from "@/lib/historical/historical";
 
@@ -28,37 +28,26 @@ export interface AdminHomeSummary {
  */
 export async function getAdminHomeSummary(actor: Actor): Promise<AdminHomeSummary> {
   const activeSemesters = await getActiveSemesters();
-
-  let plansAwaitingApproval = 0;
-  for (const sem of activeSemesters) {
-    const queue = await getPlanQueue(actor, sem.id);
-    plansAwaitingApproval += queue.length;
-  }
-
   await assertCan(actor, "grade.manageClass");
   const gradeSemesterIds = activeSemesters.filter((s) => s.state === "GRADE_SUBMISSION").map((s) => s.id);
-  let classesNotYetSubmitted = 0;
-  if (gradeSemesterIds.length > 0) {
-    const offerings = await db.query.courseOffering.findMany({ where: inArray(courseOffering.semesterId, gradeSemesterIds) });
-    const offeringsWithRegistrations = new Set(
-      (await db.query.registration.findMany({ where: and(inArray(registration.offeringId, offerings.map((o) => o.id)), eq(registration.status, "REGISTERED")) })).map(
-        (r) => r.offeringId,
-      ),
-    );
-    const submittedOfferingIds = new Set(
-      (await db.query.gradeSubmission.findMany({ where: inArray(gradeSubmission.offeringId, offerings.map((o) => o.id)) })).map((s) => s.offeringId),
-    );
-    classesNotYetSubmitted = offerings.filter((o) => offeringsWithRegistrations.has(o.id) && !submittedOfferingIds.has(o.id)).length;
-  }
 
-  // A grade returned to DRAFT with a decision_reason set is one that was
-  // rejected and never resubmitted -- decideGrades (grades.ts) is the only
-  // place that sets both at once.
-  const rejectedGrades = await db.query.gradeRecord.findMany({
-    where: and(eq(gradeRecord.status, "DRAFT"), isNotNull(gradeRecord.decisionReason)),
-  });
-
-  const progress = await getImportProgressReport(actor);
+  // This dashboard is the first screen an Admin sees, and it was the
+  // slowest page in the app. Two reasons, both fixed here: it counted
+  // pending plans with one round trip PER active semester (fetching whole
+  // rows only to read `.length`), and every one of its four independent
+  // figures was awaited in series. They share no data, so they now run
+  // together and the plan count is a single COUNT in the database.
+  const [plansAwaitingApproval, classesNotYetSubmitted, rejectedGrades, progress] = await Promise.all([
+    countPlansAwaitingApproval(actor, activeSemesters.map((s) => s.id)),
+    countClassesNotYetSubmitted(gradeSemesterIds),
+    // A grade returned to DRAFT with a decision_reason set is one that was
+    // rejected and never resubmitted -- decideGrades (grades.ts) is the
+    // only place that sets both at once.
+    db.query.gradeRecord.findMany({
+      where: and(eq(gradeRecord.status, "DRAFT"), isNotNull(gradeRecord.decisionReason)),
+    }),
+    getImportProgressReport(actor),
+  ]);
 
   return {
     plansAwaitingApproval,
@@ -66,6 +55,26 @@ export async function getAdminHomeSummary(actor: Actor): Promise<AdminHomeSummar
     rejectedGradesNeedingRework: rejectedGrades.length,
     importByStatus: progress.byStatus,
   };
+}
+
+/** Classes in a grade-submission semester that have registered students
+ * but no grade submission yet. The two lookups after the offering list
+ * depend only on it, not on each other, so they run together. */
+async function countClassesNotYetSubmitted(gradeSemesterIds: string[]): Promise<number> {
+  if (gradeSemesterIds.length === 0) return 0;
+
+  const offerings = await db.query.courseOffering.findMany({ where: inArray(courseOffering.semesterId, gradeSemesterIds) });
+  if (offerings.length === 0) return 0;
+  const offeringIds = offerings.map((o) => o.id);
+
+  const [registrations, submissions] = await Promise.all([
+    db.query.registration.findMany({ where: and(inArray(registration.offeringId, offeringIds), eq(registration.status, "REGISTERED")) }),
+    db.query.gradeSubmission.findMany({ where: inArray(gradeSubmission.offeringId, offeringIds) }),
+  ]);
+
+  const withRegistrations = new Set(registrations.map((r) => r.offeringId));
+  const submitted = new Set(submissions.map((s) => s.offeringId));
+  return offerings.filter((o) => withRegistrations.has(o.id) && !submitted.has(o.id)).length;
 }
 
 export interface SuperAdminHomeSummary {

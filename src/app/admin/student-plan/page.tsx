@@ -13,6 +13,7 @@ import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { OfferingPicker } from "@/components/planning/OfferingPicker";
@@ -369,7 +370,7 @@ async function StudentPlanEditor({
           {Object.entries(baseFields).map(([name, value]) => (
             <input key={name} type="hidden" name={name} value={value} />
           ))}
-          <Button type="submit">Start a plan for this student</Button>
+          <SubmitButton pendingLabel="Starting…">Start a plan for this student</SubmitButton>
         </form>
       )}
 
@@ -399,9 +400,9 @@ async function StudentPlanEditor({
                             <input key={name} type="hidden" name={name} value={value} />
                           ))}
                           <input type="hidden" name="planItemId" value={i.id} />
-                          <button type="submit" className="text-xs font-medium text-danger-600 hover:underline">
+                          <SubmitTextButton pendingLabel="Removing…" className="text-xs font-medium text-danger-600 hover:underline">
                             Remove
-                          </button>
+                          </SubmitTextButton>
                         </form>
                       )}
                     </li>
@@ -415,7 +416,7 @@ async function StudentPlanEditor({
                       <input key={name} type="hidden" name={name} value={value} />
                     ))}
                     <input type="hidden" name="planId" value={plan.id} />
-                    <Button type="submit">Submit for review</Button>
+                    <SubmitButton pendingLabel="Submitting…">Submit for review</SubmitButton>
                   </form>
                   {plan.status === "DRAFT" && (
                     <form action={deleteStudentDraftPlanAction}>

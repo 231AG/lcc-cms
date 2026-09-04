@@ -3,6 +3,7 @@ import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
 import { Pagination } from "@/components/ui/Pagination";
+import { SubmitTextButton } from "@/components/ui/SubmitButton";
 
 /**
  * The "available offerings" picker used both by a student building their
@@ -147,13 +148,9 @@ export function OfferingPicker({
                       <input key={name} type="hidden" name={name} value={value} />
                     ))}
                     <input type="hidden" name="offeringId" value={o.id} />
-                    <button
-                      type="submit"
-                      disabled={disabled}
-                      className="text-xs font-medium text-brand-700 hover:underline disabled:cursor-not-allowed disabled:text-neutral-400 disabled:no-underline"
-                    >
+                    <SubmitTextButton disabled={disabled} pendingLabel="Adding…" className="text-xs font-medium text-brand-700 hover:underline">
                       Add
-                    </button>
+                    </SubmitTextButton>
                   </form>
                 )}
               </div>

@@ -44,6 +44,12 @@ export default async function PlanningQueuePage({
     );
   }
 
+  // All three in ONE transaction, students included. Fetching only the
+  // queue's students was tried and measured slower: it needs the queue
+  // first, so it costs an extra asUser() round trip (~950ms against
+  // Supabase) to avoid reading 158 small rows inside a transaction that
+  // was already open. On this database the round trip is the cost, not the
+  // row count -- the reverse of the assumption.
   const [semesters, academicYears, students] = await asUser(actor.userId, (tx) =>
     Promise.all([tx.query.semester.findMany(), tx.query.academicYear.findMany(), tx.query.student.findMany()]),
   );
@@ -52,10 +58,6 @@ export default async function PlanningQueuePage({
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
     return sem && year ? `${year.label} — ${sem.name}` : semId;
   };
-  const studentLabel = (studentId: string) => {
-    const s = students.find((s) => s.id === studentId);
-    return s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : studentId;
-  };
 
   // Default to the semester currently open for registration -- same
   // definition of "current semester" the student-facing /planning page
@@ -63,6 +65,11 @@ export default async function PlanningQueuePage({
   // semester pick every time. The selector stays visible and an explicit
   // choice (including re-picking the blank placeholder) is respected.
   const semesterId = rawSemesterId || semesters.find((s) => s.state === "REGISTRATION")?.id;
+
+  const studentLabel = (studentId: string) => {
+    const s = students.find((s) => s.id === studentId);
+    return s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : studentId;
+  };
 
   const queue = semesterId ? await getPlanQueue(actor, semesterId) : [];
   const filteredQueue = q ? queue.filter((p) => studentLabel(p.studentId).toLowerCase().includes(q.toLowerCase())) : queue;
@@ -145,16 +152,16 @@ export default async function PlanningQueuePage({
       <Card>
         <CardBody>
           <h2 className="mb-3 font-medium text-neutral-900">Look up a specific plan</h2>
+          {/* A typed Student ID rather than a <select> of all 158 students:
+              the office knows the ID, and a native dropdown that long is
+              the control this pass is removing everywhere. Resolved to a
+              student in findPlanAction, which reports a bad ID plainly. */}
           <form action={findPlanAction} className="flex flex-wrap items-end gap-2">
             <div>
-              <Label className="text-xs">Student ID</Label>
-              <Select name="studentId" required className="w-64">
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.studentNumber} — {s.firstName} {s.lastName}
-                  </option>
-                ))}
-              </Select>
+              <Label className="text-xs" htmlFor="lookup-student">
+                Student ID
+              </Label>
+              <Input id="lookup-student" name="studentNumber" required placeholder="e.g. 202490" className="w-64" />
             </div>
             <div>
               <Label className="text-xs">Semester</Label>
