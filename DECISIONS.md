@@ -765,3 +765,98 @@ that take screenshots, naming `style={{caret-color:"transparent"}}` on the check
 in the code -- it is injected by Playwright's own default `caret: "hide"` screenshot behaviour, which mutates
 the DOM mid-hydration. Confirmed by loading the same page without taking a screenshot: zero console errors
 and no inline style on the element.
+
+### DEV-23 — Nav menu close/active state, College on the student listing, student profile redesign, and the simplified student password rules
+
+**Date:** 4 Sep 2026, requested by the project owner as six small changes to a live app, with the explicit
+instruction that each get the smallest correct fix rather than a rewrite. No new dependency was added; no
+schema change was made; no migration was needed.
+
+**1. The nav menu never closed, and had no active state -- the root cause, not a patch over it.** The
+dropdowns were bare `<details>` elements rendered by the (portal) layout's Server Component header. Three
+separate consequences, all from that one fact: (a) `open` is DOM state, and App Router partial rendering
+reuses a shared layout's subtree across a client navigation, so the element was never remounted and the
+menu stayed open on the page it had just navigated to; (b) clicking the item you are *already* on is not a
+navigation at all, so nothing could close the menu even in principle -- the exact case in the report; (c)
+native `<details>` has no click-outside and no Escape behaviour. The nav links are now one small client
+component (`src/components/layout/MainNav.tsx`) holding the open menu in React state and closing it on the
+four events that should close it: choosing an item (even the current one), a route change, a pointer press
+outside the nav, and Escape. The header itself stays a Server Component; only the links moved.
+
+**Why a client component rather than a script.** An active state has to know the current route. A
+server-computed one would go stale on exactly the partial renders described above, so `usePathname()` is
+what makes it honest; the same hook is what closes the menu on a route change this component did not start
+(Back button, redirect). The route change is handled by adjusting state during render (React's documented
+"information from previous renders" pattern), not in an effect -- the menu must be gone in the frame that
+paints the new route. Closing on item click is a separate, direct `onClick`, because the already-current
+item produces no pathname change to react to. Deliberately NOT installed: Radix, Headless UI or any other
+menu primitive. Nothing suitable was already in the project, and the fix did not need one -- adding a
+dependency to a live app for this would have been the larger change, not the smaller.
+
+**Active-state treatment** reuses the theming pass's tokens rather than inventing a pattern: Deep Orchid
+(`--primary`) as the indicator, Lavender-tinted `brand-subtle` as the surface, `brand-fg` as the text --
+the same hover colours the bar already used, promoted to a persistent state. The indicator is a
+pseudo-element (underline on the top-level bar, left rule inside a dropdown or the mobile panel), never a
+border: a border would shift every neighbouring item by 2px as the route changed. Accessibility: the
+current link carries `aria-current="page"`, and a closed dropdown whose section contains the current page
+carries `aria-current="true"` on its button -- "true", not "page", because the button is the group, not the
+page. Without that, a closed dropdown's active state would have been colour only.
+
+**2. Students listing scans by College, not Department (supersedes DEV-22's Department column/filter).**
+There are far fewer colleges than departments, so the department was too granular to scan by.
+`searchStudents` gained one optional `collegeId` filter -- a subquery on `department.college_id`, not a
+join, so the shape of every row this function has returned since Stage 5 is unchanged; `departmentId`
+stays supported because it is the narrower filter. The page still loads departments (enrolment is still
+BY department, and the row label needs the department -> college mapping); only the column and the filter
+became the college. Department-level detail did not disappear -- it moved to where it belongs, the
+student's own profile page, which now shows College and Department together.
+
+**3/4. Student profile page: an Edit button, and a visual pass.** Editing a student used to mean going back
+to the listing to find the pencil. The Edit button points at this same route without `?mode=view` -- i.e.
+the form the page has always rendered, with `updateStudentProfileAction` unchanged. There is still exactly
+one edit path, not two, and it is still Admin-only (a Super Admin sees no Edit button at all, REQ-R04). Its
+counterpart, "Done editing", returns to the read-only view. The redesign is presentation only: an identity
+header (initials, name, Student ID, status and import-status badges), the GPA figures promoted from a
+definition list into four stat tiles, outstanding mandatory repeats as their own card, and a two-column
+layout with the profile record on the left and planned courses plus academic history on the right -- same
+tokens, cards, spacing and icon set as the Students listing. Everything previously shown is still shown.
+The one substantive presentation change: in read-only mode the profile fields render as values rather than
+as disabled inputs a reader might try to type into.
+
+**5. Temporary passwords are 10 characters of `[a-z1-9]`.** Moved out of `students.ts` into
+`lib/identity/temporaryPassword.ts` so it can be unit-tested without importing the database client. The
+previous format was 16 random bytes as base64url -- mixed case, digits, `-` and `_` -- which was too
+complex for the students it is handed to. Zero is excluded because 0/O is the pair that is actually
+mistyped off a printed credential; nothing further was dropped, since every character removed shrinks the
+keyspace (35^10 ~= 2.8e15 remains). `randomInt` rather than `randomBytes()[i] % 35`, which would bias the
+first 11 characters of the alphabet upward. **Staff accounts were left alone**: `createStaffAccount`'s
+generator in `lib/identity/accounts.ts` is unchanged, because an Admin/Super Admin credential is not the
+one that needed simplifying.
+
+**6. Student self-chosen passwords: 6+ characters with a number and a lowercase letter -- students only.**
+The rule lives in `lib/identity/passwordPolicy.ts` and is applied per role: `STUDENT` gets the simple rule,
+everyone else keeps the 10-character minimum they already had, and an unknown/missing role falls back to
+the stricter one so a failed lookup cannot relax the check. The role is read from `app_user`, never from
+the form. There is one route and one action for both entry points the requirement names -- the forced
+first-login/post-reset change (src/proxy.ts redirects here) and the self-service change from the header --
+so they cannot drift apart. No uppercase or symbol requirement was added. The pre-existing rejection list
+of obvious values was kept and extended with six short entries (`123456`, `abc123`, `qwerty`, ...) that
+only became reachable once the minimum dropped to 6; that is the same existing control at the new length,
+not a new complexity requirement.
+
+**Verification.** `tsc --noEmit`, `eslint` and `next build` clean; 159 vitest tests pass, including 23 new
+ones covering the password format and the per-role rule. Browser pass against a local Postgres with 48
+seeded students, driven with Playwright as a real Admin, Super Admin and Student: the menu closes when the
+already-active item is clicked (`aria-expanded` false, panel gone), when a different item is chosen, on a
+click outside and on Escape, on desktop and in the mobile panel; exactly one nav item is marked current on
+a nested route (`/admin/students/<id>` keeps "Students" marked); the College column and filter return 18 of
+48 students for CBPA; the profile page's Edit button reaches the editable form, a save round-trips through
+the existing action, and "Done editing" returns to the read-only view showing the saved value; a Super
+Admin sees 25 View icons, zero Edit icons, no Add Student and no Edit button; an enrolment and a password
+reset both issued 10-character `[a-z1-9]` passwords through the real forms; and a student's change-password
+form advertises and enforces the 6/number/lowercase rule (rejecting `abcdef`, `ab12c`, `ABC123`, and
+`abc123` as obvious) while an Admin's still requires 10. Screenshots were sent to the project owner.
+
+**Pre-existing, not introduced here:** a React hydration warning about `<html data-theme>` appears whenever
+a theme preference is stored -- `public/theme.js` writes that attribute before hydration by design.
+Confirmed present on `/login`, which has no nav at all.

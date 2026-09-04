@@ -34,7 +34,7 @@ export default async function StudentsPage({
   searchParams: Promise<{
     q?: string;
     status?: string;
-    departmentId?: string;
+    collegeId?: string;
     year?: string;
     page?: string;
     pageSize?: string;
@@ -42,7 +42,7 @@ export default async function StudentsPage({
   }>;
 }) {
   const actor = await getCurrentActor();
-  const { q, status, departmentId, year, page, pageSize, error } = await searchParams;
+  const { q, status, collegeId, year, page, pageSize, error } = await searchParams;
 
   if (!actor)
     return (
@@ -60,26 +60,38 @@ export default async function StudentsPage({
   const isAdmin = actor.role === "ADMIN";
 
   // Only values the app really defines: statuses from STUDENT_STATUSES,
-  // departments from the department table, years derived from the
-  // enrolment_year column that already exists. Nothing invented, nothing
-  // hardcoded.
+  // colleges from the college table, years derived from the enrolment_year
+  // column that already exists. Nothing invented, nothing hardcoded.
   const validStatus =
     status && (STUDENT_STATUSES as readonly string[]).includes(status) ? (status as (typeof STUDENT_STATUSES)[number]) : undefined;
   const validYear = year && /^\d{4}$/.test(year) ? Number(year) : undefined;
   const size = PAGE_SIZES.includes(Number(pageSize) as (typeof PAGE_SIZES)[number]) ? Number(pageSize) : DEFAULT_PAGE_SIZE;
   const pageNum = Math.max(1, Number(page) || 1);
 
-  const [results, departments, enrolmentYears] = await Promise.all([
-    searchStudents(actor, { query: q, status: validStatus, departmentId: departmentId || undefined, enrolmentYear: validYear, page: pageNum, pageSize: size }),
+  // Departments are still fetched -- the enrolment form enrols INTO a
+  // department, and the listing needs the department -> college mapping to
+  // label each row -- but the column and the filter are the college now.
+  const [results, colleges, departments, enrolmentYears] = await Promise.all([
+    searchStudents(actor, { query: q, status: validStatus, collegeId: collegeId || undefined, enrolmentYear: validYear, page: pageNum, pageSize: size }),
+    asUser(actor.userId, (tx) =>
+      tx.query.college.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
+    ),
     asUser(actor.userId, (tx) =>
       tx.query.department.findMany({ where: (d, { eq }) => eq(d.isActive, true), orderBy: (d, { asc }) => asc(d.code) }),
     ),
     getEnrolmentYears(actor),
   ]);
 
-  const departmentName = (id: string) => {
-    const d = departments.find((d) => d.id === id);
-    return d ? `${d.code} — ${d.name}` : id;
+  const collegeLabel = (id: string) => {
+    const c = colleges.find((c) => c.id === id);
+    return c ? `${c.code} — ${c.name}` : id;
+  };
+  // A student's college is reached through their department. An inactive
+  // department (or one from an inactive college) is not in either list, so
+  // fall back to the raw id rather than showing an empty cell.
+  const collegeForStudent = (departmentId: string) => {
+    const d = departments.find((d) => d.id === departmentId);
+    return d ? collegeLabel(d.collegeId) : departmentId;
   };
 
   const rows: StudentRow[] = results.rows.map((s) => ({
@@ -88,12 +100,12 @@ export default async function StudentsPage({
     firstName: s.firstName,
     lastName: s.lastName,
     status: s.status,
-    departmentName: departmentName(s.departmentId),
+    collegeName: collegeForStudent(s.departmentId),
     enrolmentYear: s.enrolmentYear,
   }));
 
   const totalPages = Math.max(1, Math.ceil(results.total / results.pageSize));
-  const hasFilters = Boolean(q || validStatus || departmentId || validYear);
+  const hasFilters = Boolean(q || validStatus || collegeId || validYear);
   const firstShown = results.total === 0 ? 0 : (pageNum - 1) * results.pageSize + 1;
   const lastShown = Math.min(pageNum * results.pageSize, results.total);
 
@@ -105,7 +117,7 @@ export default async function StudentsPage({
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
     if (validStatus) sp.set("status", validStatus);
-    if (departmentId) sp.set("departmentId", departmentId);
+    if (collegeId) sp.set("collegeId", collegeId);
     if (validYear) sp.set("year", String(validYear));
     if (size !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(size));
     if (p > 1) sp.set("page", String(p));
@@ -159,15 +171,19 @@ export default async function StudentsPage({
               ))}
             </Select>
           </div>
+          {/* College, not Department: there are far fewer colleges than
+              departments, so this is the dimension an admin can actually
+              scan a list by. Department-level detail lives on the student's
+              profile page. */}
           <div>
-            <Label htmlFor="departmentId" className="text-xs">
-              Department
+            <Label htmlFor="collegeId" className="text-xs">
+              College
             </Label>
-            <Select id="departmentId" name="departmentId" defaultValue={departmentId ?? ""} className="max-w-56">
-              <option value="">All departments</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.code} — {d.name}
+            <Select id="collegeId" name="collegeId" defaultValue={collegeId ?? ""} className="max-w-56">
+              <option value="">All colleges</option>
+              {colleges.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {c.name}
                 </option>
               ))}
             </Select>
@@ -236,7 +252,7 @@ export default async function StudentsPage({
             <form method="GET" className="flex items-center gap-1.5">
               {q && <input type="hidden" name="q" value={q} />}
               {validStatus && <input type="hidden" name="status" value={validStatus} />}
-              {departmentId && <input type="hidden" name="departmentId" value={departmentId} />}
+              {collegeId && <input type="hidden" name="collegeId" value={collegeId} />}
               {validYear && <input type="hidden" name="year" value={String(validYear)} />}
               <Label htmlFor="pageSize" className="mb-0 text-xs whitespace-nowrap">
                 Per page

@@ -1,5 +1,4 @@
-import { randomBytes } from "node:crypto";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import { appUser, department, student } from "@/lib/db/schema";
@@ -8,14 +7,11 @@ import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { resolveLoginIdentifierToEmail } from "@/lib/identity/resolve";
 import { isValidStudentId } from "@/lib/identity/studentId";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateTemporaryPassword } from "@/lib/identity/temporaryPassword";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 
 export const STUDENT_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED", "GRADUATED", "ADMISSION_FORFEITED"] as const;
 export type StudentStatus = (typeof STUDENT_STATUSES)[number];
-
-function generateTemporaryPassword(): string {
-  return randomBytes(16).toString("base64url");
-}
 
 function isUniqueViolation(err: unknown): boolean {
   const code = (err as { code?: string; cause?: { code?: string } })?.code
@@ -270,6 +266,14 @@ export interface SearchStudentsInput {
   status?: StudentStatus;
   /** Filters combine with AND, and with `query`/`status`. */
   departmentId?: string;
+  /**
+   * Every student in any department of this college. There are far fewer
+   * colleges than departments, which is why the Students listing filters
+   * on this rather than on `departmentId` -- department-level detail lives
+   * on the student's own profile page. `departmentId` stays supported: it
+   * is the narrower filter and other callers may still want it.
+   */
+  collegeId?: string;
   enrolmentYear?: number;
   page?: number;
   pageSize?: number;
@@ -302,6 +306,19 @@ export async function searchStudents(actor: Actor, input: SearchStudentsInput = 
     }
     if (input.departmentId) {
       conditions.push(eq(student.departmentId, input.departmentId));
+    }
+    if (input.collegeId) {
+      // A subquery rather than a join: `student` is the only table the
+      // paginated read selects from, and adding a join would change the
+      // shape of every row this function has returned since Stage 5.
+      // department.college_id is indexed by the FK, and the department
+      // table holds tens of rows, not thousands.
+      conditions.push(
+        inArray(
+          student.departmentId,
+          tx.select({ id: department.id }).from(department).where(eq(department.collegeId, input.collegeId)),
+        ),
+      );
     }
     if (input.enrolmentYear !== undefined) {
       conditions.push(eq(student.enrolmentYear, input.enrolmentYear));

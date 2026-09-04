@@ -28,7 +28,8 @@ export interface StudentRow {
   firstName: string;
   lastName: string;
   status: string;
-  departmentName: string;
+  /** Already formatted as "CODE — Name" by the page. */
+  collegeName: string;
   enrolmentYear: number;
 }
 
@@ -107,10 +108,10 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
             <Th className="px-2 sm:px-3">Student ID</Th>
             <Th className="px-2 sm:px-3">Name</Th>
             <Th className="px-2 sm:px-3">Status</Th>
-            {/* Department and Enrolment year are the two that drop first on
+            {/* College and Enrolment year are the two that drop first on
                 a narrow screen -- Student ID, Name, Status and Actions stay
                 visible at every width. */}
-            <Th className="hidden md:table-cell">Department</Th>
+            <Th className="hidden md:table-cell">College</Th>
             <Th className="hidden sm:table-cell">Enrolment year</Th>
             <Th className="px-2 text-right sm:px-3">Actions</Th>
           </tr>
@@ -145,10 +146,10 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
                 <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{s.status}</Badge>
               </Td>
               {/* Truncated with the full value on hover/focus rather than
-                  widening the table -- some department names are long. */}
+                  widening the table -- some college names are long. */}
               <Td className="hidden md:table-cell">
-                <span className="block max-w-[14rem] truncate text-fg-secondary" title={s.departmentName}>
-                  {s.departmentName}
+                <span className="block max-w-[18rem] truncate text-fg-secondary" title={s.collegeName}>
+                  {s.collegeName}
                 </span>
               </Td>
               <Td className="hidden sm:table-cell text-fg-secondary">{s.enrolmentYear}</Td>
