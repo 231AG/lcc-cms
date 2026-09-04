@@ -9,3 +9,4 @@ export { PageHeader } from "./PageHeader";
 export { Pagination, pageWindow } from "./Pagination";
 export { Skeleton, SkeletonTable, SkeletonPage } from "./Skeleton";
 export { SubmitButton, SubmitTextButton } from "./SubmitButton";
+export { Breadcrumb, type Crumb } from "./Breadcrumb";

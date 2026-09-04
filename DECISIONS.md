@@ -692,3 +692,76 @@ documented security choices, so they are recorded here rather than decided unila
 and 3 touch); a browser smoke test of all 23 admin/super-admin routes across both roles renders every page
 with an h1 visible, HTTP 200, zero console errors and zero CSP violations; `tsc --noEmit` and `eslint` clean.
 Every fixture created by the throwaway measurement and smoke scripts was deleted.
+
+### DEV-22 — Student listing page redesigned (interface only, data flow untouched)
+
+**Date:** 4 Sep 2026, requested by the project owner as a UI/UX redesign of the **existing** `/admin/students`
+page, explicitly not a rebuild of student management.
+
+**What was deliberately NOT changed**, having been inspected first: `searchStudents()` is the same
+server-side, RLS-scoped, `LIMIT/OFFSET` query with a `count(*)` that it has been since Stage 5;
+`enrollStudent` / `updateStudentProfile` and their validation are untouched; the View/Edit split from the
+earlier admin pass (`?mode=view` vs the plain detail route) is reused as-is; routing, auth and permissions
+are unchanged. **No schema change** -- every column the new table shows already existed. `searchStudents`
+gained two optional filter fields (`departmentId`, `enrolmentYear`) appended to its existing `and(...)`
+builder, and one new read (`getEnrolmentYears`) derives the year filter's options from the existing
+`enrolment_year` column with a `SELECT DISTINCT`; there is no new year table and no duplicated field.
+
+**Interface:** breadcrumb (Home / Students) over an `<h1>`, a primary "+ Add Student" top right, and the
+table inside a card headed "Students Information". Columns in the order requested: selection checkbox,
+Student ID (the real `student_number`, never a row index), Name (with initials -- **the model stores no
+photo and this pass did not add one**), Status, Department, Enrolment Year, Actions. Search plus Status /
+Department / Enrolment-year filters that combine with AND, with "Clear filters". Server-side pagination
+showing "Showing X-Y of Z students", numbered pages with ellipsis, and a page-size control (10/25/50 --
+`searchStudents` already supported `pageSize`, the page simply never passed it).
+
+**Decisions worth recording:**
+- **Status colours use only the five statuses `STUDENT_STATUSES` actually defines.** The brief's example
+  list mentioned "pending", which does not exist in this system. `ADMISSION_FORFEITED` is the one that reads
+  as a warning; `SUSPENDED` is the destructive one. No status was invented to fill the palette.
+- **The table is the page's one client component**, purely because the header checkbox needs an
+  `indeterminate` state -- a DOM property with no HTML attribute, so it cannot be server-rendered. Everything
+  else stays a Server Component. Noted against DEV-14's JS budget: it is a few KB.
+- **The checkboxes are deliberately inert.** No bulk action exists in the app, and none was invented; the
+  selection is tracked (and announced to screen readers) so the control is not silently dead, and is what a
+  future bulk action would consume.
+- **"+ Add Student" toggles the existing `EnrollStudentForm`** rather than opening a modal or a new route.
+  That form uses `useActionState` to show the one-time temporary password in place, which must never travel
+  through a URL (Section 18.1, established in Stage 2) -- so a panel on the page is the only correct shape
+  for it. Same fields, same labels, same action.
+- **Filter changes reset to page 1 by construction**, not by a rule: the filter form has no `page` field, so
+  submitting it drops the parameter. The pagination links carry every active filter, so paging cannot
+  silently widen the result set.
+- **Loading and error states.** `loading.tsx` renders skeleton rows matching the real column structure --
+  structural bars only, never plausible-looking fake values, since a greyed-out Student ID that turns out
+  not to exist is worse than an obvious placeholder in a system of record. `error.tsx` is the app's **first**
+  error boundary, with a "Try again" that calls `reset()`; it deliberately does not print the error message
+  (which can carry connection strings and query text) and logs it to the console instead.
+
+**A responsive defect found by measuring, not by looking.** The first cut hid Department and Enrolment Year
+below `md`/`sm` and relied on the table's existing horizontal scroll. Measured at 390px, the Actions column
+was pushed off-screen -- reachable by scrolling, but not visible, which the brief explicitly required. Fixed
+by also dropping the selection checkbox and the initials avatar below `sm` (neither is load-bearing: there
+is no bulk action, and the avatar is decorative) and tightening cell padding. Re-measured: the Edit icon's
+right edge sits at 329px inside a 390px viewport with no horizontal overflow at all.
+
+**Two e2e assertions in `admin-students.spec.ts` were adjusted, and neither weakens the test.** (1) The
+enrolment form now lives behind "+ Add Student", so the test clicks it first. (2) `getByRole("heading", {
+name: "Students" })` became ambiguous once the card gained its "Students Information" heading, and the
+enrolment form's "Department" / "Enrolment year" labels became ambiguous once the filter row gained controls
+with the same names -- so the heading match is now exact and the form fields are scoped to the panel. Two
+assertions were **added** while there: that a Super Admin sees neither "Enrol student" nor "Add Student"
+(REQ-R04), and that the read-only list itself is still rendered (X-07).
+
+**Verification:** the 2 Playwright tests in `admin-students.spec.ts` pass; a browser pass as a real Admin
+and a real Super Admin confirmed column order, "Showing 1-25 of 158 students", breadcrumb, select-all ->
+25 selected -> indeterminate after unchecking one, the Add panel opening the existing form, filters
+combining (ACTIVE + 2020 -> 87) and surviving a page change, the filtered-empty state offering "Clear
+filters", View/Edit reaching the existing detail routes with accessible labels, mobile priority columns, and
+Super Admin seeing 25 View icons but zero Edit icons and no Add Student. `tsc --noEmit` and `eslint` clean.
+
+**One non-issue, recorded so it is not chased later:** a React hydration warning appears in Playwright runs
+that take screenshots, naming `style={{caret-color:"transparent"}}` on the checkboxes. That attribute is not
+in the code -- it is injected by Playwright's own default `caret: "hide"` screenshot behaviour, which mutates
+the DOM mid-hydration. Confirmed by loading the same page without taking a screenshot: zero console errors
+and no inline style on the element.
