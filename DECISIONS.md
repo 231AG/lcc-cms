@@ -531,3 +531,75 @@ end-to-end in a browser -- flagged as a gap for the owner to spot-check against 
 SUBMITTED demo plans (DEV-18) in `/admin/planning`.
 **Approval status:** Schema change and the PARTIALLY_APPROVED workflow design were confirmed with the owner
 before the migration was applied to the live database.
+
+### DEV-20 — An Admin may enter and submit a course plan on a student's behalf
+
+**Date:** 3 Sep 2026, requested directly by the project owner: some students have no Android phone and so
+cannot do their own course planning in the app at all. Until now the only routes into `registration` were a
+student-submitted plan or Admin direct registration (DEC-14), and direct registration deliberately bypasses
+every validator -- so a phoneless student either got no plan or got one that skipped prerequisite, credit-
+ceiling and schedule-conflict checking entirely. This closes that gap.
+
+**What changed — authorization, not logic.** The ownership test that appeared four times in
+`planning.ts` (`if (plan.studentId !== actor.userId) throw`) is replaced by one `authorizePlanSubject(actor,
+studentId)` helper: acting on your own plan needs `planning.manageOwnPlan` (Student, unchanged), acting on
+someone else's needs a new `planning.manageStudentPlan` (ADMIN true, STUDENT false, SUPER_ADMIN false --
+Section 9.4.9 keeps Super Admin out of course planning entirely). `getOrCreateDraftPlan` gained an optional
+third argument for the student being planned for; **no other service signature changed**, because every other
+entry point is keyed by `planId`/`planItemId` and derives the subject from the row. All six validators (V1
+prerequisites, V2 credit ceiling, V3 already-passed/retake, V4 duplicates, V5 availability/capacity, V6
+schedule conflict), V7's warning, the DRAFT -> SUBMITTED transition, and the approval queue are therefore
+literally the same code on the same rows -- there is no second implementation to drift.
+
+**Schema:** migration `0021_course_plan_entered_by.sql` adds `course_plan.entered_by uuid NULL` (FK to
+`app_user`, RESTRICT, matching `reviewed_by`/`decided_by`/`prereq_override_by`) plus a partial index. NULL
+means the student entered their own plan, so every pre-existing row is already correct and no backfill was
+needed. It is a provenance marker only -- nothing in the lifecycle branches on it. No RLS change: writes in
+this domain already run through the raw superuser connection (DEV-03's pattern) and the policies are
+read-only for `authenticated`. A student can see the column on their own plan, which is intended: it tells
+them the office entered it for them.
+
+**Audit:** submission stays `COURSE_PLAN_SUBMITTED` regardless of who did it, so every existing audit query,
+dashboard count and export keeps working; `enteredOnBehalf: true` in the payload distinguishes the two cases.
+One new action name, `COURSE_PLAN_STARTED_FOR_STUDENT`, records the office opening a plan for a student.
+
+**Segregation of duties — a deliberate, named trade-off.** Course planning previously had two humans in the
+loop by construction: a student submits, an Admin approves. An admin-entered plan collapses that to one, and
+nothing stops the entering Admin from then approving it. Two options were considered: block the entering
+Admin from approving that plan (a real second pair of eyes), or accept it and make the fact visible. **The
+second was chosen**, because LCC's Admin office may realistically be one person, and the first option would
+make the feature unusable for exactly the office that needs it. The mitigation is visibility, not
+enforcement: `entered_by` is shown as an "Admin-entered" badge in the review queue and stated in full on the
+plan detail page at the point of decision ("Entered by <name> on the student's behalf, not submitted by the
+student"), and the audit log records both the entry and the approval with their actors. **This is weaker
+than the grade-management two-key control (Stage 10) and is not claimed to be equivalent.** If the Registrar
+wants a hard rule once the office has two or more Admins, `entered_by` already carries everything the check
+would need -- it would be a few lines in `approvePlan`/`approvePlanItem`, no schema change.
+
+**Verification.** As with DEV-19, `planning.integration.test.ts` still cannot run: its `beforeAll` moves a
+fixture semester into REGISTRATION and the real 2026/2027 First Semester already holds that slot
+institution-wide (Section 13.6 allows one at a time) -- a pre-existing consequence of DEV-01's single shared
+Supabase project, **confirmed by running the suite on the commit before this change and getting the identical
+failure**, not a regression from it. Six new tests covering this behaviour were added to that file regardless,
+so they run whenever the environment allows. Verified for now by (1) a throwaway script exercising the same
+assertions against the real REGISTRATION semester and its 154 real published offerings -- 16/16 checks
+passed, including that an Admin's plan lands in the ordinary queue, that the credit ceiling and schedule-
+conflict validators still fire, that a Super Admin is refused, that a non-ACTIVE student is refused, and that
+a student still cannot touch another student's plan by any mutating entry point; (2) a full browser
+click-path as a real Admin through /admin/student-plan: nav -> student search -> start plan -> offering
+search -> add -> submit -> plan appears in /admin/planning badged "Admin-entered" -> detail page states the
+provenance; (3) `tsc --noEmit` and `eslint` clean. Every fixture created by both scripts was deleted.
+
+**One regression caught and fixed during verification.** The first cut of `authorizePlanSubject` refused a
+student reaching for another student's plan with `ForbiddenError: Not available to your role:
+planning.manageStudentPlan`. The code it replaced deliberately used the *same* `"Plan not found."` message
+for "does not exist" and "is not yours" -- a non-disclosure choice, repeated identically in four places. The
+new message turned the refusal into an existence oracle for plan ids. Practically unexploitable (v4 UUIDs),
+but it was an existing security property being silently traded away, so it was restored: a caller holding
+`manageOwnPlan` but not `manageStudentPlan` now gets `"Plan not found."` again, while staff still get the
+informative `ForbiddenError`. Pinned by an assertion in the new tests.
+
+**Approval status:** The schema change, the new permission row, and the segregation-of-duties trade-off were
+all put to the owner before implementation. The owner approved proceeding and delegated the open preferences
+("do 1-4, do any of 5-9 based on professional standards and your recommendations"); the accept-and-audit
+option above was the recommendation made at that point.

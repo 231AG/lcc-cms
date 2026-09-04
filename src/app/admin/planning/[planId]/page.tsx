@@ -73,14 +73,18 @@ export default async function PlanDetailPage({
 
   const items = await getPlanItems(actor, planId);
   const offeringIds = [...new Set(items.map((i) => i.offeringId))];
-  const [student, offerings, courses, semester] = await asUser(actor.userId, (tx) =>
+  const [student, offerings, courses, semester, enteredByUser] = await asUser(actor.userId, (tx) =>
     Promise.all([
       tx.query.student.findFirst({ where: (s, { eq }) => eq(s.id, plan.studentId) }),
       getOfferingsByIds(actor, offeringIds),
       tx.query.course.findMany(),
       tx.query.semester.findFirst({ where: (s, { eq }) => eq(s.id, plan.semesterId) }),
+      plan.enteredBy
+        ? tx.query.appUser.findFirst({ where: (u, { eq }) => eq(u.id, plan.enteredBy!) })
+        : Promise.resolve(undefined),
     ]),
   );
+  const enteredByName = enteredByUser?.displayName;
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
   const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
   const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, offeringIds);
@@ -106,6 +110,19 @@ export default async function PlanDetailPage({
       {plan.status === "REJECTED" && plan.rejectionReason && (
         <Alert tone="danger" className="mb-4">
           Previously rejected: {plan.rejectionReason}
+        </Alert>
+      )}
+
+      {/* DEV-20: this plan was entered by the office, not submitted by the
+          student. Stated plainly at the point of decision -- the reviewer
+          may well be the same person who entered it, and the accepted
+          trade-off there (no forced second pair of eyes, because a
+          one-person Admin office would otherwise be unable to use this at
+          all) depends on the fact being visible rather than buried in the
+          audit log. */}
+      {plan.enteredBy && (
+        <Alert tone="info" className="mb-4">
+          Entered by {enteredByName ?? "an administrator"} on the student&rsquo;s behalf, not submitted by the student.
         </Alert>
       )}
 

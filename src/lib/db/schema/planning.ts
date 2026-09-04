@@ -45,6 +45,12 @@ export const coursePlan = appSchema.table(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     rejectionReason: text("rejection_reason"),
     version: integer("version").notNull().default(0),
+    // DEV-20: the staff member who entered this plan on the student's
+    // behalf, for a student who cannot use the app themselves. NULL means
+    // the student entered it -- so it is a provenance marker, not a state:
+    // nothing in the lifecycle branches on it, and an admin-entered plan
+    // goes through exactly the same validators, queue and approval path.
+    enteredBy: uuid("entered_by").references(() => appUser.id, { onDelete: "restrict" }),
   },
   (table) => [
     check("course_plan_status_valid", sql`${table.status} IN ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PARTIALLY_APPROVED')`),

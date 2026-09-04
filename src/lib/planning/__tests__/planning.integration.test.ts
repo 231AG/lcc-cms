@@ -32,6 +32,8 @@ import {
   deleteDraftPlan,
   dropRegistration,
   getOrCreateDraftPlan,
+  getPlanItems,
+  getPlanQueue,
   overridePrerequisite,
   registerDirect,
   rejectPlan,
@@ -39,7 +41,7 @@ import {
   revisePlan,
   submitPlan,
 } from "../planning";
-import { ValidationError, StateError } from "@/lib/errors";
+import { ValidationError, StateError, ForbiddenError } from "@/lib/errors";
 import type { Actor } from "@/lib/permissions/kernel";
 
 /**
@@ -481,6 +483,94 @@ describe("approval atomicity and lifecycle", () => {
     // second live Registration transition mid-suite.
     const { actor } = await enrollTestStudent();
     await expect(getOrCreateDraftPlan(actor, pastSemesterId)).rejects.toThrow(StateError);
+  });
+});
+
+/**
+ * DEV-20: an Admin may build and submit a plan on behalf of a student who
+ * cannot use the app. The authorization for "whose plan is this?" moved
+ * from a hard `plan.studentId !== actor.userId` comparison into
+ * `authorizePlanSubject`, which permits a second case (Admin holding
+ * planning.manageStudentPlan). These tests pin down that the newly
+ * permitted case works AND that nothing else was widened by it -- the
+ * student-to-student isolation in particular, which is the property that
+ * comparison used to guarantee on its own.
+ */
+describe("admin-entered course plans (DEV-20)", () => {
+  it("an Admin can build and submit a plan for a student, and it lands in the normal queue", async () => {
+    const { id: studentId } = await enrollTestStudent();
+
+    const plan = await getOrCreateDraftPlan(adminActor, registrationSemesterId, studentId);
+    expect(plan.studentId).toBe(studentId);
+    expect(plan.enteredBy).toBe(adminActor.userId);
+
+    await addPlanItem(adminActor, plan.id, offeringA);
+    const submitted = await submitPlan(adminActor, plan.id);
+    expect(submitted.plan.status).toBe("SUBMITTED");
+    expect(submitted.plan.enteredBy).toBe(adminActor.userId);
+
+    // The whole point: it is an ordinary SUBMITTED plan on the ordinary
+    // queue, not a separate approval path.
+    const queue = await getPlanQueue(adminActor, registrationSemesterId);
+    expect(queue.map((p) => p.id)).toContain(plan.id);
+
+    await rejectPlan(adminActor, plan.id, "cleanup");
+  });
+
+  it("an admin-entered plan is validated by exactly the same rules -- the credit ceiling still blocks it", async () => {
+    const { id: studentId } = await enrollTestStudent();
+    const plan = await getOrCreateDraftPlan(adminActor, registrationSemesterId, studentId);
+    // courseB is 19 credits; with courseA's 3 that exceeds the 21 ceiling,
+    // the same V2 failure a student would hit submitting this themselves.
+    await addPlanItem(adminActor, plan.id, offeringA);
+    await addPlanItem(adminActor, plan.id, offeringB);
+    await expect(submitPlan(adminActor, plan.id)).rejects.toThrow(ValidationError);
+  });
+
+  it("a student still cannot touch another student's plan", async () => {
+    const owner = await enrollTestStudent();
+    const intruder = await enrollTestStudent();
+
+    const plan = await getOrCreateDraftPlan(owner.actor, registrationSemesterId);
+    expect(plan.enteredBy).toBeNull();
+
+    // Every mutating entry point, not just one: the intruder holds
+    // manageOwnPlan but not manageStudentPlan, so authorizePlanSubject
+    // refuses each of them -- and refuses with the same "Plan not found."
+    // used for a plan id that does not exist, so a student cannot use the
+    // refusal to discover which plan ids are real (the non-disclosure the
+    // pre-DEV-20 `plan.studentId !== actor.userId` checks provided).
+    await expect(addPlanItem(intruder.actor, plan.id, offeringA)).rejects.toThrow(/Plan not found/);
+    await expect(submitPlan(intruder.actor, plan.id)).rejects.toThrow(/Plan not found/);
+    await expect(deleteDraftPlan(intruder.actor, plan.id)).rejects.toThrow(/Plan not found/);
+    await expect(getOrCreateDraftPlan(intruder.actor, registrationSemesterId, owner.id)).rejects.toThrow(/Plan not found/);
+
+    // ...and the owner is still unaffected.
+    await addPlanItem(owner.actor, plan.id, offeringA);
+    const items = await getPlanItems(owner.actor, plan.id);
+    expect(items).toHaveLength(1);
+  });
+
+  it("a Super Admin cannot enter a plan for a student either (Section 9.4.9)", async () => {
+    const { id: studentId } = await enrollTestStudent();
+    const superAdmin = await realSuperAdminActor();
+    await expect(getOrCreateDraftPlan(superAdmin, registrationSemesterId, studentId)).rejects.toThrow(ForbiddenError);
+  });
+
+  it("refuses to start a plan for a student who is not active", async () => {
+    const { id: studentId } = await enrollTestStudent();
+    await updateStudentProfile(adminActor, studentId, { status: "SUSPENDED" });
+    await expect(getOrCreateDraftPlan(adminActor, registrationSemesterId, studentId)).rejects.toThrow(ValidationError);
+  });
+
+  it("stamps enteredBy when an Admin continues a plan the student had started themselves", async () => {
+    const { id: studentId, actor } = await enrollTestStudent();
+    const own = await getOrCreateDraftPlan(actor, registrationSemesterId);
+    expect(own.enteredBy).toBeNull();
+
+    const continued = await getOrCreateDraftPlan(adminActor, registrationSemesterId, studentId);
+    expect(continued.id).toBe(own.id);
+    expect(continued.enteredBy).toBe(adminActor.userId);
   });
 });
 

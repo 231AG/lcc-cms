@@ -6,6 +6,7 @@ import { getPlanQueue } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Label, Select, Input } from "@/components/ui/Form";
 import { findPlanAction } from "./actions";
@@ -121,9 +122,15 @@ export default async function PlanningQueuePage({
           <ul className="flex flex-col gap-2">
             {filteredQueue.map((p) => (
               <li key={p.id}>
-                <Card className="flex items-center justify-between px-3 py-2 text-sm">
-                  <span>
-                    {studentLabel(p.studentId)} — {p.totalCredits} credit hours
+                <Card className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span>
+                      {studentLabel(p.studentId)} — {p.totalCredits} credit hours
+                    </span>
+                    {/* DEV-20: the office entered this plan for the student
+                        rather than the student submitting it themselves.
+                        Surfaced here so the reviewer sees it before deciding. */}
+                    {p.enteredBy && <Badge tone="brand">Admin-entered</Badge>}
                   </span>
                   <Link href={`/admin/planning/${p.id}`} className="font-medium text-brand-700 hover:underline">
                     Review

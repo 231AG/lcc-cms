@@ -54,6 +54,10 @@ export const AUDIT_ACTIONS = [
   // Semester and planning
   "SEMESTER_STATE_CHANGED",
   "COURSE_PLAN_SUBMITTED",
+  // DEV-20: an Admin opened a plan on a student's behalf. Submission
+  // itself stays COURSE_PLAN_SUBMITTED regardless of who did it (with
+  // `enteredOnBehalf` in the payload), so existing queries keep working.
+  "COURSE_PLAN_STARTED_FOR_STUDENT",
   "COURSE_PLAN_APPROVED",
   "COURSE_PLAN_REJECTED",
   "COURSE_PLAN_PARTIALLY_APPROVED",

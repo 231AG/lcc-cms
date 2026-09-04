@@ -51,6 +51,10 @@ export const ADMIN_GROUPS: NavGroup[] = [
     label: "Planning",
     links: [
       { href: "/admin/offerings", label: "Course offerings" },
+      // Ordered as the work actually flows: publish the offerings, enter a
+      // plan for a student who can't (DEV-20), review what comes in,
+      // register directly only as the exception path.
+      { href: "/admin/student-plan", label: "Course plan entry" },
       { href: "/admin/planning", label: "Course plan review" },
       { href: "/admin/registrations", label: "Registrations" },
     ],
