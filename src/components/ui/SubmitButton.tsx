@@ -54,7 +54,7 @@ export function SubmitTextButton({
       aria-busy={pending || undefined}
       disabled={pending || disabled}
       className={cn(
-        "disabled:cursor-not-allowed disabled:text-neutral-400 disabled:no-underline",
+        "disabled:cursor-not-allowed disabled:text-fg-subtle disabled:no-underline",
         className,
       )}
       {...props}

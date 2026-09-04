@@ -50,7 +50,7 @@ test("Super Admin can create, disable, and re-enable a staff account", async ({ 
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(superAdmin.username);
-  await page.getByLabel("Password").fill(superAdmin.password);
+  await page.getByLabel("Password", { exact: true }).fill(superAdmin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -90,7 +90,7 @@ test("an Admin sees 'not available to your role' instead of the account form", a
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(admin.username);
-  await page.getByLabel("Password").fill(admin.password);
+  await page.getByLabel("Password", { exact: true }).fill(admin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 

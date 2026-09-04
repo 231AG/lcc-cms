@@ -105,13 +105,13 @@ export function OfferingPicker({
             Search
           </Button>
           {q && (
-            <Link href={clearSearchHref} className="pb-2 text-sm text-neutral-500 hover:underline">
+            <Link href={clearSearchHref} className="pb-2 text-sm text-fg-muted hover:underline">
               Clear
             </Link>
           )}
         </form>
 
-        <p className="mb-3 text-xs text-neutral-500">
+        <p className="mb-3 text-xs text-fg-muted">
           {totalMatching === 0
             ? q
               ? `No offerings match "${q}".`
@@ -127,28 +127,28 @@ export function OfferingPicker({
             const meetings = meetingsByOffering.get(o.id) ?? [];
             const already = plannedOfferingIds.has(o.id);
             return (
-              <div key={o.id} className="rounded-md border border-neutral-200 p-3 text-sm">
+              <div key={o.id} className="rounded-md border border-line p-3 text-sm">
                 <div className="mb-1 flex items-center justify-between gap-3">
-                  <span className="font-medium text-neutral-900">
+                  <span className="font-medium text-fg">
                     {c ? `${c.code} — ${c.title}` : o.courseId} (Section {o.section})
                   </span>
-                  <span className="shrink-0 text-xs text-neutral-500">{o.frozenCreditHours}cr</span>
+                  <span className="shrink-0 text-xs text-fg-muted">{o.frozenCreditHours}cr</span>
                 </div>
-                <p className="mb-2 text-xs text-neutral-500">
+                <p className="mb-2 text-xs text-fg-muted">
                   {meetings
                     .map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}${m.room ? ` (${m.room})` : ""}`)
                     .join(", ")}
                   {o.instructorName ? ` — ${o.instructorName}` : ""}
                 </p>
                 {already ? (
-                  <span className="text-xs text-neutral-400">Already in this plan</span>
+                  <span className="text-xs text-fg-subtle">Already in this plan</span>
                 ) : (
                   <form action={addAction}>
                     {Object.entries(addHiddenFields).map(([name, value]) => (
                       <input key={name} type="hidden" name={name} value={value} />
                     ))}
                     <input type="hidden" name="offeringId" value={o.id} />
-                    <SubmitTextButton disabled={disabled} pendingLabel="Adding…" className="text-xs font-medium text-brand-700 hover:underline">
+                    <SubmitTextButton disabled={disabled} pendingLabel="Adding…" className="text-xs font-medium text-brand-fg hover:underline">
                       Add
                     </SubmitTextButton>
                   </form>

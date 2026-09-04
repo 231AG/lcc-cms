@@ -61,7 +61,7 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(admin.username);
-  await page.getByLabel("Password").fill(admin.password);
+  await page.getByLabel("Password", { exact: true }).fill(admin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -99,7 +99,7 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
   // Log in as the newly enrolled student.
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(studentNumber);
-  await page.getByLabel("Password").fill(temporaryPassword);
+  await page.getByLabel("Password", { exact: true }).fill(temporaryPassword);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/change-password$/);
 
@@ -125,7 +125,7 @@ test("Super Admin sees the student list read-only", async ({ page }) => {
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(superAdmin.username);
-  await page.getByLabel("Password").fill(superAdmin.password);
+  await page.getByLabel("Password", { exact: true }).fill(superAdmin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 

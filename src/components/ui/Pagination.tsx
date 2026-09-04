@@ -59,25 +59,31 @@ export function Pagination({
 }) {
   if (totalPages <= 1) return null;
 
+  // The disabled Previous/Next caps are aria-hidden and non-interactive, so
+  // WCAG's contrast minimum does not strictly apply to them -- but
+  // `text-fg-subtle` measured 2.46:1 against the light-mode page background,
+  // which is simply hard to read. `text-fg-muted` is the app's standard
+  // muted-text treatment and still reads as unavailable beside the live
+  // controls, which carry a stronger border and a hover state.
   return (
     <nav aria-label={label} className={cn("flex flex-wrap items-center gap-1", className)}>
       {page > 1 ? (
-        <Link href={hrefForPage(page - 1)} className={cn(linkBase, "border-neutral-300 text-neutral-700 hover:bg-neutral-50")} rel="prev">
+        <Link href={hrefForPage(page - 1)} className={cn(linkBase, "border-line-strong text-fg-secondary hover:bg-surface-hover")} rel="prev">
           Previous
         </Link>
       ) : (
-        <span className={cn(linkBase, "border-neutral-200 text-neutral-400")} aria-hidden="true">
+        <span className={cn(linkBase, "border-line text-fg-muted")} aria-hidden="true">
           Previous
         </span>
       )}
 
       {pageWindow(page, totalPages).map((p, i) =>
         p === null ? (
-          <span key={`gap-${i}`} className="px-1 text-sm text-neutral-400" aria-hidden="true">
+          <span key={`gap-${i}`} className="px-1 text-sm text-fg-muted" aria-hidden="true">
             &hellip;
           </span>
         ) : p === page ? (
-          <span key={p} aria-current="page" className={cn(linkBase, "border-brand-600 bg-brand-600 text-white")}>
+          <span key={p} aria-current="page" className={cn(linkBase, "border-primary bg-primary text-on-primary")}>
             {p}
           </span>
         ) : (
@@ -85,7 +91,7 @@ export function Pagination({
             key={p}
             href={hrefForPage(p)}
             aria-label={`Page ${p}`}
-            className={cn(linkBase, "border-neutral-300 text-neutral-700 hover:bg-neutral-50")}
+            className={cn(linkBase, "border-line-strong text-fg-secondary hover:bg-surface-hover")}
           >
             {p}
           </Link>
@@ -93,11 +99,11 @@ export function Pagination({
       )}
 
       {page < totalPages ? (
-        <Link href={hrefForPage(page + 1)} className={cn(linkBase, "border-neutral-300 text-neutral-700 hover:bg-neutral-50")} rel="next">
+        <Link href={hrefForPage(page + 1)} className={cn(linkBase, "border-line-strong text-fg-secondary hover:bg-surface-hover")} rel="next">
           Next
         </Link>
       ) : (
-        <span className={cn(linkBase, "border-neutral-200 text-neutral-400")} aria-hidden="true">
+        <span className={cn(linkBase, "border-line text-fg-muted")} aria-hidden="true">
           Next
         </span>
       )}

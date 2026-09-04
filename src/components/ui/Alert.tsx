@@ -4,15 +4,15 @@ import { cn } from "./cn";
 export type AlertTone = "info" | "success" | "warning" | "danger";
 
 const tones: Record<AlertTone, string> = {
-  info: "border-info-200 bg-info-50 text-info-800",
-  success: "border-success-200 bg-success-50 text-success-800",
-  warning: "border-warning-200 bg-warning-50 text-warning-800",
-  danger: "border-danger-200 bg-danger-50 text-danger-800",
+  info: "border-info-line bg-info-surface text-info-fg",
+  success: "border-success-line bg-success-surface text-success-fg",
+  warning: "border-warning-line bg-warning-surface text-warning-fg",
+  danger: "border-danger-line bg-danger-surface text-danger-fg",
 };
 
 /**
- * Replaces the ad hoc `rounded border border-amber-300 bg-amber-50 ...`
- * strings repeated across the app (provisional-data warnings, error
+ * Replaces the ad hoc per-page `border`/`bg` colour strings repeated across
+ * the app (provisional-data warnings, error
  * banners, plan-status notices) with one consistent component. Purely
  * presentational -- takes whatever text a page already renders.
  */

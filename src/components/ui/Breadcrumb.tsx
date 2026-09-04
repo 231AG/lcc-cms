@@ -18,21 +18,21 @@ export interface Crumb {
 export function Breadcrumb({ items, className }: { items: Crumb[]; className?: string }) {
   return (
     <nav aria-label="Breadcrumb" className={cn("mb-2", className)}>
-      <ol className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+      <ol className="flex flex-wrap items-center gap-1 text-xs text-fg-muted">
         {items.map((item, i) => {
           const isLast = i === items.length - 1;
           return (
             <li key={`${item.label}-${i}`} className="flex items-center gap-1">
               {item.href && !isLast ? (
-                <Link href={item.href} className="hover:text-brand-700 hover:underline">
+                <Link href={item.href} className="hover:text-brand-fg hover:underline">
                   {item.label}
                 </Link>
               ) : (
-                <span aria-current={isLast ? "page" : undefined} className={isLast ? "text-neutral-600" : undefined}>
+                <span aria-current={isLast ? "page" : undefined} className={isLast ? "text-fg-secondary" : undefined}>
                   {item.label}
                 </span>
               )}
-              {!isLast && <ChevronRight className="h-3 w-3 text-neutral-400" aria-hidden="true" />}
+              {!isLast && <ChevronRight className="h-3 w-3 text-fg-subtle" aria-hidden="true" />}
             </li>
           );
         })}

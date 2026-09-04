@@ -176,7 +176,7 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
   // --- Admin enters and submits the grade ---
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(admin.username);
-  await page.getByLabel("Password").fill(admin.password);
+  await page.getByLabel("Password", { exact: true }).fill(admin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -206,7 +206,7 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
   // --- A different Super Admin reviews and approves ---
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(superAdmin.username);
-  await page.getByLabel("Password").fill(superAdmin.password);
+  await page.getByLabel("Password", { exact: true }).fill(superAdmin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 

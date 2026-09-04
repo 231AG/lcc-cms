@@ -46,7 +46,7 @@ test("Admin can create a college and gets a clear error on a duplicate code", as
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(admin.username);
-  await page.getByLabel("Password").fill(admin.password);
+  await page.getByLabel("Password", { exact: true }).fill(admin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -79,7 +79,7 @@ test("a Student sees 'not available to your role' instead of the structure forms
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(student.username);
-  await page.getByLabel("Password").fill(student.password);
+  await page.getByLabel("Password", { exact: true }).fill(student.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 

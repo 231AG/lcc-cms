@@ -99,7 +99,7 @@ test("Admin creates an offering, adds a meeting time, and publishes it", async (
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(admin.username);
-  await page.getByLabel("Password").fill(admin.password);
+  await page.getByLabel("Password", { exact: true }).fill(admin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -142,7 +142,7 @@ test("Super Admin sees offerings read-only; a Student is refused", async ({ page
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(superAdmin.username);
-  await page.getByLabel("Password").fill(superAdmin.password);
+  await page.getByLabel("Password", { exact: true }).fill(superAdmin.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 
@@ -153,7 +153,7 @@ test("Super Admin sees offerings read-only; a Student is refused", async ({ page
   const student = await makeSignedInStaff("STUDENT", "offerings-student");
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(student.username);
-  await page.getByLabel("Password").fill(student.password);
+  await page.getByLabel("Password", { exact: true }).fill(student.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/portal$/);
 

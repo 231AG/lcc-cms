@@ -11,20 +11,20 @@ import { cn } from "./cn";
  * reading out a dozen empty bars.
  */
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden="true" className={cn("animate-pulse rounded bg-neutral-200/70", className)} />;
+  return <div aria-hidden="true" className={cn("animate-pulse rounded bg-line", className)} />;
 }
 
 /** A table-shaped placeholder matching a real header + N body rows. */
 export function SkeletonTable({ columns, rows = 8 }: { columns: number; rows?: number }) {
   return (
     <div aria-hidden="true" className="overflow-hidden">
-      <div className="flex gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2.5">
+      <div className="flex gap-3 border-b border-line bg-surface-subtle px-3 py-2.5">
         {Array.from({ length: columns }, (_, i) => (
           <Skeleton key={i} className={cn("h-3", i === 1 ? "flex-[2]" : "flex-1")} />
         ))}
       </div>
       {Array.from({ length: rows }, (_, r) => (
-        <div key={r} className="flex items-center gap-3 border-b border-neutral-100 px-3 py-3">
+        <div key={r} className="flex items-center gap-3 border-b border-line-subtle px-3 py-3">
           {Array.from({ length: columns }, (_, i) => (
             <Skeleton key={i} className={cn("h-3.5", i === 1 ? "flex-[2]" : "flex-1")} />
           ))}
@@ -53,7 +53,7 @@ export function SkeletonPage({ columns = 6, rows = 8 }: { columns?: number; rows
         <Skeleton className="h-9 w-36" />
         <Skeleton className="h-9 w-24" />
       </div>
-      <div className="rounded-lg border border-neutral-200 bg-white shadow-sm">
+      <div className="rounded-lg border border-line bg-surface shadow-sm">
         <SkeletonTable columns={columns} rows={rows} />
       </div>
     </main>
