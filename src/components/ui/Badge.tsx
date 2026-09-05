@@ -14,7 +14,7 @@ const tones: Record<Tone, string> = {
 
 /**
  * A small status pill. The app has several independent status enums
- * (grade DRAFT/PUBLISHED/LOCKED, semester OPEN/REGISTRATION/..., correction
+ * (grade DRAFT/PUBLISHED/LOCKED, semester Draft/Open/..., correction
  * PENDING/APPROVED/REJECTED, historical import status, ...) -- rather than
  * one giant string->tone lookup table coupling them all together, each
  * call site maps its own status string to a `Tone` with a small local

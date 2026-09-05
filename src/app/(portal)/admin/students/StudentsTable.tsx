@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Eye, Pencil } from "lucide-react";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { fullName, initials, listName } from "@/lib/students/name";
 
 /**
  * The Students table.
@@ -26,6 +27,7 @@ export interface StudentRow {
   id: string;
   studentNumber: string;
   firstName: string;
+  middleName: string | null;
   lastName: string;
   status: string;
   /** Already formatted as "CODE — Name" by the page. */
@@ -46,11 +48,6 @@ const STATUS_TONE: Record<string, Tone> = {
   GRADUATED: "info",
   ADMISSION_FORFEITED: "warning",
 };
-
-/** Initials only. The student model stores no photo and this pass does not add one. */
-function initials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-}
 
 export function StudentsTable({ students, canEdit }: { students: StudentRow[]; canEdit: boolean }) {
   const [rawSelected, setSelected] = useState<Set<string>>(new Set());
@@ -125,7 +122,7 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
                   className={checkboxClass}
                   checked={selected.has(s.id)}
                   onChange={() => toggleOne(s.id)}
-                  aria-label={`Select ${s.firstName} ${s.lastName}`}
+                  aria-label={`Select ${fullName(s)}`}
                 />
               </Td>
               <Td className="px-2 font-mono text-xs whitespace-nowrap text-fg-secondary sm:px-3">{s.studentNumber}</Td>
@@ -135,10 +132,10 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
                     aria-hidden="true"
                     className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-subtle-strong text-[11px] font-semibold text-brand-fg sm:flex"
                   >
-                    {initials(s.firstName, s.lastName)}
+                    {initials(s)}
                   </span>
                   <span className="font-medium text-fg">
-                    {s.lastName}, {s.firstName}
+                    {listName(s)}
                   </span>
                 </span>
               </Td>
@@ -157,8 +154,8 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
                 <span className="flex items-center justify-end gap-1">
                   <Link
                     href={`/admin/students/${s.id}?mode=view`}
-                    title={`View ${s.firstName} ${s.lastName}`}
-                    aria-label={`View ${s.firstName} ${s.lastName}`}
+                    title={`View ${fullName(s)}`}
+                    aria-label={`View ${fullName(s)}`}
                     className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                   >
                     <Eye className="h-4 w-4" aria-hidden="true" />
@@ -166,8 +163,8 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
                   {canEdit && (
                     <Link
                       href={`/admin/students/${s.id}`}
-                      title={`Edit ${s.firstName} ${s.lastName}`}
-                      aria-label={`Edit ${s.firstName} ${s.lastName}`}
+                      title={`Edit ${fullName(s)}`}
+                      aria-label={`Edit ${fullName(s)}`}
                       className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                     >
                       <Pencil className="h-4 w-4" aria-hidden="true" />

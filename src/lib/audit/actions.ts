@@ -20,6 +20,10 @@ export const AUDIT_ACTIONS = [
   // Calendar (Stage 4)
   "ACADEMIC_YEAR_CREATED",
   "SEMESTER_CREATED",
+  "SEMESTER_DELETED",
+
+  // Institution configuration
+  "INSTITUTION_SETTING_UPDATED",
 
   // Course offerings and scheduling (Stage 8) -- not pre-named in the
   // plan's own Section 19.3 vocabulary table (only what must be audited

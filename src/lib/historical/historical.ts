@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
+import { listName } from "@/lib/students/name";
 import { StateError, ValidationError } from "@/lib/errors";
 import { recomputeStudentSummaries } from "@/lib/gpa/recompute";
 
@@ -586,7 +587,7 @@ export async function getImportProgressReport(actor: Actor): Promise<ImportProgr
       return {
         studentId: r.studentId,
         studentNumber: s?.studentNumber ?? r.studentId,
-        studentName: s ? `${s.lastName}, ${s.firstName}` : r.studentId,
+        studentName: s ? listName(s) : r.studentId,
         courseCodeSnapshot: r.courseCodeSnapshot,
         semesterId: r.semesterId,
         enteredAt: r.enteredAt,

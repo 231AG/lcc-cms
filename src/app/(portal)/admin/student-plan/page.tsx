@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { fullName, listName } from "@/lib/students/name";
+import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, searchStudents } from "@/lib/students/students";
 import { NotFoundError } from "@/lib/errors";
@@ -87,7 +89,7 @@ export default async function StudentPlanEntryPage({
 
   // Same definition of "the current semester" the student-facing page uses,
   // so the Admin lands on the right one without picking it every time.
-  const semesterId = rawSemesterId || semesters.find((s) => s.state === "REGISTRATION")?.id;
+  const semesterId = rawSemesterId || semesters.find((s) => isPlanningOpen(s.state as SemesterState))?.id;
   const semesterState = semesters.find((s) => s.id === semesterId)?.state;
 
   let chosen: Awaited<ReturnType<typeof getStudent>> | undefined;
@@ -145,10 +147,10 @@ export default async function StudentPlanEntryPage({
         </Button>
       </form>
 
-      {semesterId && semesterState !== "REGISTRATION" && (
+      {semesterId && !isPlanningOpen(semesterState as SemesterState) && (
         <Alert tone="warning" className="mb-6">
-          {yearLabel(semesterId)} is {semesterState}, not Registration. Course planning is only open while a semester is in
-          Registration, so a plan cannot be built or submitted for it.
+          {yearLabel(semesterId)} is {SEMESTER_STATE_LABEL[semesterState as SemesterState] ?? semesterState}. Course planning is only
+          open while a semester is Open, so a plan cannot be built or submitted for it.
         </Alert>
       )}
 
@@ -160,7 +162,7 @@ export default async function StudentPlanEntryPage({
           student={chosen}
           semesterId={semesterId}
           semesterLabel={semesterId ? yearLabel(semesterId) : ""}
-          canEdit={semesterState === "REGISTRATION"}
+          canEdit={isPlanningOpen(semesterState as SemesterState)}
           sq={sq}
           q={q}
           page={page}
@@ -225,7 +227,7 @@ async function StudentChooser({
                   <Tr key={s.id}>
                     <Td className="font-mono text-xs text-fg-secondary">{s.studentNumber}</Td>
                     <Td className="font-medium text-fg">
-                      {s.lastName}, {s.firstName}
+                      {listName(s)}
                     </Td>
                     <Td>{s.status}</Td>
                     <Td>
@@ -271,7 +273,7 @@ async function StudentPlanEditor({
   page,
 }: {
   actor: Actor;
-  student: { id: string; studentNumber: string; firstName: string; lastName: string; status: string };
+  student: { id: string; studentNumber: string; firstName: string; middleName: string | null; lastName: string; status: string };
   semesterId?: string;
   semesterLabel: string;
   canEdit: boolean;
@@ -286,7 +288,7 @@ async function StudentPlanEditor({
       <CardBody className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-medium text-fg">
-            {student.firstName} {student.lastName}
+            {fullName(student)}
           </p>
           <p className="text-xs text-fg-muted">
             <span className="font-mono">{student.studentNumber}</span> &middot; {student.status}

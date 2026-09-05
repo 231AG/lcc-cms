@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
-import { createAcademicYear, createSemester, transitionSemester } from "@/lib/academic/calendar";
+import { createAcademicYear, createSemester, deleteSemester, transitionSemester } from "@/lib/academic/calendar";
 import type { SemesterState } from "@/lib/academic/semesterStateMachine";
 
 function errorRedirect(message: string): never {
@@ -50,6 +50,22 @@ export async function transitionSemesterAction(formData: FormData): Promise<void
       toState: String(formData.get("toState") ?? "") as SemesterState,
       reason: String(formData.get("reason") ?? "").trim() || undefined,
     });
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(err.message);
+    throw err;
+  }
+  redirect("/admin/calendar");
+}
+
+/**
+ * Deleting a Draft semester. Redirects back to the calendar either way --
+ * a failure (not a Draft, or offerings still attached) comes back as the
+ * page's own error banner rather than an unstyled exception screen.
+ */
+export async function deleteSemesterAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  try {
+    await deleteSemester(actor, String(formData.get("semesterId") ?? ""));
   } catch (err) {
     if (err instanceof AppError) errorRedirect(err.message);
     throw err;

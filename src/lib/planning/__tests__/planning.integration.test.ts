@@ -164,8 +164,9 @@ beforeAll(async () => {
   });
   registrationSemesterId = sem.id;
   cleanupSemesterIds.push(sem.id);
-  await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN" });
-  await transitionSemester(adminActor, { semesterId: sem.id, toState: "REGISTRATION" });
+  // Open IS the planning window under the four-state model -- what used to
+  // take two transitions (OPEN then REGISTRATION) now takes one.
+  await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN", reason: "Test fixture" });
 
   async function makeOffering(courseId: string, section: string, day: number, capacity?: number) {
     const off = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId, section, capacity });

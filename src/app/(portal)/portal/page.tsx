@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
+import { fullName } from "@/lib/students/name";
 import { getStudent } from "@/lib/students/students";
 import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
@@ -9,10 +12,11 @@ import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSumma
 import { getMyPlan } from "@/lib/planning/planning";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
+import { getStudentStatistics, type StudentStatistics } from "@/lib/dashboard/statistics";
+import { BarList, ColumnChart, StatTile, StatusBarList } from "@/components/charts/Charts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
 import { Table, Tr, Td } from "@/components/ui/Table";
 import PrintButton from "./PrintButton";
 
@@ -76,7 +80,7 @@ export default async function PortalPage() {
     // only fetched when there is a current semester to have a plan in.
     const currentPlan = currentSemester ? await getMyPlan(actor, currentSemester.id) : null;
     const planStatusLine =
-      currentSemester?.state === "REGISTRATION" && !currentPlan
+      isPlanningOpen(currentSemester?.state as SemesterState) && !currentPlan
         ? "You have not started your course plan for this semester."
         : currentPlan?.status === "REJECTED"
           ? "Your course plan was returned and needs revision."
@@ -89,7 +93,7 @@ export default async function PortalPage() {
         <PageHeader
           title={
             <>
-              {record.firstName} {record.lastName}
+              {fullName(record)}
             </>
           }
           description={`Student ID ${record.studentNumber}`}
@@ -113,7 +117,9 @@ export default async function PortalPage() {
               <div>
                 <dt className="text-fg-muted">Current semester</dt>
                 <dd className="mt-0.5 font-medium text-fg">
-                  {currentSemesterLabel ? `${currentSemesterLabel} (${currentSemester!.state})` : "No semester is currently open."}
+                  {currentSemesterLabel
+                    ? `${currentSemesterLabel} (${SEMESTER_STATE_LABEL[currentSemester!.state as SemesterState] ?? currentSemester!.state})`
+                    : "No semester is currently open."}
                 </dd>
               </div>
             </dl>
@@ -227,12 +233,16 @@ export default async function PortalPage() {
   }
 
   if (actor.role === "SUPER_ADMIN") {
-    const summary = await getSuperAdminHomeSummary(actor);
+    // The queues and the statistics share nothing, so they are fetched
+    // together rather than one after the other.
+    const [summary, stats] = await Promise.all([getSuperAdminHomeSummary(actor), getStudentStatistics(actor)]);
     const nothingWaiting = summary.submissionsAwaitingApproval === 0 && summary.correctionsAwaitingDecision === 0;
 
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 outline-none sm:py-12">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 outline-none sm:py-12">
         <PageHeader title="Super Admin home" description={`Signed in as ${actor.displayName}.`} />
+
+        <StatisticsSection stats={stats} semesterCount={summary.semesterStates.length} />
 
         <Card className="mb-6">
           <CardHeader>
@@ -270,7 +280,7 @@ export default async function PortalPage() {
                 {summary.semesterStates.map((s) => (
                   <li key={s.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
                     <span className="text-fg">{s.label}</span>
-                    <Badge tone={semesterStateTone(s.state)}>{s.state}</Badge>
+                    <SemesterStateBadge state={s.state} />
                   </li>
                 ))}
               </ul>
@@ -282,13 +292,15 @@ export default async function PortalPage() {
   }
 
   // ADMIN
-  const summary = await getAdminHomeSummary(actor);
+  const [summary, stats] = await Promise.all([getAdminHomeSummary(actor), getStudentStatistics(actor)]);
   const nothingWaiting =
     summary.plansAwaitingApproval === 0 && summary.classesNotYetSubmitted === 0 && summary.rejectedGradesNeedingRework === 0;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 outline-none sm:py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 outline-none sm:py-12">
       <PageHeader title="Admin home" description={`Signed in as ${actor.displayName}.`} />
+
+      <StatisticsSection stats={stats} />
 
       <Card className="mb-6">
         <CardHeader>
@@ -347,17 +359,61 @@ export default async function PortalPage() {
   );
 }
 
-function semesterStateTone(state: string): "neutral" | "brand" | "success" | "warning" | "info" {
-  switch (state) {
-    case "OPEN":
-      return "success";
-    case "REGISTRATION":
-      return "info";
-    case "IN_PROGRESS":
-      return "brand";
-    case "CLOSED":
-      return "neutral";
-    default:
-      return "neutral";
-  }
+
+/**
+ * The at-a-glance statistics both staff dashboards now open with: one
+ * headline figure and three breakdowns of the student body.
+ *
+ * Identical for Admin and Super Admin on purpose -- "how many students are
+ * there, and where are they" is not a role-specific question, and the two
+ * roles' work queues below already differ, which is where the difference
+ * belongs. The queues are untouched by this section.
+ */
+function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics; semesterCount?: number }) {
+  return (
+    <>
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Total students" value={stats.total} />
+        <StatTile
+          label="Active"
+          value={stats.byStatus.find((s) => s.label === "ACTIVE")?.count ?? 0}
+          hint={stats.total > 0 ? `${Math.round(((stats.byStatus.find((s) => s.label === "ACTIVE")?.count ?? 0) / stats.total) * 100)}% of all students` : undefined}
+        />
+        <StatTile label="Colleges represented" value={stats.byCollege.length} />
+        <StatTile
+          label={semesterCount === undefined ? "Enrolment years" : "Semesters"}
+          value={semesterCount ?? stats.byEnrolmentYear.length}
+        />
+      </div>
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Students by status</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <StatusBarList data={stats.byStatus} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Students by college</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <BarList data={stats.byCollege} emptyMessage="No students are enrolled in any college yet." />
+          </CardBody>
+        </Card>
+      </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Students by enrolment year</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <ColumnChart data={stats.byEnrolmentYear} />
+        </CardBody>
+      </Card>
+    </>
+  );
 }

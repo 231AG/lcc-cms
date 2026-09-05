@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent } from "@/lib/students/students";
 import { getStudentHistory } from "@/lib/historical/historical";
@@ -101,7 +102,7 @@ export default async function HistoricalEntryPage({
       <PageHeader
         title={
           <>
-            {record.firstName} {record.lastName}
+            {fullName(record)}
           </>
         }
         description={

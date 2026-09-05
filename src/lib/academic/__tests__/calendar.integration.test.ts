@@ -152,7 +152,12 @@ describe("transitionSemester", () => {
   it("advances DRAFT -> OPEN as Admin, and audits from/to state", async () => {
     const { semester: sem } = await makeYearAndSemester();
 
-    const updated = await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN" });
+    const updated = await transitionSemester(adminActor, {
+      semesterId: sem.id,
+      toState: "OPEN",
+      // An Admin must always give a reason under the four-state model.
+      reason: "Publishing for testing",
+    });
     expect(updated.state).toBe("OPEN");
 
     const entries = await db.query.auditLog.findMany({
@@ -160,57 +165,84 @@ describe("transitionSemester", () => {
     });
     const transitionEntry = entries.find((e) => e.action === "SEMESTER_STATE_CHANGED");
     expect(transitionEntry?.oldValue).toEqual({ state: "DRAFT" });
-    expect(transitionEntry?.newValue).toEqual({ state: "OPEN" });
+    expect(transitionEntry?.newValue).toEqual({ state: "OPEN", reopened: false });
   });
 
-  it("refuses an Admin attempting a backward transition", async () => {
+  it("refuses any backward transition other than the reopen -- for either role", async () => {
     const { semester: sem } = await makeYearAndSemester();
-    await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN" });
+    await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN", reason: "Publishing" });
 
+    // The lifecycle is forward-only. OPEN -> DRAFT is not a rule at all, so
+    // it fails as an illegal transition for BOTH roles -- this is not a
+    // permission question, and a Super Admin has no back door to it either.
     await expect(
       transitionSemester(adminActor, { semesterId: sem.id, toState: "DRAFT" }),
-    ).rejects.toThrow(ForbiddenError);
-  });
-
-  it("refuses a Super Admin attempting a forward transition", async () => {
-    const { semester: sem } = await makeYearAndSemester();
-
+    ).rejects.toThrow(StateError);
     await expect(
-      transitionSemester(superAdminActor, { semesterId: sem.id, toState: "OPEN" }),
-    ).rejects.toThrow(ForbiddenError);
-  });
-
-  it("refuses an illegal jump (e.g. DRAFT straight to CLOSED)", async () => {
-    const { semester: sem } = await makeYearAndSemester();
-
-    await expect(
-      transitionSemester(adminActor, { semesterId: sem.id, toState: "CLOSED" }),
+      transitionSemester(superAdminActor, { semesterId: sem.id, toState: "DRAFT", reason: "Trying anyway" }),
     ).rejects.toThrow(StateError);
   });
 
-  it("requires a reason for a Super Admin backward transition, and audits it", async () => {
+  it("lets a Super Admin advance a semester forward too, with no reason required", async () => {
     const { semester: sem } = await makeYearAndSemester();
-    await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN" });
+
+    // Changing state is separate from creating a semester: both staff roles
+    // hold it, and only the Admin is obliged to explain themselves.
+    const updated = await transitionSemester(superAdminActor, { semesterId: sem.id, toState: "OPEN" });
+    expect(updated.state).toBe("OPEN");
+  });
+
+  it("requires a reason from an Admin on an ordinary forward move", async () => {
+    const { semester: sem } = await makeYearAndSemester();
 
     await expect(
-      transitionSemester(superAdminActor, { semesterId: sem.id, toState: "DRAFT" }),
+      transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN" }),
+    ).rejects.toThrow(ValidationError);
+  });
+
+  it("refuses an illegal jump (e.g. DRAFT straight to CLOSED)", async () => {
+    // Skipping a state is not a shortcut anyone may take; every semester
+    // walks the lifecycle one step at a time.
+    const { semester: sem } = await makeYearAndSemester();
+
+    await expect(
+      transitionSemester(adminActor, { semesterId: sem.id, toState: "CLOSED", reason: "Skipping ahead" }),
+    ).rejects.toThrow(StateError);
+  });
+
+  it("reopens CLOSED -> IN_PROGRESS as Super Admin only, with a mandatory reason, and audits it", async () => {
+    const { semester: sem } = await makeYearAndSemester();
+    await transitionSemester(superAdminActor, { semesterId: sem.id, toState: "OPEN" });
+    await transitionSemester(superAdminActor, { semesterId: sem.id, toState: "IN_PROGRESS" });
+    await transitionSemester(superAdminActor, { semesterId: sem.id, toState: "CLOSED" });
+
+    // An Admin cannot reopen at all, reason or not.
+    await expect(
+      transitionSemester(adminActor, { semesterId: sem.id, toState: "IN_PROGRESS", reason: "Late grade" }),
+    ).rejects.toThrow(ForbiddenError);
+
+    // A Super Admin can, but not silently -- this is the one transition
+    // where the reason is mandatory for everybody.
+    await expect(
+      transitionSemester(superAdminActor, { semesterId: sem.id, toState: "IN_PROGRESS" }),
     ).rejects.toThrow(ValidationError);
 
-    const withReason = await transitionSemester(superAdminActor, {
+    const reopened = await transitionSemester(superAdminActor, {
       semesterId: sem.id,
-      toState: "DRAFT",
+      toState: "IN_PROGRESS",
       reason: "Testing the reopen path",
     });
-    expect(withReason.state).toBe("DRAFT");
+    expect(reopened.state).toBe("IN_PROGRESS");
 
     const entries = await db.query.auditLog.findMany({
       where: and(eq(auditLog.entityType, "semester"), eq(auditLog.entityId, sem.id)),
     });
-    const backwardEntry = entries.find((e) => e.newValue && (e.newValue as { state?: string }).state === "DRAFT");
-    expect(backwardEntry?.reason).toBe("Testing the reopen path");
-  });
+    const reopenEntry = entries.find((e) => e.newValue && (e.newValue as { reopened?: boolean }).reopened === true);
+    expect(reopenEntry?.reason).toBe("Testing the reopen path");
+    expect(reopenEntry?.oldValue).toEqual({ state: "CLOSED" });
+  }, 90_000);
 
-  it("enforces at most one semester in REGISTRATION at a time (Section 13.6)", async () => {
+  it("enforces at most one semester OPEN at a time (Section 13.6)", async () => {
     // ~8 sequential Supabase round trips in this one test (a
     // create-year-and-semester setup plus a second semester plus four
     // transitions) -- comfortably over the shared 40s default under real
@@ -227,12 +259,16 @@ describe("transitionSemester", () => {
     });
     cleanupSemesterIds.push(semB.id);
 
-    await transitionSemester(adminActor, { semesterId: semA.id, toState: "OPEN" });
-    await transitionSemester(adminActor, { semesterId: semA.id, toState: "REGISTRATION" });
+    await transitionSemester(adminActor, { semesterId: semA.id, toState: "OPEN", reason: "First planning window" });
 
-    await transitionSemester(adminActor, { semesterId: semB.id, toState: "OPEN" });
+    // One planning window at a time: the second semester cannot join it.
     await expect(
-      transitionSemester(adminActor, { semesterId: semB.id, toState: "REGISTRATION" }),
+      transitionSemester(adminActor, { semesterId: semB.id, toState: "OPEN", reason: "Second planning window" }),
     ).rejects.toThrow(StateError);
+
+    // Once the first moves on, the slot frees up.
+    await transitionSemester(adminActor, { semesterId: semA.id, toState: "IN_PROGRESS", reason: "Term started" });
+    const opened = await transitionSemester(adminActor, { semesterId: semB.id, toState: "OPEN", reason: "Next window" });
+    expect(opened.state).toBe("OPEN");
   }, 90_000);
 });

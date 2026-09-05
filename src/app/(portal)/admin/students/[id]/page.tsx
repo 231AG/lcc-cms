@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarDays,
   ClipboardList,
+  FileText,
   GraduationCap,
   History,
   KeyRound,
@@ -16,6 +17,7 @@ import {
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
+import { fullName, initials, listName } from "@/lib/students/name";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getPlansForStudent } from "@/lib/planning/planning";
@@ -95,10 +97,6 @@ function Detail({ icon: Icon, label, children }: { icon: typeof Award; label: st
       </div>
     </div>
   );
-}
-
-function initials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
 /**
@@ -202,7 +200,7 @@ export default async function StudentDetailPage({
         items={[
           { label: "Home", href: "/portal" },
           { label: "Students", href: "/admin/students" },
-          { label: `${record.lastName}, ${record.firstName}` },
+          { label: listName(record) },
         ]}
       />
 
@@ -215,11 +213,11 @@ export default async function StudentDetailPage({
               aria-hidden="true"
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-subtle-strong text-lg font-semibold text-brand-fg"
             >
-              {initials(record.firstName, record.lastName)}
+              {initials(record)}
             </span>
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">
-                {record.firstName} {record.lastName}
+                {fullName(record)}
               </h1>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-fg-secondary">{record.studentNumber}</span>
@@ -314,14 +312,22 @@ export default async function StudentDetailPage({
               {canEdit ? (
                 <form action={updateStudentProfileAction} className="flex flex-col gap-3">
                   <input type="hidden" name="studentId" value={record.id} />
-                  <div className="flex gap-3">
-                    <div className="flex-1">
+                  <div className="flex flex-wrap gap-3">
+                    <div className="min-w-32 flex-1">
                       <Label htmlFor="firstName" className="text-xs">
                         First name
                       </Label>
                       <Input id="firstName" name="firstName" defaultValue={record.firstName} required />
                     </div>
-                    <div className="flex-1">
+                    {/* Optional, and clearable: submitting it empty removes a
+                        middle name that was recorded by mistake. */}
+                    <div className="min-w-32 flex-1">
+                      <Label htmlFor="middleName" className="text-xs">
+                        Middle name
+                      </Label>
+                      <Input id="middleName" name="middleName" defaultValue={record.middleName ?? ""} />
+                    </div>
+                    <div className="min-w-32 flex-1">
                       <Label htmlFor="lastName" className="text-xs">
                         Last name
                       </Label>
@@ -471,6 +477,9 @@ export default async function StudentDetailPage({
                       <Th>Credits</Th>
                       <Th>Grade</Th>
                       <Th>Semester GPA</Th>
+                      <Th>
+                        <span className="sr-only">Grade sheet</span>
+                      </Th>
                     </tr>
                   </Thead>
                   <tbody>
@@ -489,6 +498,21 @@ export default async function StudentDetailPage({
                             {r.isRepeatDropped && " (R)"}
                           </Td>
                           <Td>{showSemesterGpa ? (summary?.gpa ?? "—") : ""}</Td>
+                          {/* One link per semester, on that semester's first
+                              row -- the grade sheet is a per-semester
+                              document, so a link on every course row would
+                              be the same link a dozen times. */}
+                          <Td className="whitespace-nowrap">
+                            {showSemesterGpa && (
+                              <Link
+                                href={`/admin/students/${record.id}/grade-sheet/${r.semesterId}`}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-brand-fg hover:underline"
+                              >
+                                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                                Grade sheet
+                              </Link>
+                            )}
+                          </Td>
                         </Tr>
                       );
                     })}

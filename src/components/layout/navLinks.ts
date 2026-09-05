@@ -36,7 +36,7 @@ export const ADMIN_GROUPS: NavGroup[] = [
   {
     label: "Students",
     links: [
-      { href: "/admin/students", label: "Students" },
+      { href: "/admin/students", label: "Student Listing" },
       { href: "/admin/historical/progress", label: "Historical import progress" },
     ],
   },
@@ -81,15 +81,15 @@ export const SUPER_ADMIN_GROUPS: NavGroup[] = [
   {
     label: "Students",
     links: [
-      { href: "/admin/students", label: "Students (read-only)" },
+      { href: "/admin/students", label: "Student Listing" },
       { href: "/admin/historical/progress", label: "Historical import progress" },
     ],
   },
   {
     label: "Academic",
     links: [
-      { href: "/admin/calendar", label: "Academic calendar (read-only)" },
-      { href: "/admin/offerings", label: "Course offerings (read-only)" },
+      { href: "/admin/calendar", label: "Academic calendar" },
+      { href: "/admin/offerings", label: "Course offerings" },
     ],
   },
   {

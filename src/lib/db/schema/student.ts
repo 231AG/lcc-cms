@@ -22,6 +22,9 @@ export const student = appSchema.table(
     id: uuid("id").primaryKey().references(() => appUser.id, { onDelete: "restrict" }),
     studentNumber: text("student_number").notNull(), // DEC-02 / CR-08 format, validated in the service layer
     firstName: text("first_name").notNull(),
+    // Optional -- NULL means "none recorded". The service layer coerces an
+    // empty string to NULL so there is one representation, not two.
+    middleName: text("middle_name"),
     lastName: text("last_name").notNull(),
     departmentId: uuid("department_id")
       .notNull()

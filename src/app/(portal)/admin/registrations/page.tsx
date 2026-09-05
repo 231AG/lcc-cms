@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
 import { filterOfferings, pageSlice } from "@/lib/offerings/offeringSearch";
 import { getRegistrationsForOffering } from "@/lib/planning/planning";
@@ -78,7 +79,7 @@ export default async function RegistrationsPage({
     : [];
   const studentLabel = (studentId: string) => {
     const s = classListStudents.find((s) => s.id === studentId);
-    return s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : studentId;
+    return s ? `${s.studentNumber} — ${fullName(s)}` : studentId;
   };
 
   // Candidates for direct registration: searched, not enumerated.
@@ -193,7 +194,7 @@ export default async function RegistrationsPage({
                         <input type="hidden" name="offeringId" value={offeringId} />
                         <input type="hidden" name="studentId" value={s.id} />
                         <span className="mb-1.5 grow text-sm">
-                          <span className="font-mono text-xs text-fg-secondary">{s.studentNumber}</span> — {s.firstName} {s.lastName}
+                          <span className="font-mono text-xs text-fg-secondary">{s.studentNumber}</span> — {fullName(s)}
                         </span>
                         <div>
                           <Label className="text-xs">Reason</Label>

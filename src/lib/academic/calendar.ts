@@ -1,11 +1,18 @@
 import { and, eq, ne } from "drizzle-orm";
 import { db, type Tx } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
-import { academicYear, semester } from "@/lib/db/schema";
+import { academicYear, courseOffering, semester } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { ValidationError, ForbiddenError, StateError } from "@/lib/errors";
-import { findTransitionRule, legalNextStates, type SemesterState } from "./semesterStateMachine";
+import {
+  findTransitionRule,
+  isDeletable,
+  legalNextStates,
+  reasonRequiredFor,
+  SEMESTER_STATE_LABEL,
+  type SemesterState,
+} from "./semesterStateMachine";
 
 const ACADEMIC_YEAR_LABEL_PATTERN = /^(\d{4})\/(\d{4})$/;
 
@@ -118,6 +125,16 @@ export interface TransitionSemesterInput {
   reason?: string;
 }
 
+/**
+ * The one way a semester's state ever changes.
+ *
+ * Under the four-state model BOTH staff roles may move a semester forward
+ * -- changing a semester's state is a separate power from creating one,
+ * which stays Admin-only (`calendar.manageSemester`). The reason field is
+ * required of an Admin and optional for a Super Admin, except on the
+ * Closed -> In Progress reopen, where it is mandatory for anyone and is the
+ * whole point of the audit record.
+ */
 export async function transitionSemester(actor: Actor, input: TransitionSemesterInput) {
   await assertCan(actor, "calendar.transitionSemester");
 
@@ -125,38 +142,47 @@ export async function transitionSemester(actor: Actor, input: TransitionSemester
   if (!current) throw new ValidationError("Semester not found.");
 
   const fromState = current.state as SemesterState;
-  const rule = findTransitionRule(fromState, input.toState);
+  if (fromState === input.toState) {
+    throw new StateError(`This semester is already ${SEMESTER_STATE_LABEL[fromState]}.`);
+  }
 
+  const rule = findTransitionRule(fromState, input.toState);
   if (!rule) {
-    const legal = legalNextStates(fromState).map((r) => r.to);
+    const legal = legalNextStates(fromState).map((r) => SEMESTER_STATE_LABEL[r.to]);
     throw new StateError(
       legal.length > 0
-        ? `Cannot move from ${fromState} to ${input.toState}. Legal next state(s): ${legal.join(", ")}.`
-        : `Cannot move from ${fromState} to ${input.toState}. ${fromState} is a terminal state for forward progress.`,
+        ? `Cannot move a ${SEMESTER_STATE_LABEL[fromState]} semester to ${SEMESTER_STATE_LABEL[input.toState]}. ` +
+          `The lifecycle is forward-only; legal next state(s): ${legal.join(", ")}.`
+        : `Cannot move a ${SEMESTER_STATE_LABEL[fromState]} semester to ${SEMESTER_STATE_LABEL[input.toState]}.`,
     );
   }
 
-  if (actor.role !== rule.actorRole) {
+  if (!(rule.actorRoles as readonly string[]).includes(actor.role)) {
     throw new ForbiddenError(
-      `Moving a semester from ${fromState} to ${input.toState} requires the ${rule.actorRole} role.`,
+      `Moving a semester from ${SEMESTER_STATE_LABEL[fromState]} to ${SEMESTER_STATE_LABEL[input.toState]} ` +
+        `requires the ${rule.actorRoles.join(" or ")} role.`,
     );
   }
 
-  if (rule.reasonRequired && !input.reason?.trim()) {
-    throw new ValidationError("A reason is required for this transition.");
+  const reason = input.reason?.trim() || undefined;
+  if (reasonRequiredFor(rule, actor.role) && !reason) {
+    throw new ValidationError(
+      rule.isReopen
+        ? "Reopening a closed semester requires a reason. It is recorded in the audit log before any change is permitted."
+        : "A reason is required for this change.",
+    );
   }
 
   await assertGuardConditions(current, rule.to);
 
   // REQ-A05 / Section 10.5: RLS only grants UPDATE on `semester` to the
-  // ADMIN role. A Super Admin's backward/reopen transition is therefore
-  // performed through the superuser connection, not asUser() -- this is
-  // the "explicitly elevated, audited path" the plan calls for, not a
-  // bypass of authorization (assertCan-equivalent role/rule checks above
-  // already gated this before a single row was touched).
-  const runAs: <T>(fn: (tx: Tx) => Promise<T>) => Promise<T> = rule.actorRole === "ADMIN"
-    ? (fn) => asUser(actor.userId, fn)
-    : (fn) => db.transaction(fn);
+  // ADMIN role. A Super Admin's transition is therefore performed through
+  // the superuser connection, not asUser() -- this is the "explicitly
+  // elevated, audited path" the plan calls for, not a bypass of
+  // authorization (assertCan and the role/rule checks above already gated
+  // this before a single row was touched).
+  const runAs: <T>(fn: (tx: Tx) => Promise<T>) => Promise<T> =
+    actor.role === "ADMIN" ? (fn) => asUser(actor.userId, fn) : (fn) => db.transaction(fn);
 
   return runAs(async (tx) => {
     const [row] = await tx
@@ -165,6 +191,10 @@ export async function transitionSemester(actor: Actor, input: TransitionSemester
       .where(eq(semester.id, input.semesterId))
       .returning();
 
+    // Written in the SAME transaction as the state change, so on a reopen
+    // the audit record provably exists before anything can be modified
+    // under the reopened semester -- there is no window in which the
+    // semester is open again but the reason for it is not yet recorded.
     await auditWrite(tx, {
       actorUserId: actor.userId,
       actorRole: actor.role,
@@ -172,8 +202,8 @@ export async function transitionSemester(actor: Actor, input: TransitionSemester
       entityType: "semester",
       entityId: input.semesterId,
       oldValue: { state: fromState },
-      newValue: { state: input.toState },
-      reason: input.reason ?? null,
+      newValue: { state: input.toState, reopened: rule.isReopen },
+      reason: reason ?? null,
     });
 
     return row;
@@ -181,45 +211,92 @@ export async function transitionSemester(actor: Actor, input: TransitionSemester
 }
 
 /**
- * Guards checked before a transition is allowed (Section 13.2). Several of
- * the plan's stated guards reference tables that don't exist until later
- * stages (offerings/plans in Stage 8-9, grade submissions in Stage 10) --
- * those are marked TODO below and must be added when those stages land,
- * not silently skipped forever.
+ * Deleting a semester, which is possible only while it is still a Draft.
+ *
+ * Draft means nothing has ever been visible to a student and, by the state
+ * machine, no plan, registration or grade can exist -- so a Draft is the
+ * one point in the lifecycle where a semester created by mistake can be
+ * removed rather than left cluttering the calendar forever. Anything past
+ * Draft is history and is kept.
+ *
+ * Admin-only, under the same permission as creating one: this is the
+ * undo of `createSemester`, not a state change.
  */
-async function assertGuardConditions(current: typeof semester.$inferSelect, toState: SemesterState): Promise<void> {
-  if (toState === "OPEN" && current.state === "DRAFT") {
-    // "Semester dates set and within the parent academic year" -- dates
-    // are NOT NULL at the schema level and validated against the parent
-    // year at creation time (createSemester), so nothing further to check.
+export async function deleteSemester(actor: Actor, semesterId: string) {
+  await assertCan(actor, "calendar.manageSemester");
+
+  const current = await db.query.semester.findFirst({ where: eq(semester.id, semesterId) });
+  if (!current) throw new ValidationError("Semester not found.");
+
+  const state = current.state as SemesterState;
+  if (!isDeletable(state)) {
+    throw new StateError(
+      `Only a Draft semester can be deleted. This one is ${SEMESTER_STATE_LABEL[state]}, and its records are permanent history.`,
+    );
   }
 
-  // Section 13.6: at most one semester in Registration, and at most one
-  // in Grade Submission, at any time (DEC-34, adopted).
-  if (toState === "REGISTRATION" || toState === "GRADE_SUBMISSION") {
+  // Belt and braces against the state machine: a Draft should have no
+  // offerings, but an offering created before this rule existed would make
+  // the delete fail on a foreign key with an unreadable Postgres error
+  // instead of a sentence explaining what to do.
+  const offering = await db.query.courseOffering.findFirst({ where: eq(courseOffering.semesterId, semesterId) });
+  if (offering) {
+    throw new StateError("This semester still has course offerings. Remove them before deleting it.");
+  }
+
+  return asUser(actor.userId, async (tx) => {
+    // Audit BEFORE the delete: the row's own values are what the log needs
+    // to record, and after the DELETE there is nothing left to read them
+    // from. Same transaction, so a failed delete rolls the entry back too.
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "SEMESTER_DELETED",
+      entityType: "semester",
+      entityId: semesterId,
+      oldValue: {
+        academicYearId: current.academicYearId,
+        sequence: current.sequence,
+        name: current.name,
+        state: current.state,
+        startDate: current.startDate,
+        endDate: current.endDate,
+      },
+    });
+    await tx.delete(semester).where(eq(semester.id, semesterId));
+  });
+}
+
+/**
+ * Guards checked before a transition is allowed (Section 13.2).
+ *
+ * Section 13.6 (DEC-34) kept at most one semester in the registration
+ * window and at most one in grade submission. Those windows are now the
+ * Open and In Progress states, so the same rule lands on them -- a College
+ * runs one planning window and one live term at a time. Note this is a
+ * guard on the TRANSITION, not a database constraint: the four-state
+ * migration can legitimately leave two semesters Open (see
+ * 0024_semester_four_states.sql), and those rows are not forced through a
+ * state change they never asked for.
+ */
+async function assertGuardConditions(current: typeof semester.$inferSelect, toState: SemesterState): Promise<void> {
+  if (toState === "OPEN" || toState === "IN_PROGRESS") {
     const conflicting = await db.query.semester.findFirst({
       where: and(eq(semester.state, toState), ne(semester.id, current.id)),
     });
     if (conflicting) {
       throw new StateError(
-        `Another semester is already in ${toState}. Only one semester may be in this state at a time (Section 13.6).`,
+        `Another semester is already ${SEMESTER_STATE_LABEL[toState]}. ` +
+          `Only one semester may be in this state at a time (Section 13.6).`,
       );
     }
   }
 
-  // TODO (Stage 8): OPEN -> REGISTRATION should also require at least one
+  // TODO (Stage 8): DRAFT -> OPEN should also require at least one
   // published offering to exist.
-  // TODO (Stage 9): REGISTRATION -> IN_PROGRESS should warn (not block) if
-  // plans remain unapproved.
-  // TODO (Stage 10): GRADE_SUBMISSION -> CLOSED must block while any
+  // TODO (Stage 9): OPEN -> IN_PROGRESS should warn (not block) if plans
+  // remain unapproved.
+  // TODO (Stage 10): IN_PROGRESS -> CLOSED must block while any grade
   // submission is SUBMITTED/PARTIALLY_DECIDED or any correction is
   // PENDING, and warn if any registration has no published grade.
-  // TODO (Stage 9): OPEN <- REGISTRATION (Super Admin backward) should
-  // require no plans exist.
-  // TODO (Stage 10): IN_PROGRESS <- GRADE_SUBMISSION (Super Admin
-  // backward) should require no grades submitted for approval.
-  // TODO (Stage 10): GRADE_SUBMISSION <- CLOSED (Super Admin reopen)
-  // should require no submission currently awaiting a decision -- though
-  // by definition reopening starts a new decision window, so this guard
-  // may turn out to be a no-op; revisit when Stage 10 exists.
 }

@@ -5,8 +5,12 @@ import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { countPlansAwaitingApproval } from "@/lib/planning/planning";
 import { getSubmissionQueue, getCorrectionQueue } from "@/lib/grades/grades";
 import { getImportProgressReport } from "@/lib/historical/historical";
+import { ACTIVE_SEMESTER_STATES, isGradeEntryOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
 
-const ACTIVE_STATES = ["OPEN", "REGISTRATION", "IN_PROGRESS", "GRADE_SUBMISSION"] as const;
+/** The states with live work in them: a published semester students are
+ *  planning in, and one whose term is running. Draft has nothing in it yet
+ *  and Closed is sealed, so neither can contribute to a work queue. */
+const ACTIVE_STATES = ACTIVE_SEMESTER_STATES;
 
 async function getActiveSemesters() {
   return db.query.semester.findMany({ where: inArray(semester.state, [...ACTIVE_STATES]) });
@@ -29,7 +33,7 @@ export interface AdminHomeSummary {
 export async function getAdminHomeSummary(actor: Actor): Promise<AdminHomeSummary> {
   const activeSemesters = await getActiveSemesters();
   await assertCan(actor, "grade.manageClass");
-  const gradeSemesterIds = activeSemesters.filter((s) => s.state === "GRADE_SUBMISSION").map((s) => s.id);
+  const gradeSemesterIds = activeSemesters.filter((s) => isGradeEntryOpen(s.state as SemesterState)).map((s) => s.id);
 
   // This dashboard is the first screen an Admin sees, and it was the
   // slowest page in the app. Two reasons, both fixed here: it counted
@@ -57,7 +61,7 @@ export async function getAdminHomeSummary(actor: Actor): Promise<AdminHomeSummar
   };
 }
 
-/** Classes in a grade-submission semester that have registered students
+/** Classes in an In Progress semester that have registered students
  * but no grade submission yet. The two lookups after the offering list
  * depend only on it, not on each other, so they run together. */
 async function countClassesNotYetSubmitted(gradeSemesterIds: string[]): Promise<number> {

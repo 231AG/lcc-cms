@@ -5,20 +5,30 @@ import { course, courseOffering, offeringMeeting, registration, semester } from 
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
+import {
+  isOfferingEditable,
+  SEMESTER_STATE_LABEL,
+  SEMESTER_STATES,
+  type SemesterState,
+} from "@/lib/academic/semesterStateMachine";
 
 /**
- * Offerings and schedules can only be created or edited while the parent
- * semester is Draft, Open or Registration (Section 13.4: "Refuse;
- * schedules are frozen once teaching starts").
+ * Offerings and schedules can only be created or edited before the term
+ * starts -- Draft or Open under the four-state model (Section 13.4:
+ * "Refuse; schedules are frozen once teaching starts"). From In Progress
+ * onward, changes go through the audited late add/drop path instead.
+ * Derived from the state machine rather than restated, and kept as an
+ * array so the refusal message below can name the states.
  */
-const EDITABLE_SEMESTER_STATES = ["DRAFT", "OPEN", "REGISTRATION"];
+const EDITABLE_SEMESTER_STATES: SemesterState[] = SEMESTER_STATES.filter(isOfferingEditable);
 
 async function assertSemesterEditable(semesterId: string): Promise<void> {
   const sem = await db.query.semester.findFirst({ where: eq(semester.id, semesterId) });
   if (!sem) throw new ValidationError("Semester not found.");
-  if (!EDITABLE_SEMESTER_STATES.includes(sem.state)) {
+  if (!EDITABLE_SEMESTER_STATES.includes(sem.state as SemesterState)) {
     throw new StateError(
-      `Offerings can only be created or edited while the semester is Draft, Open or Registration (currently ${sem.state}) -- schedules are frozen once teaching starts.`,
+      `Offerings can only be created or edited while the semester is ${EDITABLE_SEMESTER_STATES.map((st) => SEMESTER_STATE_LABEL[st]).join(" or ")} ` +
+        `-- this one is ${SEMESTER_STATE_LABEL[sem.state as SemesterState]}, and schedules are frozen once teaching starts.`,
     );
   }
 }

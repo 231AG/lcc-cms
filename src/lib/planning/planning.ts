@@ -19,6 +19,7 @@ import {
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
+import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -279,8 +280,10 @@ function importStatusLabel(status: string): string {
 async function assertSemesterOpenForRegistration(tx: Tx, semesterId: string): Promise<void> {
   const sem = await tx.query.semester.findFirst({ where: eq(semester.id, semesterId) });
   if (!sem) throw new ValidationError("Semester not found.");
-  if (sem.state !== "REGISTRATION") {
-    throw new StateError(`Course planning is not currently open (semester is ${sem.state}, not Registration).`);
+  if (!isPlanningOpen(sem.state as SemesterState)) {
+    throw new StateError(
+      `Course planning is not currently open -- this semester is ${SEMESTER_STATE_LABEL[sem.state as SemesterState]}, and plans can only be built while it is Open.`,
+    );
   }
 }
 

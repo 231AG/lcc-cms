@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { fullName } from "@/lib/students/name";
+import { isPlanningOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { asUser } from "@/lib/db/asUser";
 import { getPlanQueue } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -64,11 +66,11 @@ export default async function PlanningQueuePage({
   // uses -- so the queue is populated on load without forcing a manual
   // semester pick every time. The selector stays visible and an explicit
   // choice (including re-picking the blank placeholder) is respected.
-  const semesterId = rawSemesterId || semesters.find((s) => s.state === "REGISTRATION")?.id;
+  const semesterId = rawSemesterId || semesters.find((s) => isPlanningOpen(s.state as SemesterState))?.id;
 
   const studentLabel = (studentId: string) => {
     const s = students.find((s) => s.id === studentId);
-    return s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : studentId;
+    return s ? `${s.studentNumber} — ${fullName(s)}` : studentId;
   };
 
   const queue = semesterId ? await getPlanQueue(actor, semesterId) : [];

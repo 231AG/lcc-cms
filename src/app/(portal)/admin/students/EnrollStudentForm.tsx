@@ -57,6 +57,13 @@ export function EnrollStudentForm({
             <Input id="firstName" name="firstName" required />
           </div>
           <div>
+            {/* Optional -- the only name field without `required`. */}
+            <Label htmlFor="middleName" className="text-xs">
+              Middle name
+            </Label>
+            <Input id="middleName" name="middleName" />
+          </div>
+          <div>
             <Label htmlFor="lastName" className="text-xs">
               Last name
             </Label>

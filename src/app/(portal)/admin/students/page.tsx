@@ -8,13 +8,18 @@ import { Card } from "@/components/ui/Card";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
+import { Download, Printer } from "lucide-react";
 import { StudentsHeader } from "./AddStudentPanel";
 import { StudentsTable, type StudentRow } from "./StudentsTable";
+import {
+  DEFAULT_PAGE_SIZE,
+  PAGE_SIZES,
+  filterSearchParams,
+  parseStudentFilters,
+  type StudentListParams,
+} from "./filters";
 
-export const metadata: Metadata = { title: "Students" };
-
-const PAGE_SIZES = [10, 25, 50] as const;
-const DEFAULT_PAGE_SIZE = 25;
+export const metadata: Metadata = { title: "Student Listing" };
 
 /**
  * A-09 (Admin: search, enrol, quick links to edit) and X-07 (Super Admin:
@@ -31,18 +36,11 @@ const DEFAULT_PAGE_SIZE = 25;
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    q?: string;
-    status?: string;
-    collegeId?: string;
-    year?: string;
-    page?: string;
-    pageSize?: string;
-    error?: string;
-  }>;
+  searchParams: Promise<StudentListParams & { error?: string }>;
 }) {
   const actor = await getCurrentActor();
-  const { q, status, collegeId, year, page, pageSize, error } = await searchParams;
+  const params = await searchParams;
+  const { q, collegeId, error } = params;
 
   if (!actor)
     return (
@@ -59,20 +57,17 @@ export default async function StudentsPage({
   }
   const isAdmin = actor.role === "ADMIN";
 
-  // Only values the app really defines: statuses from STUDENT_STATUSES,
-  // colleges from the college table, years derived from the enrolment_year
-  // column that already exists. Nothing invented, nothing hardcoded.
-  const validStatus =
-    status && (STUDENT_STATUSES as readonly string[]).includes(status) ? (status as (typeof STUDENT_STATUSES)[number]) : undefined;
-  const validYear = year && /^\d{4}$/.test(year) ? Number(year) : undefined;
-  const size = PAGE_SIZES.includes(Number(pageSize) as (typeof PAGE_SIZES)[number]) ? Number(pageSize) : DEFAULT_PAGE_SIZE;
-  const pageNum = Math.max(1, Number(page) || 1);
+  // Parsed by the same function the CSV route and the print view use, so
+  // "the export respects the current filters" is structurally true rather
+  // than three separate implementations agreeing by luck.
+  const filters = parseStudentFilters(params);
+  const { status: validStatus, enrolmentYear: validYear, pageSize: size, page: pageNum, hasFilters } = filters;
 
   // Departments are still fetched -- the enrolment form enrols INTO a
   // department, and the listing needs the department -> college mapping to
   // label each row -- but the column and the filter are the college now.
   const [results, colleges, departments, enrolmentYears] = await Promise.all([
-    searchStudents(actor, { query: q, status: validStatus, collegeId: collegeId || undefined, enrolmentYear: validYear, page: pageNum, pageSize: size }),
+    searchStudents(actor, filters),
     asUser(actor.userId, (tx) =>
       tx.query.college.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
     ),
@@ -98,6 +93,7 @@ export default async function StudentsPage({
     id: s.id,
     studentNumber: s.studentNumber,
     firstName: s.firstName,
+    middleName: s.middleName,
     lastName: s.lastName,
     status: s.status,
     collegeName: collegeForStudent(s.departmentId),
@@ -105,7 +101,6 @@ export default async function StudentsPage({
   }));
 
   const totalPages = Math.max(1, Math.ceil(results.total / results.pageSize));
-  const hasFilters = Boolean(q || validStatus || collegeId || validYear);
   const firstShown = results.total === 0 ? 0 : (pageNum - 1) * results.pageSize + 1;
   const lastShown = Math.min(pageNum * results.pageSize, results.total);
 
@@ -114,15 +109,17 @@ export default async function StudentsPage({
   // any filter resets to page 1 by construction rather than by a rule
   // someone has to remember.
   const hrefForPage = (p: number) => {
-    const sp = new URLSearchParams();
-    if (q) sp.set("q", q);
-    if (validStatus) sp.set("status", validStatus);
-    if (collegeId) sp.set("collegeId", collegeId);
-    if (validYear) sp.set("year", String(validYear));
+    const sp = filterSearchParams(filters);
     if (size !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(size));
     if (p > 1) sp.set("page", String(p));
     return `/admin/students${sp.toString() ? `?${sp}` : ""}`;
   };
+
+  // Export and print act on the whole filtered set, not the page on screen,
+  // so they carry the filters and deliberately drop `page`/`pageSize`.
+  const exportQuery = filterSearchParams(filters).toString();
+  const exportHref = `/admin/students/export${exportQuery ? `?${exportQuery}` : ""}`;
+  const printHref = `/admin/students/print${exportQuery ? `?${exportQuery}` : ""}`;
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:py-10">
@@ -146,9 +143,22 @@ export default async function StudentsPage({
               {hasFilters ? " matching the current filters" : " enrolled"}
             </p>
           </div>
-          <Link href="/admin/historical/progress" className="text-sm font-medium text-brand-fg hover:underline">
-            Historical import progress
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Both act on every row matching the current filters, across
+                every page -- not just what is on screen, and not the whole
+                unfiltered table. */}
+            <a href={exportHref} className="flex items-center gap-1.5 text-sm font-medium text-brand-fg hover:underline">
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Export CSV
+            </a>
+            <Link href={printHref} className="flex items-center gap-1.5 text-sm font-medium text-brand-fg hover:underline">
+              <Printer className="h-3.5 w-3.5" aria-hidden="true" />
+              Print (PDF)
+            </Link>
+            <Link href="/admin/historical/progress" className="text-sm font-medium text-brand-fg hover:underline">
+              Historical import progress
+            </Link>
+          </div>
         </div>
 
         <form method="GET" className="flex flex-wrap items-end gap-2 border-b border-line-subtle px-4 py-3 sm:px-5">
@@ -179,7 +189,11 @@ export default async function StudentsPage({
             <Label htmlFor="collegeId" className="text-xs">
               College
             </Label>
-            <Select id="collegeId" name="collegeId" defaultValue={collegeId ?? ""} className="max-w-56">
+            {/* Applies as soon as a college is chosen -- see the
+                `data-auto-submit` handler in public/enhance.js. The Apply
+                button below stays: it is what the search box uses, and it
+                is the whole control if scripts are blocked. */}
+            <Select id="collegeId" name="collegeId" defaultValue={collegeId ?? ""} className="max-w-56" data-auto-submit="">
               <option value="">All colleges</option>
               {colleges.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -250,10 +264,9 @@ export default async function StudentsPage({
 
           <div className="flex flex-wrap items-center gap-3">
             <form method="GET" className="flex items-center gap-1.5">
-              {q && <input type="hidden" name="q" value={q} />}
-              {validStatus && <input type="hidden" name="status" value={validStatus} />}
-              {collegeId && <input type="hidden" name="collegeId" value={collegeId} />}
-              {validYear && <input type="hidden" name="year" value={String(validYear)} />}
+              {[...filterSearchParams(filters)].map(([name, value]) => (
+                <input key={name} type="hidden" name={name} value={value} />
+              ))}
               <Label htmlFor="pageSize" className="mb-0 text-xs whitespace-nowrap">
                 Per page
               </Label>

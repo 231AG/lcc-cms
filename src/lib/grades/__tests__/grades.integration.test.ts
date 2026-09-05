@@ -214,8 +214,7 @@ beforeAll(async () => {
   semesterId = sem.id;
   cleanupSemesterId = sem.id;
 
-  await transitionSemester(adminActor, { semesterId, toState: "OPEN" });
-  await transitionSemester(adminActor, { semesterId, toState: "REGISTRATION" });
+  await transitionSemester(adminActor, { semesterId, toState: "OPEN", reason: "Test fixture" });
 
   // Every offering any test in this file will need, created now while the
   // semester still permits it (see the offeringPool comment above).
@@ -228,8 +227,8 @@ beforeAll(async () => {
   }
 
   // Walk the semester the rest of the way to Grade Submission.
-  await transitionSemester(adminActor, { semesterId, toState: "IN_PROGRESS" });
-  await transitionSemester(adminActor, { semesterId, toState: "GRADE_SUBMISSION" });
+  // In Progress IS the grade-entry window under the four-state model.
+  await transitionSemester(adminActor, { semesterId, toState: "IN_PROGRESS", reason: "Test fixture" });
 }, 400_000);
 
 afterAll(async () => {

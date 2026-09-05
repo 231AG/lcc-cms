@@ -1,4 +1,5 @@
 import { getCurrentActor } from "@/lib/auth/session";
+import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
 import { getSubmissionDetail } from "@/lib/grades/grades";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -113,12 +114,12 @@ export default async function GradeReviewDetailPage({
                           name="gradeRecordId"
                           value={g.id}
                           form="decision-form"
-                          aria-label={`Select ${s ? `${s.firstName} ${s.lastName}` : g.registrationId} for this decision`}
+                          aria-label={`Select ${s ? fullName(s) : g.registrationId} for this decision`}
                           className="h-4 w-4 rounded border-line-strong"
                         />
                       )}
                     </Td>
-                    <Td>{s ? `${s.studentNumber} — ${s.firstName} ${s.lastName}` : g.registrationId}</Td>
+                    <Td>{s ? `${s.studentNumber} — ${fullName(s)}` : g.registrationId}</Td>
                     <Td>
                       {g.letter}
                       {g.score ? ` (${g.score})` : ""}

@@ -1,4 +1,5 @@
 import { getCurrentActor } from "@/lib/auth/session";
+import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds } from "@/lib/offerings/offerings";
 import { getPlan, getPlanItems } from "@/lib/planning/planning";
@@ -92,7 +93,7 @@ export default async function PlanDetailPage({
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
       <PageHeader
-        title={student ? `${student.studentNumber} — ${student.firstName} ${student.lastName}` : plan.studentId}
+        title={student ? `${student.studentNumber} — ${fullName(student)}` : plan.studentId}
         description={
           <>
             {semester?.name ?? plan.semesterId} — status <Badge tone={PLAN_STATUS_TONE[plan.status] ?? "neutral"}>{plan.status}</Badge> —{" "}

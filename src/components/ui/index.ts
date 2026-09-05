@@ -1,6 +1,7 @@
 export { cn } from "./cn";
 export { Button, buttonClasses, type ButtonVariant, type ButtonSize } from "./Button";
 export { Badge, type Tone } from "./Badge";
+export { SemesterStateBadge } from "./SemesterStateBadge";
 export { Card, CardHeader, CardBody, CardTitle } from "./Card";
 export { Alert, type AlertTone } from "./Alert";
 export { Table, Thead, Th, Td, Tr } from "./Table";

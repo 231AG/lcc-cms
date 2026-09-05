@@ -27,6 +27,7 @@ export async function enrollStudentAction(
     const result = await enrollStudent(actor, {
       studentNumber: String(formData.get("studentNumber") ?? ""),
       firstName: String(formData.get("firstName") ?? ""),
+      middleName: String(formData.get("middleName") ?? ""),
       lastName: String(formData.get("lastName") ?? ""),
       departmentId: String(formData.get("departmentId") ?? ""),
       enrolmentYear: Number(formData.get("enrolmentYear") ?? ""),
@@ -69,6 +70,9 @@ export async function updateStudentProfileAction(formData: FormData): Promise<vo
   try {
     await updateStudentProfile(actor, studentId, {
       firstName: String(formData.get("firstName") ?? ""),
+      // "" is a real instruction here (clear the middle name), so unlike the
+      // required names this is passed through rather than coerced away.
+      middleName: String(formData.get("middleName") ?? ""),
       lastName: String(formData.get("lastName") ?? ""),
       departmentId: String(formData.get("departmentId") ?? ""),
       enrolmentYear: enrolmentYearRaw ? Number(enrolmentYearRaw) : undefined,
