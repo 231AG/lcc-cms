@@ -191,16 +191,16 @@ export default async function StudentDetailPage({
   // Students listing now filters by, so both are shown here -- this page
   // is where department-level detail belongs.
   const departmentRecord = departments.find((d) => d.id === record.departmentId);
-  const departmentLabel = departmentRecord ? `${departmentRecord.code} — ${departmentRecord.name}` : record.departmentId;
+  const departmentLabel = departmentRecord?.name ?? record.departmentId;
   const collegeRecord = departmentRecord ? colleges.find((c) => c.id === departmentRecord.collegeId) : undefined;
-  const collegeLabel = collegeRecord ? `${collegeRecord.code} — ${collegeRecord.name}` : "—";
+  const collegeLabel = collegeRecord?.name ?? "—";
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:py-10">
       <Breadcrumb
         items={[
           { label: "Home", href: "/portal" },
-          { label: "Students", href: "/admin/students" },
+          { label: "Student Listing", href: "/admin/students" },
           { label: listName(record) },
         ]}
       />
@@ -246,7 +246,7 @@ export default async function StudentDetailPage({
                 </Link>
               ))}
             <Link href="/admin/students" className={buttonClasses("ghost", "md")}>
-              Back to students
+              Back to listing
             </Link>
           </div>
         </CardBody>
@@ -477,7 +477,7 @@ export default async function StudentDetailPage({
                       <Th>Course</Th>
                       <Th>Credits</Th>
                       <Th>Grade</Th>
-                      <Th>Semester GPA</Th>
+                      <Th className="whitespace-nowrap">Semester GPA</Th>
                       <Th>
                         <span className="sr-only">Grade sheet</span>
                       </Th>
@@ -489,7 +489,11 @@ export default async function StudentDetailPage({
                       const summary = semesterSummaryFor(r.semesterId);
                       return (
                         <Tr key={r.id}>
-                          <Td className="whitespace-nowrap">{yearLabel(r.semesterId)}</Td>
+                          {/* The semester is named once per group, not on
+                              every course row: repeating it six times is
+                              width this narrow column cannot spare, and the
+                              rows are already visually grouped by it. */}
+                          <Td className="whitespace-nowrap">{showSemesterGpa ? yearLabel(r.semesterId) : ""}</Td>
                           <Td>
                             {r.courseCodeSnapshot} — {r.courseTitleSnapshot}
                           </Td>
@@ -502,15 +506,17 @@ export default async function StudentDetailPage({
                           {/* One link per semester, on that semester's first
                               row -- the grade sheet is a per-semester
                               document, so a link on every course row would
-                              be the same link a dozen times. */}
+                              be the same link a dozen times. Icon-only with
+                              a tooltip, like every other row action. */}
                           <Td className="whitespace-nowrap">
                             {showSemesterGpa && (
                               <Link
                                 href={`/admin/students/${record.id}/grade-sheet/${r.semesterId}`}
-                                className="inline-flex items-center gap-1 text-xs font-medium text-brand-fg hover:underline"
+                                title={`Grade sheet for ${yearLabel(r.semesterId)}`}
+                                aria-label={`Grade sheet for ${yearLabel(r.semesterId)}`}
+                                className="inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                               >
-                                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                                Grade sheet
+                                <FileText className="h-4 w-4" aria-hidden="true" />
                               </Link>
                             )}
                           </Td>

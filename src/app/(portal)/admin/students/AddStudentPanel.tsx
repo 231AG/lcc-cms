@@ -33,9 +33,9 @@ export function StudentsHeader({
 
   return (
     <>
-      <Breadcrumb items={[{ label: "Home", href: "/portal" }, { label: "Students" }]} />
+      <Breadcrumb items={[{ label: "Home", href: "/portal" }, { label: "Student Listing" }]} />
       <PageHeader
-        title="Students"
+        title="Student Listing"
         actions={
           canEnrol ? (
             <Button
