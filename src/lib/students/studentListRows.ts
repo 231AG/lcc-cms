@@ -1,6 +1,7 @@
 import { asUser } from "@/lib/db/asUser";
 import { exportStudents } from "@/lib/students/students";
 import { listName } from "@/lib/students/name";
+import { genderLabel } from "@/lib/students/gender";
 import type { Actor } from "@/lib/permissions/kernel";
 import type { SearchStudentsInput } from "@/lib/students/students";
 
@@ -23,6 +24,7 @@ export interface StudentListRow {
   [column: string]: string;
   studentNumber: string;
   name: string;
+  gender: string;
   status: string;
   college: string;
   enrolmentYear: string;
@@ -33,6 +35,7 @@ export interface StudentListRow {
 export const STUDENT_LIST_COLUMNS = [
   { key: "studentNumber", header: "Student ID", nowrap: true },
   { key: "name", header: "Name" },
+  { key: "gender", header: "Gender", nowrap: true },
   { key: "status", header: "Status", nowrap: true },
   { key: "college", header: "College" },
   { key: "enrolmentYear", header: "Enrolment year", nowrap: true },
@@ -71,6 +74,10 @@ export async function getStudentListRows(
     rows: students.map((s) => ({
       studentNumber: s.studentNumber,
       name: listName(s),
+      // "—" for a student enrolled before gender was recorded, so the column
+      // reads as "not recorded" rather than as an empty cell that looks like
+      // a rendering fault.
+      gender: genderLabel(s.gender),
       status: s.status,
       college: collegeFor(s.departmentId),
       enrolmentYear: String(s.enrolmentYear),

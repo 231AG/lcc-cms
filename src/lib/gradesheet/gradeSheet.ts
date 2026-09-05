@@ -192,10 +192,10 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
       // The system has no separate "major" field: a student belongs to a
       // department, and that department IS their programme of study.
       major: department ? department.name : "—",
-      // ...and it has no minor at all. Printed as N/A rather than left
-      // blank, so the sheet says "not applicable" instead of looking
-      // like a field somebody forgot to fill in.
-      minor: "N/A",
+      // A minor is optional and most students have none, so an unset one
+      // still prints N/A -- "not applicable" rather than a blank that reads
+      // as a field somebody forgot to fill in.
+      minor: studentRow.minor || "N/A",
     },
     academicYearLabel: academicYear?.label ?? "—",
     semesterName: semesterDisplayName(semesterRow),

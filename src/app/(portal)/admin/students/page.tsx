@@ -101,6 +101,7 @@ export default async function StudentsPage({
     firstName: s.firstName,
     middleName: s.middleName,
     lastName: s.lastName,
+    gender: s.gender,
     status: s.status,
     collegeName: collegeForStudent(s.departmentId),
     enrolmentYear: s.enrolmentYear,
@@ -131,7 +132,12 @@ export default async function StudentsPage({
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:py-10">
       <StudentsHeader
         canEnrol={isAdmin}
-        departments={departments.map((d) => ({ id: d.id, code: d.code, name: d.name }))}
+        departments={departments.map((d) => ({
+          id: d.id,
+          name: d.name,
+          collegeId: d.collegeId,
+          collegeName: collegeLabel(d.collegeId),
+        }))}
       />
 
       {error && (

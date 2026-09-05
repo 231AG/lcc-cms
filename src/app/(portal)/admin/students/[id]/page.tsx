@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Award,
+  BookMarked,
   BookOpen,
   Building2,
   CalendarDays,
@@ -13,6 +14,7 @@ import {
   Phone,
   School,
   TrendingUp,
+  UserRound,
 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
@@ -29,8 +31,9 @@ import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
-import { Label, Input, Select } from "@/components/ui/Form";
+import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { GENDER_LABEL } from "@/lib/students/gender";
 import { updateStudentProfileAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
 
@@ -313,10 +316,31 @@ export default async function StudentDetailPage({
               {canEdit ? (
                 <form action={updateStudentProfileAction} className="flex flex-col gap-3">
                   <input type="hidden" name="studentId" value={record.id} />
+                  {/* Editable, and consequential: the Student ID is also how
+                      the student signs in, so saving a new one moves their
+                      login identifier and Auth account with it. */}
+                  <div>
+                    <Label htmlFor="studentNumber" className="text-xs">
+                      Student ID
+                      <Required />
+                    </Label>
+                    <Input
+                      id="studentNumber"
+                      name="studentNumber"
+                      defaultValue={record.studentNumber}
+                      required
+                      className="max-w-xs font-mono"
+                      aria-describedby="studentNumber-help"
+                    />
+                    <p id="studentNumber-help" className="mt-1 text-xs text-fg-muted">
+                      Changing this also changes how the student signs in.
+                    </p>
+                  </div>
                   <div className="flex flex-wrap gap-3">
                     <div className="min-w-32 flex-1">
                       <Label htmlFor="firstName" className="text-xs">
                         First name
+                        <Required />
                       </Label>
                       <Input id="firstName" name="firstName" defaultValue={record.firstName} required />
                     </div>
@@ -331,13 +355,30 @@ export default async function StudentDetailPage({
                     <div className="min-w-32 flex-1">
                       <Label htmlFor="lastName" className="text-xs">
                         Last name
+                        <Required />
                       </Label>
                       <Input id="lastName" name="lastName" defaultValue={record.lastName} required />
                     </div>
                   </div>
+                  {/* Surfaced whether or not it has a value: a student
+                      enrolled before gender existed has none, and an empty
+                      required-looking field is exactly the prompt to fill it
+                      in. The placeholder option is selectable so saving an
+                      unrelated edit does not force a value to be invented. */}
+                  <div>
+                    <Label htmlFor="gender" className="text-xs">
+                      Gender
+                    </Label>
+                    <Select id="gender" name="gender" defaultValue={record.gender ?? ""} className="max-w-xs">
+                      <option value="">Not recorded</option>
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                    </Select>
+                  </div>
                   <div>
                     <Label htmlFor="departmentId" className="text-xs">
                       Department
+                      <Required />
                     </Label>
                     <Select id="departmentId" name="departmentId" defaultValue={record.departmentId}>
                       {departments.map((d) => (
@@ -354,8 +395,14 @@ export default async function StudentDetailPage({
                     <Input id="enrolmentYear" name="enrolmentYear" type="number" defaultValue={record.enrolmentYear} className="w-32" />
                   </div>
                   <div>
+                    <Label htmlFor="minor" className="text-xs">
+                      Minor
+                    </Label>
+                    <Input id="minor" name="minor" defaultValue={record.minor ?? ""} placeholder="None" className="max-w-xs" />
+                  </div>
+                  <div>
                     <Label htmlFor="contactPhone" className="text-xs">
-                      Contact phone
+                      Phone
                     </Label>
                     <Input id="contactPhone" name="contactPhone" defaultValue={record.contactPhone ?? ""} className="max-w-xs" />
                   </div>
@@ -387,11 +434,17 @@ export default async function StudentDetailPage({
                   <Detail icon={Building2} label="Department">
                     {departmentLabel}
                   </Detail>
+                  <Detail icon={UserRound} label="Gender">
+                    {GENDER_LABEL[record.gender ?? ""] ?? "—"}
+                  </Detail>
+                  <Detail icon={BookMarked} label="Minor">
+                    {record.minor || "—"}
+                  </Detail>
                   <Detail icon={CalendarDays} label="Enrolment year">
                     {record.enrolmentYear}
                   </Detail>
-                  <Detail icon={Phone} label="Contact phone">
-                    {record.contactPhone || "Not recorded"}
+                  <Detail icon={Phone} label="Phone">
+                    {record.contactPhone || "—"}
                   </Detail>
                   <Detail icon={ClipboardList} label="Import status">
                     {record.historicalImportStatus}

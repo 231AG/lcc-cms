@@ -176,6 +176,13 @@
       "when": 1788400000000,
       "tag": "0024_semester_four_states",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788500000000,
+      "tag": "0025_student_gender_minor",
+      "breakpoints": true
     }
   ]
 }

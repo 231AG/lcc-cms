@@ -4,7 +4,13 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
-import { enrollStudent, resetStudentPassword, updateStudentProfile, type StudentStatus } from "@/lib/students/students";
+import {
+  enrollStudent,
+  resetStudentPassword,
+  updateStudentProfile,
+  type StudentGender,
+  type StudentStatus,
+} from "@/lib/students/students";
 
 export interface EnrollStudentState {
   error?: string;
@@ -29,8 +35,13 @@ export async function enrollStudentAction(
       firstName: String(formData.get("firstName") ?? ""),
       middleName: String(formData.get("middleName") ?? ""),
       lastName: String(formData.get("lastName") ?? ""),
+      gender: String(formData.get("gender") ?? "") as StudentGender,
+      // The College field is a UI affordance for narrowing the Department
+      // list; the record hangs off the department, which already names its
+      // college. Nothing reads a collegeId off the form.
       departmentId: String(formData.get("departmentId") ?? ""),
       enrolmentYear: Number(formData.get("enrolmentYear") ?? ""),
+      minor: String(formData.get("minor") ?? ""),
       contactPhone: String(formData.get("contactPhone") ?? ""),
     });
     revalidatePath("/admin/students");
@@ -67,15 +78,23 @@ export async function updateStudentProfileAction(formData: FormData): Promise<vo
   const studentId = String(formData.get("studentId") ?? "");
   const enrolmentYearRaw = String(formData.get("enrolmentYear") ?? "").trim();
   const contactPhoneRaw = String(formData.get("contactPhone") ?? "").trim();
+  const genderRaw = String(formData.get("gender") ?? "").trim();
   try {
     await updateStudentProfile(actor, studentId, {
+      studentNumber: String(formData.get("studentNumber") ?? ""),
       firstName: String(formData.get("firstName") ?? ""),
       // "" is a real instruction here (clear the middle name), so unlike the
       // required names this is passed through rather than coerced away.
       middleName: String(formData.get("middleName") ?? ""),
       lastName: String(formData.get("lastName") ?? ""),
+      // Left unset rather than sent as "" when the field is still blank on a
+      // student enrolled before gender existed, so submitting the form
+      // without touching it does not trip the CHECK.
+      gender: genderRaw ? (genderRaw as StudentGender) : undefined,
       departmentId: String(formData.get("departmentId") ?? ""),
       enrolmentYear: enrolmentYearRaw ? Number(enrolmentYearRaw) : undefined,
+      // "" is a real instruction here too: it clears a recorded minor.
+      minor: String(formData.get("minor") ?? ""),
       contactPhone: contactPhoneRaw || null,
       status: String(formData.get("status") ?? "") as StudentStatus,
     });

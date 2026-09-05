@@ -114,6 +114,7 @@ test("Admin enters a full past semester for a student in one save, then marks th
     studentNumber: `${yearBase}${Math.floor(1000 + Math.random() * 9000)}`,
     firstName: "E2E",
     lastName: "Historical",
+    gender: "FEMALE",
     departmentId: dept.id,
     enrolmentYear: yearBase,
   });
@@ -174,6 +175,7 @@ test("Super Admin sees a student's historical record read-only", async ({ page }
     studentNumber: `2017${Math.floor(1000 + Math.random() * 9000)}`,
     firstName: "ReadOnly",
     lastName: "Check",
+    gender: "FEMALE",
     departmentId: dept.id,
     enrolmentYear: 2017,
   });

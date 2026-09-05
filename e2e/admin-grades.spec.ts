@@ -157,6 +157,7 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
     studentNumber,
     firstName: "Grade",
     lastName: `Fixture-${studentNumber}`,
+    gender: "FEMALE",
     departmentId: dept.id,
     enrolmentYear,
   });

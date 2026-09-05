@@ -24,13 +24,21 @@ function isUniqueViolation(err: unknown): boolean {
 // Enrolment
 // ---------------------------------------------------------------------------
 
+export const STUDENT_GENDERS = ["MALE", "FEMALE"] as const;
+export type StudentGender = (typeof STUDENT_GENDERS)[number];
+
 export interface EnrollStudentInput {
   studentNumber: string;
   firstName: string;
   middleName?: string;
   lastName: string;
+  /** Required at enrolment; nullable in the column for students enrolled
+   *  before the field existed. */
+  gender: StudentGender;
   departmentId: string;
   enrolmentYear: number;
+  /** Optional secondary field of study, free text. */
+  minor?: string;
   contactPhone?: string;
 }
 
@@ -59,6 +67,7 @@ export async function enrollStudent(
   const middleName = input.middleName?.trim() || null;
   const lastName = input.lastName.trim();
   if (!firstName || !lastName) throw new ValidationError("First and last name are required.");
+  if (!STUDENT_GENDERS.includes(input.gender)) throw new ValidationError("Gender is required.");
 
   if (!Number.isInteger(input.enrolmentYear) || String(input.enrolmentYear) !== studentNumber.slice(0, 4)) {
     throw new ValidationError("Enrolment year must match the admission year encoded in the Student ID.");
@@ -71,6 +80,7 @@ export async function enrollStudent(
   const email = resolveLoginIdentifierToEmail(studentNumber);
   const temporaryPassword = generateTemporaryPassword();
   const contactPhone = input.contactPhone?.trim() || null;
+  const minor = input.minor?.trim() || null;
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
@@ -102,8 +112,10 @@ export async function enrollStudent(
         firstName,
         middleName,
         lastName,
+        gender: input.gender,
         departmentId: input.departmentId,
         enrolmentYear: input.enrolmentYear,
+        minor,
         contactPhone,
         createdBy: actor.userId,
       });
@@ -118,8 +130,10 @@ export async function enrollStudent(
           firstName,
           middleName,
           lastName,
+          gender: input.gender,
           departmentId: input.departmentId,
           enrolmentYear: input.enrolmentYear,
+          minor,
         },
       });
     });
@@ -139,14 +153,103 @@ export async function enrollStudent(
 // ---------------------------------------------------------------------------
 
 export interface UpdateStudentProfileInput {
+  /**
+   * The Student ID. Editable by an Admin (correcting a typo, or an ID
+   * issued wrongly), but it is not an ordinary column: it is also the
+   * student's login identifier and the seed of their synthetic Auth email,
+   * so changing it moves three things at once. See `changeStudentNumber`.
+   */
+  studentNumber?: string;
   firstName?: string;
   /** `null` clears a recorded middle name; `undefined` leaves it as it is. */
   middleName?: string | null;
   lastName?: string;
+  gender?: StudentGender;
   departmentId?: string;
   enrolmentYear?: number;
+  /** `null` clears a recorded minor; `undefined` leaves it as it is. */
+  minor?: string | null;
   contactPhone?: string | null;
   status?: StudentStatus;
+}
+
+/**
+ * Moves a Student ID, and everything that is derived from it, together.
+ *
+ * A Student ID is three things in this system: `student.student_number`,
+ * `app_user.login_identifier`, and -- via resolveLoginIdentifierToEmail --
+ * the synthetic email of the Supabase Auth user. Change one and leave the
+ * others and the student silently cannot sign in, which is the failure
+ * this function exists to make impossible.
+ *
+ * Two of the three are rows in Postgres and move in one transaction. The
+ * third is an external service that cannot join it, so the ordering is the
+ * same compensating pattern `enrollStudent` uses: change Auth first,
+ * because that is the step we can undo, then the database; if the database
+ * write fails, put the Auth email back before rethrowing.
+ *
+ * Uniqueness is the database's rule, not this function's guess: 0009's
+ * `student_number_unique_idx` is UNIQUE on `trim(student_number)`, so the
+ * pre-check below is a courtesy that produces a readable message, and the
+ * 23505 handler is what actually guarantees it under a concurrent edit.
+ *
+ * Note what is deliberately NOT enforced here: enrolment does require the
+ * ID's first four digits to match the enrolment year, but an edit does
+ * not. Confirmed with the owner -- an Admin fixing a mis-typed admission
+ * year needs to change one field at a time, and the year is separately
+ * editable on the same form.
+ */
+async function changeStudentNumber(
+  actor: Actor,
+  studentId: string,
+  oldNumber: string,
+  newNumber: string,
+): Promise<void> {
+  if (!isValidStudentId(newNumber)) {
+    throw new ValidationError('Student ID must be digits only, starting with the admission year (e.g. "202634").');
+  }
+
+  const clash = await db.query.student.findFirst({
+    where: and(eq(student.studentNumber, newNumber), sql`${student.id} <> ${studentId}`),
+  });
+  if (clash) throw new ValidationError(`Student ID "${newNumber}" is already in use.`);
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(studentId, {
+    email: resolveLoginIdentifierToEmail(newNumber),
+  });
+  if (error) {
+    if (error.message?.toLowerCase().includes("already")) {
+      throw new ValidationError(`Student ID "${newNumber}" is already in use.`);
+    }
+    throw new Error(`Failed to update the sign-in account: ${error.message}`);
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(student).set({ studentNumber: newNumber }).where(eq(student.id, studentId));
+      await tx.update(appUser).set({ loginIdentifier: newNumber }).where(eq(appUser.id, studentId));
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "STUDENT_NUMBER_CHANGED",
+        entityType: "student",
+        entityId: studentId,
+        oldValue: { studentNumber: oldNumber },
+        newValue: { studentNumber: newNumber },
+      });
+    });
+  } catch (err) {
+    // Put the sign-in account back the way it was, so a failed edit leaves
+    // the student able to log in with the ID they still have.
+    await admin.auth.admin
+      .updateUserById(studentId, { email: resolveLoginIdentifierToEmail(oldNumber) })
+      .catch(() => {});
+    if (isUniqueViolation(err)) {
+      throw new ValidationError(`Student ID "${newNumber}" is already in use.`);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -166,6 +269,14 @@ export async function updateStudentProfile(
   const existing = await db.query.student.findFirst({ where: eq(student.id, studentId) });
   if (!existing) throw new ValidationError("Student not found.");
 
+  // Done before the field diff below, and separately from it, because it is
+  // the one edit on this form that also touches Supabase Auth. If it throws,
+  // nothing else has been written yet.
+  const requestedNumber = input.studentNumber?.trim();
+  if (requestedNumber && requestedNumber !== existing.studentNumber) {
+    await changeStudentNumber(actor, studentId, existing.studentNumber, requestedNumber);
+  }
+
   if (input.departmentId && input.departmentId !== existing.departmentId) {
     const dept = await db.query.department.findFirst({ where: eq(department.id, input.departmentId) });
     if (!dept) throw new ValidationError("Department not found.");
@@ -177,28 +288,41 @@ export async function updateStudentProfile(
   // absent key falls back to the stored value, but a blank one clears it.
   const newMiddleName = input.middleName === undefined ? existing.middleName : input.middleName?.trim() || null;
   const newLastName = input.lastName?.trim() || existing.lastName;
+  const newGender = input.gender ?? (existing.gender as StudentGender | null);
   const newDepartmentId = input.departmentId ?? existing.departmentId;
   const newEnrolmentYear = input.enrolmentYear ?? existing.enrolmentYear;
+  // Same rule as middleName: an absent key keeps the stored value, a blank
+  // one clears it.
+  const newMinor = input.minor === undefined ? existing.minor : input.minor?.trim() || null;
   const newContactPhone = input.contactPhone === undefined ? existing.contactPhone : input.contactPhone;
   const newStatus = input.status ?? (existing.status as StudentStatus);
 
   if (input.status && !STUDENT_STATUSES.includes(input.status)) {
     throw new ValidationError(`Invalid status "${input.status}".`);
   }
+  if (input.gender && !STUDENT_GENDERS.includes(input.gender)) {
+    throw new ValidationError(`Invalid gender "${input.gender}".`);
+  }
 
   const allFields: Array<[string, unknown, unknown]> = [
     ["firstName", existing.firstName, newFirstName],
     ["middleName", existing.middleName, newMiddleName],
     ["lastName", existing.lastName, newLastName],
+    ["gender", existing.gender, newGender],
     ["departmentId", existing.departmentId, newDepartmentId],
     ["enrolmentYear", existing.enrolmentYear, newEnrolmentYear],
+    ["minor", existing.minor, newMinor],
     ["contactPhone", existing.contactPhone, newContactPhone],
     ["status", existing.status, newStatus],
   ];
   const changedFields = allFields.filter(([, oldV, newV]) => oldV !== newV);
 
   if (changedFields.length === 0) {
-    return existing;
+    // The ID edit above is not one of the diffed fields, so re-read rather
+    // than returning the stale snapshot when it was the only change.
+    return requestedNumber && requestedNumber !== existing.studentNumber
+      ? ((await db.query.student.findFirst({ where: eq(student.id, studentId) })) ?? existing)
+      : existing;
   }
 
   const oldValue = Object.fromEntries(changedFields.map(([key, oldV]) => [key, oldV]));
@@ -213,8 +337,10 @@ export async function updateStudentProfile(
         firstName: newFirstName,
         middleName: newMiddleName,
         lastName: newLastName,
+        gender: newGender,
         departmentId: newDepartmentId,
         enrolmentYear: newEnrolmentYear,
+        minor: newMinor,
         contactPhone: newContactPhone,
         status: newStatus,
       })

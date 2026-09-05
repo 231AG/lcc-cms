@@ -97,6 +97,7 @@ async function enrollTestStudent() {
     studentNumber,
     firstName: "Test",
     lastName: `Student-${studentNumber}`,
+    gender: "FEMALE",
     departmentId,
     enrolmentYear,
   });

@@ -79,8 +79,31 @@ export const OFFERING_COLUMNS = [
  */
 export const DAY_LETTER = ["", "M", "T", "W", "Th", "F", "S", "Su"];
 
-/** The full names, for a tooltip on the abbreviation. */
+/** Three-letter forms, used when a slot meets on exactly two days. */
+export const DAY_SHORT = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** The full names: the one-day form, and the tooltip behind an abbreviation. */
 export const DAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/**
+ * How a slot's days are written, which depends on how many there are.
+ *
+ * Three or more run together as letters ("MWF"), which is how a printed
+ * timetable writes a standard weekly pattern and how staff already read one.
+ * Two are spelled as three-letter names separated by a comma ("Mon, Wed") --
+ * a two-letter run like "MW" is short enough to be misread as one token, and
+ * there is room for the clearer form. One is spelled out in full ("Monday"),
+ * because a lone abbreviation saves nothing and costs a moment's decoding.
+ *
+ * Days arrive in week order and are kept that way: "Mon, Wed" not "Wed, Mon".
+ */
+export function formatDays(days: number[]): string {
+  const ordered = [...days].sort((a, b) => a - b);
+  if (ordered.length === 0) return "";
+  if (ordered.length === 1) return DAY_NAMES[ordered[0]] ?? "";
+  if (ordered.length === 2) return ordered.map((d) => DAY_SHORT[d] ?? "").join(", ");
+  return ordered.map((d) => DAY_LETTER[d] ?? "").join("");
+}
 
 /** "13:30:00" -> "13:30". Postgres `time` comes back with seconds nobody
  *  schedules a class to. */
@@ -88,10 +111,23 @@ function shortTime(value: string): string {
   return value.slice(0, 5);
 }
 
-/** The full day names behind an abbreviation like "MWF", for its tooltip. */
-export function expandDays(abbreviation: string): string {
-  if (!abbreviation) return "";
-  const parts = abbreviation.match(/Th|Su|[MTWFS]/g) ?? [];
+/**
+ * The full day names behind whatever `formatDays` produced, for a tooltip.
+ *
+ * The two- and one-day forms are already full or near-full words, so this
+ * only has real work to do on the concatenated three-or-more form; the
+ * others are normalised to full names so every tooltip reads the same way.
+ */
+export function expandDays(formatted: string): string {
+  if (!formatted) return "";
+  if (formatted.includes(",")) {
+    return formatted
+      .split(",")
+      .map((part) => DAY_NAMES[DAY_SHORT.indexOf(part.trim())] ?? part.trim())
+      .join(", ");
+  }
+  if (DAY_NAMES.includes(formatted)) return formatted;
+  const parts = formatted.match(/Th|Su|[MTWFS]/g) ?? [];
   return parts.map((p) => DAY_NAMES[DAY_LETTER.indexOf(p)] ?? p).join(", ");
 }
 
@@ -172,7 +208,7 @@ export async function getOfferingRows(actor: Actor, semesterId: string): Promise
       rows.push({
         ...base,
         room: slot.room,
-        day: [...slot.days].sort((a, b) => a - b).map((d) => DAY_LETTER[d] ?? "").join(""),
+        day: formatDays(slot.days),
         startTime: slot.start,
         endTime: slot.end,
         meetingIds: slot.ids.join(","),

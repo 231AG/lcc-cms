@@ -3,6 +3,7 @@ import { Eye, Pencil } from "lucide-react";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { fullName, initials, listName } from "@/lib/students/name";
+import { genderLabel } from "@/lib/students/gender";
 
 /**
  * The Students table.
@@ -22,6 +23,8 @@ export interface StudentRow {
   firstName: string;
   middleName: string | null;
   lastName: string;
+  /** NULL for a student enrolled before the field existed. */
+  gender: string | null;
   status: string;
   /** The college's name on its own -- the page resolves it. */
   collegeName: string;
@@ -55,6 +58,7 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
         <tr>
           <Th className="px-2 sm:px-3">Student ID</Th>
           <Th className="px-2 sm:px-3">Name</Th>
+          <Th className="hidden lg:table-cell px-2 sm:px-3">Gender</Th>
           <Th className="px-2 sm:px-3">Status</Th>
           {/* College and Enrolment year are the two that drop first on a
               narrow screen -- Student ID, Name, Status and Actions stay
@@ -78,6 +82,9 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
                 </span>
                 <span className="font-medium text-fg">{listName(s)}</span>
               </span>
+            </Td>
+            <Td className="hidden lg:table-cell px-2 whitespace-nowrap text-fg-secondary sm:px-3">
+              {genderLabel(s.gender)}
             </Td>
             <Td className="px-2 sm:px-3">
               <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{s.status}</Badge>

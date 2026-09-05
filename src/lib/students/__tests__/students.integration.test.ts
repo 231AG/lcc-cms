@@ -49,6 +49,7 @@ async function enrollTestStudent(overrides: Partial<Parameters<typeof enrollStud
     studentNumber,
     firstName: "Test",
     lastName: `Student-${studentNumber}`,
+    gender: "FEMALE",
     departmentId,
     enrolmentYear,
     ...overrides,
@@ -119,6 +120,7 @@ describe("enrollStudent", () => {
         studentNumber: enrolled.studentNumber,
         firstName: "Duplicate",
         lastName: "Attempt",
+        gender: "FEMALE",
         departmentId,
         enrolmentYear: 2026,
       }),
@@ -131,6 +133,7 @@ describe("enrollStudent", () => {
         studentNumber: "not-a-valid-id",
         firstName: "Bad",
         lastName: "Id",
+        gender: "FEMALE",
         departmentId,
         enrolmentYear: 2026,
       }),
@@ -144,6 +147,7 @@ describe("enrollStudent", () => {
         studentNumber,
         firstName: "Mismatch",
         lastName: "Year",
+        gender: "FEMALE",
         departmentId,
         enrolmentYear: 2020,
       }),
@@ -160,6 +164,7 @@ describe("enrollStudent", () => {
         studentNumber,
         firstName: "Inactive",
         lastName: "Dept",
+        gender: "FEMALE",
         departmentId: inactiveDept.id,
         enrolmentYear,
       }),
@@ -169,10 +174,10 @@ describe("enrollStudent", () => {
   it("refuses a Student and a Super Admin", async () => {
     const { studentNumber, enrolmentYear } = makeStudentNumber();
     await expect(
-      enrollStudent(studentActor, { studentNumber, firstName: "A", lastName: "B", departmentId, enrolmentYear }),
+      enrollStudent(studentActor, { studentNumber, firstName: "A", lastName: "B", gender: "FEMALE", departmentId, enrolmentYear }),
     ).rejects.toThrow(ForbiddenError);
     await expect(
-      enrollStudent(superAdminActor, { studentNumber, firstName: "A", lastName: "B", departmentId, enrolmentYear }),
+      enrollStudent(superAdminActor, { studentNumber, firstName: "A", lastName: "B", gender: "FEMALE", departmentId, enrolmentYear }),
     ).rejects.toThrow(ForbiddenError);
   });
 });
