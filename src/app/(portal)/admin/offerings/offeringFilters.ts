@@ -1,5 +1,6 @@
 import { asUser } from "@/lib/db/asUser";
 import type { Actor } from "@/lib/permissions/kernel";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { filterOfferingRows, getOfferingRows, type OfferingRow } from "@/lib/offerings/offeringRows";
 
 /**
@@ -38,7 +39,7 @@ export async function getFilteredOfferingRows(
 
   return {
     rows: filterOfferingRows(rows, params.q, params.collegeId, collegeLabel),
-    semesterLabel: semester && year ? `${year.label} — ${semester.name}` : "",
+    semesterLabel: semesterFullLabel(year, semester),
     collegeLabel,
   };
 }

@@ -21,6 +21,11 @@ import {
 
 export const metadata: Metadata = { title: "Student Listing" };
 
+/** Icon controls carry a tooltip and an accessible name; this is their look. */
+const iconAction =
+  "rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+
 /**
  * A-09 (Admin: search, enrol, quick links to edit) and X-07 (Super Admin:
  * same search, read-only -- Section 20.5/20.6) combined onto one page, the
@@ -77,10 +82,11 @@ export default async function StudentsPage({
     getEnrolmentYears(actor),
   ]);
 
-  const collegeLabel = (id: string) => {
-    const c = colleges.find((c) => c.id === id);
-    return c ? `${c.code} — ${c.name}` : id;
-  };
+  // The college's NAME, without its code. The code is an internal key; on a
+  // listing a reader is scanning for "Faculty of Science & Technology", and
+  // the "FST — " prefix in front of every row is noise they have to look
+  // past. It is still what the filter dropdown is keyed on, just not shown.
+  const collegeLabel = (id: string) => colleges.find((c) => c.id === id)?.name ?? id;
   // A student's college is reached through their department. An inactive
   // department (or one from an inactive college) is not in either list, so
   // fall back to the raw id rather than showing an empty cell.
@@ -143,20 +149,16 @@ export default async function StudentsPage({
               {hasFilters ? " matching the current filters" : " enrolled"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Both act on every row matching the current filters, across
-                every page -- not just what is on screen, and not the whole
-                unfiltered table. */}
-            <a href={exportHref} className="flex items-center gap-1.5 text-sm font-medium text-brand-fg hover:underline">
-              <Download className="h-3.5 w-3.5" aria-hidden="true" />
-              Export CSV
+          {/* Icon-only, with a tooltip and a matching accessible name on
+              each. Both act on every row matching the current filters,
+              across every page -- not just what is on screen, and not the
+              whole unfiltered table. */}
+          <div className="flex flex-wrap items-center gap-1">
+            <a href={exportHref} title="Export to CSV" aria-label="Export to CSV" className={iconAction}>
+              <Download className="h-4 w-4" aria-hidden="true" />
             </a>
-            <Link href={printHref} className="flex items-center gap-1.5 text-sm font-medium text-brand-fg hover:underline">
-              <Printer className="h-3.5 w-3.5" aria-hidden="true" />
-              Print (PDF)
-            </Link>
-            <Link href="/admin/historical/progress" className="text-sm font-medium text-brand-fg hover:underline">
-              Historical import progress
+            <Link href={printHref} title="Print (PDF)" aria-label="Print (PDF)" className={iconAction}>
+              <Printer className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
         </div>
@@ -197,7 +199,7 @@ export default async function StudentsPage({
               <option value="">All colleges</option>
               {colleges.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.code} — {c.name}
+                  {c.name}
                 </option>
               ))}
             </Select>

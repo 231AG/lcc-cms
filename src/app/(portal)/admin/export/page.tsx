@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Download } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterDisplayName } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { countUnpublishedGrades } from "@/lib/export/academicExport";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -60,7 +61,7 @@ export default async function ExportPage() {
                 <CardBody className="flex flex-col gap-1 py-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-fg">
-                      {yearLabel(s.academicYearId)} — {s.name} <span className="text-xs text-fg-muted">({s.state})</span>
+                      {yearLabel(s.academicYearId)} — {semesterDisplayName(s)} <span className="text-xs text-fg-muted">({s.state})</span>
                     </span>
                     <a href={`/admin/export/${s.id}`} className="flex items-center gap-1 text-sm font-medium text-brand-fg hover:underline">
                       <Download className="h-3.5 w-3.5" aria-hidden="true" />

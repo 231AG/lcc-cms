@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
 import { fullName, initials, listName } from "@/lib/students/name";
@@ -170,7 +171,7 @@ export default async function StudentDetailPage({
   const yearLabel = (semesterId: string) => {
     const sem = semesters.find((s) => s.id === semesterId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semesterId;
+    return semesterFullLabel(year, sem, semesterId);
   };
   const courseLabel = (courseId: string) => {
     const c = courses.find((c) => c.id === courseId);

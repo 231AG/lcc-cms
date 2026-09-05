@@ -70,7 +70,7 @@ export default async function GradeSheetPage({
   const canEditSignatories = await can(actor, "institution.manageSignatories");
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 outline-none print:p-0">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-6 outline-none print:max-w-none print:p-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-lg font-semibold text-fg">

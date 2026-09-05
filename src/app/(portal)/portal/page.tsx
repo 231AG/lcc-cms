@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { fullName } from "@/lib/students/name";
 import { getStudent } from "@/lib/students/students";
@@ -63,7 +64,7 @@ export default async function PortalPage() {
       const sem = semesters.find((s) => s.id === semesterId);
       const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
       return sem && year
-        ? { label: `${year.label} — ${sem.name}`, sortKey: { yearStart: new Date(year.startDate).getFullYear(), sequence: sem.sequence as 1 | 2 } }
+        ? { label: semesterFullLabel(year, sem), sortKey: { yearStart: new Date(year.startDate).getFullYear(), sequence: sem.sequence as 1 | 2 } }
         : null;
     };
     const semesterSummaryFor = (semesterId: string) => semesterSummaries.find((s) => s.semesterId === semesterId);

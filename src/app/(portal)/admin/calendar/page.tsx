@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterDisplayName } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import {
   isDeletable,
@@ -201,7 +202,17 @@ export default async function CalendarPage({
                   <Tr key={s.id} className="align-top">
                     <Td>{yearLabel(s.academicYearId)}</Td>
                     <Td className="hidden sm:table-cell">{s.sequence}</Td>
-                    <Td className="font-medium text-fg">{s.name}</Td>
+                    <Td className="font-medium text-fg">
+                      {semesterDisplayName(s)}
+                      {/* The name an Admin typed, kept underneath rather than
+                          dropped: the College reads its terms as "Semester I"
+                          and "Semester II", but the stored label is still what
+                          the create form asks for and what tells two
+                          differently-named terms apart. */}
+                      {s.name !== semesterDisplayName(s) && (
+                        <span className="mt-0.5 block text-xs font-normal text-fg-muted">{s.name}</span>
+                      )}
+                    </Td>
                     <Td className="hidden whitespace-nowrap text-xs text-fg-secondary md:table-cell">
                       {s.startDate} &ndash; {s.endDate}
                     </Td>

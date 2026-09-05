@@ -89,12 +89,29 @@ export async function addMeetingAction(formData: FormData): Promise<void> {
   redirect(`/admin/offerings?semesterId=${semesterId}`);
 }
 
+/**
+ * Removes a whole timetable slot.
+ *
+ * A row in the offerings table is one room at one time, and the days it meets
+ * on are collapsed into it -- so an "MWF 09:00-10:30 in B4" row is three
+ * `offering_meeting` rows and removing it has to remove all three. Removing
+ * only Monday's and leaving Wednesday and Friday behind would silently do a
+ * third of what the button says.
+ *
+ * Sequential rather than parallel: `removeMeeting` audits each deletion, and
+ * three of them at once through the same connection buys nothing at this size.
+ */
 export async function removeMeetingAction(formData: FormData): Promise<void> {
   const actor = await requireActor();
   const semesterId = String(formData.get("semesterId") ?? "");
-  const meetingId = String(formData.get("meetingId") ?? "");
+  const meetingIds = String(formData.get("meetingIds") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
   try {
-    await removeMeeting(actor, meetingId);
+    for (const meetingId of meetingIds) {
+      await removeMeeting(actor, meetingId);
+    }
   } catch (err) {
     if (err instanceof AppError) errorRedirect(semesterId, err.message);
     throw err;

@@ -36,12 +36,18 @@ const CSS = `
   --gs-text: #2a2135;
   --gs-muted: #6b5a7d;
   --gs-gpa-highlight: #f7ead0;
-  --gs-paper: #fffdf5;
+  /* White paper. The reference mock had a cream ground; on a real printer
+     that is either ignored or eats a cartridge, and the purple/gold marks
+     read cleaner on white anyway. */
+  --gs-paper: #ffffff;
 
-  width: 210mm;
-  min-height: 297mm;
+  /* A4 landscape. The sheet is wide rather than tall so the courses table
+     and the three summary cards each get real width, and the whole document
+     lands on one page with margins that are not apologetic. */
+  width: 297mm;
+  min-height: 210mm;
   margin: 0 auto;
-  padding: 12mm;
+  padding: 10mm 12mm;
   box-sizing: border-box;
   background: var(--gs-paper);
   color: var(--gs-text);
@@ -53,7 +59,7 @@ const CSS = `
      so the gap between them is a real, controllable distance. */
   border: 4px double var(--gs-gold);
   outline: 1px solid var(--gs-purple);
-  outline-offset: -6mm;
+  outline-offset: -5mm;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
@@ -64,29 +70,29 @@ const CSS = `
 /* A grid, not flex: the two seal columns are a fixed physical size and the
    title column is exactly what is left, so the name can be sized to fit a
    known width instead of overflowing a flex item that has no fixed share. */
+/* The seals flank the wordmark rather than sitting out at the page edges --
+   a centred row, so the mark and the name read as one masthead. */
 .gs-header {
-  display: grid;
-  grid-template-columns: 24mm 1fr 24mm;
+  display: flex;
   align-items: center;
-  gap: 5mm;
-  padding: 2mm 3mm 4mm;
+  justify-content: center;
+  gap: 10mm;
+  padding: 1mm 3mm 3mm;
 }
 /* The seal artwork is a PNG on a white ground, and the sheet's paper is
    cream -- multiply drops the white square into the paper without needing
    a second, alpha-cut copy of the asset. */
-.gs-seal { width: 24mm; height: 24mm; object-fit: contain; mix-blend-mode: multiply; }
-.gs-titles { text-align: center; min-width: 0; }
+.gs-seal { width: 30mm; height: 30mm; flex: 0 0 auto; object-fit: contain; mix-blend-mode: multiply; }
+.gs-titles { text-align: center; min-width: 0; flex: 0 1 auto; }
 .gs-college {
   font-family: "DejaVu Serif", Georgia, serif;
   font-weight: 700;
-  font-size: 16.5pt;
+  font-size: 19pt;
   letter-spacing: 0.01em;
   color: var(--gs-purple);
   margin: 0;
-  /* The reference's "must fit between the seals" rule. Sized so it fits the
-     grid's middle column at A4 with room to spare, and kept on one line so
-     that a longer institution name would be visibly wrong rather than
-     silently reflowing the letterhead. */
+  /* Kept on one line, so a longer institution name would be visibly wrong
+     rather than silently reflowing the letterhead. */
   white-space: nowrap;
 }
 .gs-address {
@@ -188,9 +194,15 @@ const CSS = `
 .gs-gpa-value { font-weight: 700; font-size: 16pt; color: var(--gs-purple-dark); }
 
 /* ---- Signature block ---- */
-.gs-signatures { margin-top: 8mm; }
+.gs-signatures { margin-top: 6mm; }
 .gs-sign-line { border-bottom: 1px solid var(--gs-text); min-width: 52mm; height: 6mm; }
-.gs-sign-row { display: flex; gap: 8mm; align-items: flex-end; margin-bottom: 6mm; }
+/* Signed at the left margin, Approved at the right -- and "right" is the
+   content width, so the block lines up with the table above it instead of
+   drifting past its edge. */
+.gs-sign-row { display: flex; gap: 8mm; align-items: flex-end; justify-content: space-between; margin-bottom: 5mm; }
+.gs-sign-block { flex: 0 0 auto; max-width: 46%; }
+.gs-sign-block--right { text-align: right; }
+.gs-sign-block--right .gs-sign-field { justify-content: flex-end; }
 .gs-sign-field { display: flex; align-items: flex-end; gap: 2mm; }
 .gs-sign-caption { text-align: center; font-size: 8.5pt; margin-top: 1mm; }
 .gs-sign-name { font-weight: 700; }
@@ -201,7 +213,7 @@ const CSS = `
 
 /* ---- Print ---- */
 @media print {
-  @page { size: A4 portrait; margin: 0; }
+  @page { size: A4 landscape; margin: 0; }
   .gs { border-width: 4px; margin: 0; box-shadow: none; }
   /* A long semester can spill onto a second sheet; when it does, the
      course table repeats its header rather than orphaning bare rows. */
@@ -210,7 +222,7 @@ const CSS = `
   .gs-bottom, .gs-signatures { break-inside: avoid; }
 }
 
-@media screen and (max-width: 220mm) {
+@media screen and (max-width: 310mm) {
   /* On a phone the fixed A4 width would force a horizontal page scroll.
      Scaling the whole sheet keeps the layout honest -- it still looks like
      the page that will come out of the printer, just smaller. */
@@ -333,7 +345,7 @@ export function GradeSheetDocument({ data, sealSrc = "/lcc-logo.png" }: { data: 
           </section>
 
           <section className="gs-card gs-scale">
-            <h2 className="gs-card-head">Grading Scale</h2>
+            <h2 className="gs-card-head">Grading System</h2>
             <div className="gs-card-body">
               <table className="gs-scale-table">
                 <tbody>
@@ -384,7 +396,7 @@ export function GradeSheetDocument({ data, sealSrc = "/lcc-logo.png" }: { data: 
             </div>
           </div>
           <div className="gs-sign-row">
-            <div>
+            <div className="gs-sign-block">
               <div className="gs-sign-field">
                 <span>Signed:</span>
                 <span className="gs-sign-line" />
@@ -395,7 +407,7 @@ export function GradeSheetDocument({ data, sealSrc = "/lcc-logo.png" }: { data: 
                 <span className="gs-sign-title">{signatories.signedTitle}</span>
               </p>
             </div>
-            <div>
+            <div className="gs-sign-block gs-sign-block--right">
               <div className="gs-sign-field">
                 <span>Approved:</span>
                 <span className="gs-sign-line" />

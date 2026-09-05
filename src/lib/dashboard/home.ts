@@ -6,6 +6,7 @@ import { countPlansAwaitingApproval } from "@/lib/planning/planning";
 import { getSubmissionQueue, getCorrectionQueue } from "@/lib/grades/grades";
 import { getImportProgressReport } from "@/lib/historical/historical";
 import { ACTIVE_SEMESTER_STATES, isGradeEntryOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { semesterDisplayName } from "@/lib/academic/semesterName";
 
 /** The states with live work in them: a published semester students are
  *  planning in, and one whose term is running. Draft has nothing in it yet
@@ -100,6 +101,6 @@ export async function getSuperAdminHomeSummary(actor: Actor): Promise<SuperAdmin
   return {
     submissionsAwaitingApproval: submissions.filter((s) => s.status !== "CLOSED").length,
     correctionsAwaitingDecision: corrections.length,
-    semesterStates: semesters.map((s) => ({ id: s.id, label: `${yearLabel(s.academicYearId)} — ${s.name}`, state: s.state })),
+    semesterStates: semesters.map((s) => ({ id: s.id, label: `${yearLabel(s.academicYearId)} — ${semesterDisplayName(s)}`, state: s.state })),
   };
 }

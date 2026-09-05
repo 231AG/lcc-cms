@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { fullName, listName } from "@/lib/students/name";
 import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { asUser } from "@/lib/db/asUser";
@@ -84,7 +85,7 @@ export default async function StudentPlanEntryPage({
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semId;
+    return semesterFullLabel(year, sem, semId);
   };
 
   // Same definition of "the current semester" the student-facing page uses,

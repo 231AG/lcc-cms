@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { fullName } from "@/lib/students/name";
 import { isPlanningOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { asUser } from "@/lib/db/asUser";
@@ -58,7 +59,7 @@ export default async function PlanningQueuePage({
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semId;
+    return semesterFullLabel(year, sem, semId);
   };
 
   // Default to the semester currently open for registration -- same

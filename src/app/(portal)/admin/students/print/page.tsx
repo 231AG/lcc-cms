@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
-import { getStudentListRows, STUDENT_LIST_COLUMNS } from "@/lib/students/studentListRows";
+import { getStudentListRows, STUDENT_PRINT_COLUMNS } from "@/lib/students/studentListRows";
 import { Alert } from "@/components/ui/Alert";
 import { buttonClasses } from "@/components/ui/Button";
 import { PrintReport } from "@/components/print/PrintReport";
@@ -40,7 +40,7 @@ export default async function PrintStudentsPage({ searchParams }: { searchParams
   const backHref = `/admin/students${filterSearchParams(filters).toString() ? `?${filterSearchParams(filters)}` : ""}`;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 outline-none print:p-0">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 outline-none print:max-w-none print:p-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-lg font-semibold text-fg">Student listing — print preview</h1>
@@ -60,11 +60,11 @@ export default async function PrintStudentsPage({ searchParams }: { searchParams
         </Alert>
       )}
 
-      <div className="rounded-lg bg-white p-6 shadow-sm print:rounded-none print:p-0 print:shadow-none">
+      <div className="overflow-x-auto rounded-lg bg-white p-6 shadow-sm print:overflow-visible print:rounded-none print:p-0 print:shadow-none">
         <PrintReport
           title="STUDENT LISTING"
           subtitle={describeFilters(filters, collegeName)}
-          columns={STUDENT_LIST_COLUMNS}
+          columns={STUDENT_PRINT_COLUMNS}
           rows={rows}
           emptyMessage="No student matches these filters."
         />

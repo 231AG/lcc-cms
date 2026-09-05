@@ -40,7 +40,7 @@ export default async function PrintOfferingsPage({ searchParams }: { searchParam
   if (params.collegeId) backSearch.set("collegeId", params.collegeId);
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 outline-none print:p-0">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 outline-none print:max-w-none print:p-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-lg font-semibold text-fg">Course offerings — print preview</h1>
@@ -54,7 +54,7 @@ export default async function PrintOfferingsPage({ searchParams }: { searchParam
         </div>
       </div>
 
-      <div className="rounded-lg bg-white p-6 shadow-sm print:rounded-none print:p-0 print:shadow-none">
+      <div className="overflow-x-auto rounded-lg bg-white p-6 shadow-sm print:overflow-visible print:rounded-none print:p-0 print:shadow-none">
         <PrintReport
           title="COURSE OFFERINGS"
           subtitle={describeOfferingFilters(semesterLabel, params.q, collegeLabel)}

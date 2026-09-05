@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Printer } from "lucide-react";
+import { Download, Pencil, Printer, Trash2 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
-import { getOfferingRows, filterOfferingRows, DAY_SHORT, DAY_NAMES } from "@/lib/offerings/offeringRows";
+import {
+  DAY_LETTER,
+  expandDays,
+  filterOfferingRows,
+  getOfferingRows,
+  isOfferingSortColumn,
+  sortOfferingRows,
+} from "@/lib/offerings/offeringRows";
 import { isOfferingEditable, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -12,7 +20,7 @@ import { Badge } from "@/components/ui/Badge";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select } from "@/components/ui/Form";
-import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { Table, Thead, Th, Tr, Td, SortableTh, type SortDirection } from "@/components/ui/Table";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   addMeetingAction,
@@ -27,18 +35,27 @@ export const metadata: Metadata = { title: "Course offerings" };
 
 const PAGE_SIZE = 25;
 
+/** Icon controls carry a tooltip and a matching accessible name. */
+const iconAction =
+  "rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+const iconDanger =
+  "rounded-md p-1.5 text-fg-muted transition-colors hover:bg-danger-surface hover:text-danger-fg " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+
 /**
  * A-08 (plan Section 20.4, Stage 8): the semester's offerings, sections and
  * meeting times.
  *
- * ONE TABLE FOR EVERY ROLE. Admin and Super Admin used to get the same list
- * rendered as a stack of cards, with the Admin's controls interleaved; it is
- * now a single table with the twelve columns a timetable actually needs, and
- * the Admin's management controls hang off a per-offering disclosure in the
- * last column. Same data, same permissions, one view.
+ * ONE TABLE FOR EVERY ROLE, laid out like the Students listing: search first
+ * in the filter row, sortable headings, icon actions with tooltips, and
+ * pagination under the table. The Admin's management controls hang off a
+ * per-offering disclosure in the last column; a Super Admin sees the same
+ * table with that column absent, and no other role can reach this page at all.
  *
- * A row is a MEETING, not an offering -- see offeringRows.ts for why, and
- * for why the requested "Date" column is headed "Day".
+ * A row is a TIMETABLE SLOT -- a room at a time, with its days collapsed into
+ * "MWF" -- not a single meeting. See offeringRows.ts for why, and for why the
+ * originally requested "Date" column is headed "Day".
  *
  * Choosing a semester fetches immediately (`data-auto-submit`), with the
  * button still there for the no-JavaScript path.
@@ -46,10 +63,18 @@ const PAGE_SIZE = 25;
 export default async function OfferingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semesterId?: string; error?: string; q?: string; collegeId?: string; page?: string }>;
+  searchParams: Promise<{
+    semesterId?: string;
+    error?: string;
+    q?: string;
+    collegeId?: string;
+    page?: string;
+    sort?: string;
+    dir?: string;
+  }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId, error, q, collegeId, page } = await searchParams;
+  const { semesterId, error, q, collegeId, page, sort, dir } = await searchParams;
 
   if (!actor)
     return (
@@ -77,26 +102,29 @@ export default async function OfferingsPage({
   const semesterLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semId;
+    return semesterFullLabel(year, sem, semId);
   };
   const selectedSemester = semesterId ? semesters.find((s) => s.id === semesterId) : undefined;
   const canManage = isAdmin && selectedSemester ? isOfferingEditable(selectedSemester.state as SemesterState) : false;
 
   const allRows = semesterId ? await getOfferingRows(actor, semesterId) : [];
-  const collegeLabel = collegeId ? (() => {
-    const c = colleges.find((c) => c.id === collegeId);
-    return c ? `${c.code} — ${c.name}` : undefined;
-  })() : undefined;
-  const rows = filterOfferingRows(allRows, q, collegeId, collegeLabel);
+  const collegeLabel = collegeId ? colleges.find((c) => c.id === collegeId)?.name : undefined;
+  const filtered = filterOfferingRows(allRows, q, collegeId, collegeLabel);
+
+  // An unrecognised sort key falls back to course code rather than throwing:
+  // these arrive from the URL, which anyone can edit.
+  const sortColumn = isOfferingSortColumn(sort) ? sort : "code";
+  const sortDirection: SortDirection = dir === "desc" ? "desc" : "asc";
+  const rows = sortOfferingRows(filtered, sortColumn, sortDirection);
 
   const pageNum = Math.max(1, Number(page) || 1);
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const pageRows = rows.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE);
 
-  // Every offering's meetings sit on consecutive rows, so the management
-  // controls are attached to the first row of each offering -- repeating
-  // them beside every meeting time would be the same three buttons over
-  // and over for one section.
+  // An offering's slots sit on consecutive rows, so the management controls
+  // are attached to the first slot of each offering -- repeating Publish and
+  // Cancel beside every timetable slot would be the same buttons over and
+  // over for one section.
   const firstRowOfOffering = new Set<number>();
   const seen = new Set<string>();
   pageRows.forEach((row, i) => {
@@ -111,6 +139,8 @@ export default async function OfferingsPage({
     if (semesterId) sp.set("semesterId", semesterId);
     if (q) sp.set("q", q);
     if (collegeId) sp.set("collegeId", collegeId);
+    if (sortColumn !== "code") sp.set("sort", sortColumn);
+    if (sortDirection !== "asc") sp.set("dir", sortDirection);
     for (const [k, v] of Object.entries(extra)) {
       if (v) sp.set(k, v);
       else sp.delete(k);
@@ -118,6 +148,17 @@ export default async function OfferingsPage({
     return sp;
   };
   const hrefForPage = (p: number) => `/admin/offerings?${queryParams(p > 1 ? { page: String(p) } : {})}`;
+  // Sorting always returns to page 1: staying on page 4 of a re-sorted table
+  // shows a different set of rows than the one you were looking at.
+  const hrefForSort = (column: string, direction: SortDirection) => {
+    const sp = new URLSearchParams();
+    if (semesterId) sp.set("semesterId", semesterId);
+    if (q) sp.set("q", q);
+    if (collegeId) sp.set("collegeId", collegeId);
+    sp.set("sort", column);
+    sp.set("dir", direction);
+    return `/admin/offerings?${sp}`;
+  };
   const exportHref = `/admin/offerings/export?${queryParams()}`;
   const printHref = `/admin/offerings/print?${queryParams()}`;
   const hasFilters = Boolean(q || collegeId);
@@ -132,15 +173,23 @@ export default async function OfferingsPage({
         </Alert>
       )}
 
+      {/* Search first, then the narrowing filters -- the same order as the
+          Students listing, so the two screens are learned once. */}
       <Card className="mb-6 overflow-hidden">
         <form method="GET" className="flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5">
+          <div className="grow sm:grow-0">
+            <Label htmlFor="q" className="text-xs">
+              Search
+            </Label>
+            <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Code, title, section, room, day" className="w-full sm:w-64" />
+          </div>
           <div>
             <Label htmlFor="semesterId" className="text-xs">
               Semester
             </Label>
-            {/* Fetches on choice -- no separate confirm step. The Select
-                button below is the no-JavaScript fallback. */}
-            <Select id="semesterId" name="semesterId" defaultValue={semesterId ?? ""} className="w-64" data-auto-submit="">
+            {/* Fetches on choice -- no separate confirm step. The Search
+                button is the no-JavaScript fallback. */}
+            <Select id="semesterId" name="semesterId" defaultValue={semesterId ?? ""} className="w-56" data-auto-submit="">
               <option value="">Select a semester…</option>
               {semesters.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -157,16 +206,10 @@ export default async function OfferingsPage({
               <option value="">All colleges</option>
               {colleges.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.code} — {c.name}
+                  {c.name}
                 </option>
               ))}
             </Select>
-          </div>
-          <div className="grow sm:grow-0">
-            <Label htmlFor="q" className="text-xs">
-              Search
-            </Label>
-            <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Code, title, section, room, day" className="w-full sm:w-64" />
           </div>
           <Button type="submit" variant="secondary">
             Search
@@ -202,10 +245,11 @@ export default async function OfferingsPage({
                     </Select>
                   </div>
                   <div>
+                    {/* Sections are numbered, not lettered. */}
                     <Label htmlFor="section" className="text-xs">
                       Section
                     </Label>
-                    <Input id="section" name="section" required placeholder="A" className="w-20" />
+                    <Input id="section" name="section" required inputMode="numeric" placeholder="1" className="w-20" />
                   </div>
                   <div>
                     <Label htmlFor="instructorName" className="text-xs">
@@ -237,14 +281,12 @@ export default async function OfferingsPage({
                   {hasFilters ? " matching the current filters" : ""}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <a href={exportHref} className="flex items-center gap-1.5 text-sm font-medium text-brand-fg hover:underline">
-                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                  Download CSV
+              <div className="flex flex-wrap items-center gap-1">
+                <a href={exportHref} title="Download CSV" aria-label="Download CSV" className={iconAction}>
+                  <Download className="h-4 w-4" aria-hidden="true" />
                 </a>
-                <Link href={printHref} className="flex items-center gap-1.5 text-sm font-medium text-brand-fg hover:underline">
-                  <Printer className="h-3.5 w-3.5" aria-hidden="true" />
-                  Print (PDF)
+                <Link href={printHref} title="Print (PDF)" aria-label="Print (PDF)" className={iconAction}>
+                  <Printer className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </div>
             </div>
@@ -267,30 +309,43 @@ export default async function OfferingsPage({
                     {/* The four context columns collapse first on a narrow
                         screen: on a phone you are looking up one class, and
                         you already know which semester you chose. */}
-                    <Th className="hidden xl:table-cell">College</Th>
-                    <Th className="hidden lg:table-cell">Department</Th>
-                    <Th className="hidden xl:table-cell">Year</Th>
-                    <Th className="hidden xl:table-cell">Semester</Th>
-                    <Th className="whitespace-nowrap">Code</Th>
-                    <Th>Course Title</Th>
-                    <Th>Sec</Th>
-                    <Th className="hidden sm:table-cell">Cr/Hrs</Th>
-                    <Th className="hidden md:table-cell">Room</Th>
-                    <Th>Day</Th>
-                    <Th className="whitespace-nowrap">Start</Th>
+                    <SortableTh label="College" column="college" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="hidden 2xl:table-cell" />
+                    <SortableTh label="Department" column="department" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="hidden lg:table-cell" />
+                    <Th className="hidden 2xl:table-cell">Year</Th>
+                    <Th className="hidden whitespace-nowrap 2xl:table-cell">Semester</Th>
+                    <SortableTh label="Code" column="code" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="whitespace-nowrap" />
+                    <SortableTh label="Course Title" column="title" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} />
+                    <SortableTh label="Sec" column="section" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} />
+                    <SortableTh label="Cr/Hrs" column="creditHours" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="hidden sm:table-cell" />
+                    <SortableTh label="Room" column="room" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="hidden md:table-cell" />
+                    <SortableTh label="Day" column="day" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} />
+                    <SortableTh label="Start" column="startTime" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="whitespace-nowrap" />
                     <Th className="whitespace-nowrap">End</Th>
-                    {isAdmin && <Th className="text-right">Manage</Th>}
+                    {/* Management is Admin-only; a Super Admin's view of this
+                        table has no Actions column at all rather than an
+                        empty one. */}
+                    {isAdmin && <Th className="text-right">Actions</Th>}
                   </tr>
                 </Thead>
                 <tbody>
                   {pageRows.map((row, i) => (
                     <Tr key={`${row.offeringId}-${row.day}-${row.startTime}-${i}`} className="align-top">
-                      <Td className="hidden text-xs text-fg-secondary xl:table-cell">{row.college || "—"}</Td>
-                      <Td className="hidden text-xs text-fg-secondary lg:table-cell">{row.department || "—"}</Td>
-                      <Td className="hidden whitespace-nowrap text-xs text-fg-secondary xl:table-cell">{row.year}</Td>
-                      <Td className="hidden text-xs text-fg-secondary xl:table-cell">{row.semester}</Td>
+                      {/* Truncated with the full value on hover rather than
+                          wrapping three lines deep and making every row tall. */}
+                      <Td className="hidden text-xs text-fg-secondary 2xl:table-cell">
+                        <span className="block max-w-[11rem] truncate" title={row.college}>
+                          {row.college || "—"}
+                        </span>
+                      </Td>
+                      <Td className="hidden text-xs text-fg-secondary lg:table-cell">
+                        <span className="block max-w-[9rem] truncate" title={row.department}>
+                          {row.department || "—"}
+                        </span>
+                      </Td>
+                      <Td className="hidden whitespace-nowrap text-xs text-fg-secondary 2xl:table-cell">{row.year}</Td>
+                      <Td className="hidden whitespace-nowrap text-xs text-fg-secondary 2xl:table-cell">{row.semester}</Td>
                       <Td className="font-mono text-xs whitespace-nowrap text-fg-secondary">{row.code}</Td>
-                      <Td className="font-medium text-fg">
+                      <Td className="min-w-[12rem] font-medium text-fg">
                         {row.title}
                         {/* Shown for every status, not only the unusual ones:
                             a published offering with no badge reads as "the
@@ -305,14 +360,11 @@ export default async function OfferingsPage({
                       <Td>{row.section}</Td>
                       <Td className="hidden sm:table-cell">{row.creditHours}</Td>
                       <Td className="hidden text-fg-secondary md:table-cell">{row.room || "—"}</Td>
-                      {/* Full day name on wide screens, three letters on
-                          narrow ones -- same value, no truncation. */}
+                      {/* Timetable abbreviations, with the full day names on
+                          hover so "TTh" is never a guess. */}
                       <Td className="whitespace-nowrap">
                         {row.day ? (
-                          <>
-                            <span className="hidden lg:inline">{row.day}</span>
-                            <span className="lg:hidden">{DAY_SHORT[DAY_NAMES.indexOf(row.day)]}</span>
-                          </>
+                          <span title={expandDays(row.day)}>{row.day}</span>
                         ) : (
                           <span className="text-fg-muted">Not scheduled</span>
                         )}
@@ -320,81 +372,94 @@ export default async function OfferingsPage({
                       <Td className="whitespace-nowrap">{row.startTime || "—"}</Td>
                       <Td className="whitespace-nowrap">{row.endTime || "—"}</Td>
                       {isAdmin && (
-                        <Td className="text-right">
-                          {firstRowOfOffering.has(i) && (
-                            <details className="text-left">
-                              <summary className="cursor-pointer list-none text-xs font-medium text-brand-fg hover:underline">Manage</summary>
-                              <div className="mt-2 flex flex-col gap-3">
-                                {canManage ? (
-                                  <>
-                                    <form action={updateOfferingAction} className="flex flex-wrap items-end gap-2">
-                                      <input type="hidden" name="semesterId" value={semesterId} />
-                                      <input type="hidden" name="offeringId" value={row.offeringId} />
-                                      <Input name="instructorName" defaultValue={row.instructor} placeholder="Instructor" className="w-40 py-1 text-xs" />
-                                      <Input name="capacity" type="number" min={1} defaultValue={row.capacity} placeholder="Capacity" className="w-24 py-1 text-xs" />
-                                      <Button type="submit" variant="secondary" size="sm">
-                                        Save
-                                      </Button>
-                                    </form>
+                        <Td className="px-2 sm:px-3">
+                          <span className="flex items-center justify-end gap-1">
+                            {firstRowOfOffering.has(i) && (
+                              <details className="relative">
+                                <summary
+                                  title={`Edit ${row.code} section ${row.section}`}
+                                  aria-label={`Edit ${row.code} section ${row.section}`}
+                                  className={`${iconAction} inline-flex cursor-pointer list-none`}
+                                >
+                                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                                </summary>
+                                <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-line bg-surface-raised p-3 text-left shadow-lg">
+                                  {canManage ? (
+                                    <div className="flex flex-col gap-3">
+                                      <form action={updateOfferingAction} className="flex flex-wrap items-end gap-2">
+                                        <input type="hidden" name="semesterId" value={semesterId} />
+                                        <input type="hidden" name="offeringId" value={row.offeringId} />
+                                        <Input name="instructorName" defaultValue={row.instructor} placeholder="Instructor" className="w-36 py-1 text-xs" />
+                                        <Input name="capacity" type="number" min={1} defaultValue={row.capacity} placeholder="Capacity" className="w-20 py-1 text-xs" />
+                                        <Button type="submit" variant="secondary" size="sm">
+                                          Save
+                                        </Button>
+                                      </form>
 
-                                    <form action={addMeetingAction} className="flex flex-wrap items-end gap-2">
-                                      <input type="hidden" name="semesterId" value={semesterId} />
-                                      <input type="hidden" name="offeringId" value={row.offeringId} />
-                                      <Select name="dayOfWeek" required className="w-24 py-1 text-xs">
-                                        {DAY_SHORT.slice(1).map((d, index) => (
-                                          <option key={d} value={index + 1}>
-                                            {d}
-                                          </option>
-                                        ))}
-                                      </Select>
-                                      <Input name="startTime" type="time" required className="w-28 py-1 text-xs" />
-                                      <Input name="endTime" type="time" required className="w-28 py-1 text-xs" />
-                                      <Input name="room" placeholder="Room" className="w-24 py-1 text-xs" />
-                                      <Button type="submit" variant="secondary" size="sm">
-                                        Add meeting
-                                      </Button>
-                                    </form>
+                                      <form action={addMeetingAction} className="flex flex-wrap items-end gap-2">
+                                        <input type="hidden" name="semesterId" value={semesterId} />
+                                        <input type="hidden" name="offeringId" value={row.offeringId} />
+                                        <Select name="dayOfWeek" required className="w-16 py-1 text-xs">
+                                          {DAY_LETTER.slice(1).map((letter, index) => (
+                                            <option key={letter} value={index + 1}>
+                                              {letter}
+                                            </option>
+                                          ))}
+                                        </Select>
+                                        <Input name="startTime" type="time" required className="w-24 py-1 text-xs" />
+                                        <Input name="endTime" type="time" required className="w-24 py-1 text-xs" />
+                                        <Input name="room" placeholder="Room" className="w-20 py-1 text-xs" />
+                                        <Button type="submit" variant="secondary" size="sm">
+                                          Add meeting
+                                        </Button>
+                                      </form>
 
-                                    <div className="flex flex-wrap items-center gap-3">
-                                      {row.status === "DRAFT" && (
-                                        <form action={publishOfferingAction}>
-                                          <input type="hidden" name="semesterId" value={semesterId} />
-                                          <input type="hidden" name="offeringId" value={row.offeringId} />
-                                          <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
-                                            Publish
-                                          </button>
-                                        </form>
-                                      )}
-                                      {row.status !== "CANCELLED" && (
-                                        <form action={cancelOfferingAction}>
-                                          <input type="hidden" name="semesterId" value={semesterId} />
-                                          <input type="hidden" name="offeringId" value={row.offeringId} />
-                                          <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
-                                            Cancel offering
-                                          </button>
-                                        </form>
-                                      )}
+                                      <div className="flex flex-wrap items-center gap-3">
+                                        {row.status === "DRAFT" && (
+                                          <form action={publishOfferingAction}>
+                                            <input type="hidden" name="semesterId" value={semesterId} />
+                                            <input type="hidden" name="offeringId" value={row.offeringId} />
+                                            <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
+                                              Publish
+                                            </button>
+                                          </form>
+                                        )}
+                                        {row.status !== "CANCELLED" && (
+                                          <form action={cancelOfferingAction}>
+                                            <input type="hidden" name="semesterId" value={semesterId} />
+                                            <input type="hidden" name="offeringId" value={row.offeringId} />
+                                            <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
+                                              Cancel offering
+                                            </button>
+                                          </form>
+                                        )}
+                                      </div>
                                     </div>
-                                  </>
-                                ) : (
-                                  <p className="text-xs text-fg-muted">
-                                    Schedules are frozen once teaching starts — this semester is no longer editable.
-                                  </p>
-                                )}
-                              </div>
-                            </details>
-                          )}
-                          {/* A meeting is removed from its own row, so there
-                              is never any doubt which one is going. */}
-                          {canManage && row.day && (
-                            <form action={removeMeetingAction} className="mt-1">
-                              <input type="hidden" name="semesterId" value={semesterId} />
-                              <input type="hidden" name="meetingId" value={row.meetingId} />
-                              <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
-                                Remove
-                              </button>
-                            </form>
-                          )}
+                                  ) : (
+                                    <p className="text-xs text-fg-muted">
+                                      Schedules are frozen once teaching starts — this semester is no longer editable.
+                                    </p>
+                                  )}
+                                </div>
+                              </details>
+                            )}
+                            {/* Deletes the whole slot this row shows, every
+                                day of it -- see removeMeetingAction. */}
+                            {canManage && row.meetingIds && (
+                              <form action={removeMeetingAction}>
+                                <input type="hidden" name="semesterId" value={semesterId} />
+                                <input type="hidden" name="meetingIds" value={row.meetingIds} />
+                                <button
+                                  type="submit"
+                                  title={`Delete the ${row.day} ${row.startTime}–${row.endTime} meeting`}
+                                  aria-label={`Delete the ${expandDays(row.day)} ${row.startTime} to ${row.endTime} meeting for ${row.code} section ${row.section}`}
+                                  className={iconDanger}
+                                >
+                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              </form>
+                            )}
+                          </span>
                         </Td>
                       )}
                     </Tr>
@@ -402,16 +467,18 @@ export default async function OfferingsPage({
                 </tbody>
               </Table>
             )}
-          </Card>
 
-          {totalPages > 1 && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-fg-secondary">
-                Page {pageNum} of {totalPages}
-              </p>
-              <Pagination page={pageNum} totalPages={totalPages} hrefForPage={hrefForPage} label="Offerings pagination" />
-            </div>
-          )}
+            {/* Inside the card, under the table -- the Students listing puts
+                its count and pager together the same way. */}
+            {rows.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-subtle px-4 py-3 sm:px-5">
+                <p className="text-sm text-fg-secondary">
+                  Showing {(pageNum - 1) * PAGE_SIZE + 1}&ndash;{Math.min(pageNum * PAGE_SIZE, rows.length)} of {rows.length}
+                </p>
+                <Pagination page={pageNum} totalPages={totalPages} hrefForPage={hrefForPage} label="Offerings pagination" />
+              </div>
+            )}
+          </Card>
         </>
       )}
     </main>

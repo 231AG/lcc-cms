@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterDisplayName } from "@/lib/academic/semesterName";
 import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent } from "@/lib/students/students";
@@ -175,7 +176,7 @@ export default async function HistoricalEntryPage({
                   <option value="">Select a semester…</option>
                   {semesters.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {yearLabel(s.academicYearId)} — {s.name} ({s.state})
+                      {yearLabel(s.academicYearId)} — {semesterDisplayName(s)} ({s.state})
                     </option>
                   ))}
                 </Select>
@@ -311,7 +312,7 @@ export default async function HistoricalEntryPage({
                   const sem = semesters.find((s) => s.id === r.semesterId);
                   return (
                     <Tr key={r.id}>
-                      <Td>{sem ? `${yearLabel(sem.academicYearId)} — ${sem.name}` : r.semesterId}</Td>
+                      <Td>{sem ? `${yearLabel(sem.academicYearId)} — ${semesterDisplayName(sem)}` : r.semesterId}</Td>
                       <Td>
                         {r.courseCodeSnapshot} — {r.courseTitleSnapshot}
                         {!r.courseId && <span className="ml-1 text-xs text-warning-fg">(not in catalogue)</span>}

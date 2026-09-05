@@ -16,6 +16,11 @@ import type { ReactNode } from "react";
  *    break.
  *  - `print-color-adjust: exact`, or the purple header band silently
  *    disappears under the browser's "save ink" default.
+ *  - A4 LANDSCAPE. These tables are wide -- course offerings is twelve
+ *    columns -- and portrait forces every cell to wrap two or three lines
+ *    deep. Landscape gives each column the width it actually needs, which is
+ *    the difference between a timetable you can read across and a wall of
+ *    wrapped text.
  *
  * Nothing here tries to squeeze the table onto one page: a 300-student list
  * that fits on one sheet is a list nobody can read.
@@ -31,7 +36,8 @@ const CSS = `
   --pr-text: #2a2135;
   --pr-muted: #6b5a7d;
 
-  max-width: 190mm;
+  /* A4 landscape minus the @page margins below. */
+  max-width: 273mm;
   margin: 0 auto;
   color: var(--pr-text);
   font-family: "DejaVu Sans", "Segoe UI", system-ui, sans-serif;
@@ -41,13 +47,16 @@ const CSS = `
 }
 .pr * { box-sizing: border-box; }
 
-.pr-head { display: grid; grid-template-columns: 20mm 1fr 20mm; align-items: center; gap: 5mm; }
-.pr-seal { width: 20mm; height: 20mm; object-fit: contain; mix-blend-mode: multiply; }
+/* The seals sit beside the college name rather than out at the page edges:
+   a centred flex row, so the three parts read as one masthead instead of
+   three things spread across the width of the sheet. */
+.pr-head { display: flex; align-items: center; justify-content: center; gap: 8mm; }
+.pr-seal { width: 26mm; height: 26mm; flex: 0 0 auto; object-fit: contain; mix-blend-mode: multiply; }
 .pr-titles { text-align: center; min-width: 0; }
 .pr-college {
   font-family: "DejaVu Serif", Georgia, serif;
   font-weight: 700;
-  font-size: 15pt;
+  font-size: 17pt;
   color: var(--pr-purple);
   margin: 0;
   white-space: nowrap;
@@ -57,7 +66,8 @@ const CSS = `
 .pr-title { font-family: "DejaVu Serif", Georgia, serif; font-weight: 700; font-size: 12pt; color: var(--pr-purple-dark); margin: 0; }
 .pr-subtitle { font-size: 8.5pt; color: var(--pr-muted); margin: 1mm 0 0; }
 
-.pr-table { width: 100%; border-collapse: collapse; margin-top: 5mm; }
+/* Centred in the page, and never wider than it. */
+.pr-table { width: 100%; margin: 5mm auto 0; border-collapse: collapse; }
 .pr-table thead th {
   background: var(--pr-purple-dark);
   color: #ffffff;
@@ -67,13 +77,17 @@ const CSS = `
   border: 1px solid var(--pr-divider);
 }
 .pr-table td { border: 1px solid var(--pr-divider); padding: 1.2mm 2mm; font-size: 8.5pt; }
+/* Short columns keep to one line: "Semester I" broken over two rows is
+   taller and harder to read than the two words it saves. Only the free-text
+   columns (names, titles) are allowed to wrap. */
+.pr-table .pr-nowrap { white-space: nowrap; }
 .pr-table tbody tr:nth-child(even) { background: var(--pr-tint); }
 .pr-empty { text-align: center; font-style: italic; color: var(--pr-muted); padding: 8mm; }
 
 .pr-foot { margin-top: 4mm; font-size: 7.5pt; color: var(--pr-muted); display: flex; justify-content: space-between; gap: 6mm; }
 
 @media print {
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 landscape; margin: 12mm; }
   /* The whole point of this component: column headers repeat on every
      printed page, and no row is cut in half by a page break. */
   .pr-table thead { display: table-header-group; }
@@ -93,7 +107,7 @@ export function PrintReport({
 }: {
   title: string;
   subtitle?: string;
-  columns: ReadonlyArray<{ key: string; header: string }>;
+  columns: ReadonlyArray<{ key: string; header: string; nowrap?: boolean }>;
   rows: Array<Record<string, ReactNode>>;
   emptyMessage?: string;
   footNote?: string;
@@ -122,7 +136,9 @@ export function PrintReport({
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.key}>{c.header}</th>
+                <th key={c.key} className={c.nowrap ? "pr-nowrap" : undefined}>
+                  {c.header}
+                </th>
               ))}
             </tr>
           </thead>
@@ -137,7 +153,9 @@ export function PrintReport({
               rows.map((row, i) => (
                 <tr key={i}>
                   {columns.map((c) => (
-                    <td key={c.key}>{row[c.key]}</td>
+                    <td key={c.key} className={c.nowrap ? "pr-nowrap" : undefined}>
+                      {row[c.key]}
+                    </td>
                   ))}
                 </tr>
               ))

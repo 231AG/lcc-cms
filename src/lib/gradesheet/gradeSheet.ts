@@ -5,6 +5,7 @@ import { academicRecord, semester } from "@/lib/db/schema";
 import type { Actor } from "@/lib/permissions/kernel";
 import { NotFoundError } from "@/lib/errors";
 import { fullName } from "@/lib/students/name";
+import { semesterDisplayName, semesterNumeral } from "@/lib/academic/semesterName";
 import { getCumulativeSummary, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { roundHalfUp } from "@/lib/gpa/engine";
 import { getGradeSheetSignatories, type GradeSheetSignatories } from "@/lib/settings/signatories";
@@ -113,8 +114,6 @@ function formatRange(minScore: number | null, maxScore: number | null): string {
   return `${minScore} – ${maxScore}`;
 }
 
-const ROMAN: Record<number, string> = { 1: "I", 2: "II" };
-
 export async function getGradeSheet(actor: Actor, studentId: string, semesterId: string): Promise<GradeSheetData> {
   // One transaction for the row reads that share a connection, then the two
   // GPA reads and the settings read alongside it -- they touch different
@@ -199,8 +198,8 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
       minor: "N/A",
     },
     academicYearLabel: academicYear?.label ?? "—",
-    semesterName: semesterRow.name,
-    semesterNumeral: ROMAN[semesterRow.sequence] ?? String(semesterRow.sequence),
+    semesterName: semesterDisplayName(semesterRow),
+    semesterNumeral: semesterNumeral(semesterRow),
     courses,
     summary: {
       totalCredits: summary ? new Decimal(summary.creditsAttempted).toFixed(2) : "0.00",
