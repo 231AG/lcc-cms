@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
 import { addMeeting, cancelOffering, createOffering, publishOffering, removeMeeting, updateOffering } from "@/lib/offerings/offerings";
+import { addPlanItem, getOrCreateDraftPlan } from "@/lib/planning/planning";
 
 function errorRedirect(semesterId: string, message: string): never {
   redirect(`/admin/offerings?semesterId=${semesterId}&error=${encodeURIComponent(message)}`);
@@ -16,16 +17,49 @@ export async function createOfferingAction(formData: FormData): Promise<void> {
   try {
     await createOffering(actor, {
       semesterId,
-      courseId: String(formData.get("courseId") ?? ""),
+      courseCode: String(formData.get("courseCode") ?? ""),
       section: String(formData.get("section") ?? ""),
+      // Blank instructor and capacity are left undefined rather than sent
+      // as "" / NaN, so the service layer's documented defaults apply.
       instructorName: String(formData.get("instructorName") ?? ""),
       capacity: capacityRaw ? Number(capacityRaw) : undefined,
+      // Checkboxes: one entry per ticked day.
+      days: formData.getAll("days").map((d) => Number(d)),
+      room: String(formData.get("room") ?? ""),
+      startTime: String(formData.get("startTime") ?? ""),
+      endTime: String(formData.get("endTime") ?? ""),
     });
   } catch (err) {
     if (err instanceof AppError) errorRedirect(semesterId, err.message);
     throw err;
   }
   redirect(`/admin/offerings?semesterId=${semesterId}`);
+}
+
+/**
+ * The student-side action on the offerings table: put this offering into my
+ * plan for the semester I am looking at.
+ *
+ * "Their current course plan" is the draft for that semester -- created on
+ * the spot if they have not started one, which is what makes this a single
+ * click rather than "go to Course planning, start a plan, come back". Every
+ * rule still applies: getOrCreateDraftPlan and addPlanItem enforce the
+ * semester being open, the plan being editable, and the duplicate and
+ * prerequisite checks, so this is a shortcut through the UI, not around
+ * the validators.
+ */
+export async function addOfferingToMyPlanAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const semesterId = String(formData.get("semesterId") ?? "");
+  const offeringId = String(formData.get("offeringId") ?? "");
+  try {
+    const plan = await getOrCreateDraftPlan(actor, semesterId);
+    await addPlanItem(actor, plan.id, offeringId);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(semesterId, err.message);
+    throw err;
+  }
+  redirect(`/admin/offerings?semesterId=${semesterId}&added=1`);
 }
 
 export async function updateOfferingAction(formData: FormData): Promise<void> {

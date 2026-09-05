@@ -1,29 +1,39 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Pencil, Printer, Trash2 } from "lucide-react";
+import { Download, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import {
   DAY_LETTER,
+  DAY_NAMES,
   expandDays,
   filterOfferingRows,
   getOfferingRows,
   isOfferingSortColumn,
   sortOfferingRows,
 } from "@/lib/offerings/offeringRows";
-import { isOfferingEditable, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import {
+  ACTIVE_SEMESTER_STATES,
+  isOfferingEditable,
+  isPlanningOpen,
+  type SemesterState,
+} from "@/lib/academic/semesterStateMachine";
+import { ROOMS } from "@/lib/offerings/rooms";
+import { DEFAULT_CAPACITY, DEFAULT_INSTRUCTOR } from "@/lib/offerings/offerings";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { Button, buttonClasses } from "@/components/ui/Button";
-import { Label, Input, Select } from "@/components/ui/Form";
+import { SubmitTextButton } from "@/components/ui/SubmitButton";
+import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td, SortableTh, type SortDirection } from "@/components/ui/Table";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   addMeetingAction,
+  addOfferingToMyPlanAction,
   cancelOfferingAction,
   createOfferingAction,
   publishOfferingAction,
@@ -74,7 +84,7 @@ export default async function OfferingsPage({
   }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId, error, q, collegeId, page, sort, dir } = await searchParams;
+  const { semesterId: requestedSemesterId, error, q, collegeId, page, sort, dir } = await searchParams;
 
   if (!actor)
     return (
@@ -82,14 +92,12 @@ export default async function OfferingsPage({
         Please sign in.
       </main>
     );
-  if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
-    return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-lg flex-1 p-8 outline-none">
-        <Alert tone="info">Not available to your role.</Alert>
-      </main>
-    );
-  }
+  // Students read this table too -- it is the course catalogue, and item 6
+  // puts "Add to plan" on it. Everything that manages an offering stays
+  // behind `isAdmin`/`canManage`, so what a student sees is the same table
+  // with a different single action on each row.
   const isAdmin = actor.role === "ADMIN";
+  const isStudent = actor.role === "STUDENT";
 
   const [semesters, academicYears, courses, colleges] = await asUser(actor.userId, (tx) =>
     Promise.all([
@@ -104,8 +112,25 @@ export default async function OfferingsPage({
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
     return semesterFullLabel(year, sem, semId);
   };
+  // Landing on an empty page and being asked to pick a semester is a step
+  // nobody wants: the answer is almost always the semester currently being
+  // taught or planned. "Most recently opened" is read off start_date among
+  // the states that are open in the lifecycle sense (OPEN, IN_PROGRESS) --
+  // not the newest semester overall, which could be a DRAFT for next year
+  // that has no offerings in it yet. An explicit ?semesterId always wins,
+  // and if nothing is open this falls back to the latest semester there is.
+  const defaultSemester =
+    [...semesters]
+      .filter((s) => (ACTIVE_SEMESTER_STATES as readonly string[]).includes(s.state))
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))[0] ??
+    [...semesters].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+  const semesterId =
+    (requestedSemesterId && semesters.find((s) => s.id === requestedSemesterId)?.id) ?? defaultSemester?.id ?? "";
   const selectedSemester = semesterId ? semesters.find((s) => s.id === semesterId) : undefined;
   const canManage = isAdmin && selectedSemester ? isOfferingEditable(selectedSemester.state as SemesterState) : false;
+  // A student can only add to a plan while the semester is open for
+  // planning; outside that the table is still readable, just not actionable.
+  const planningOpenHere = selectedSemester ? isPlanningOpen(selectedSemester.state as SemesterState) : false;
 
   const allRows = semesterId ? await getOfferingRows(actor, semesterId) : [];
   const collegeLabel = collegeId ? colleges.find((c) => c.id === collegeId)?.name : undefined;
@@ -230,40 +255,115 @@ export default async function OfferingsPage({
             <Card className="mb-6">
               <CardBody>
                 <h2 className="mb-3 font-medium text-fg">Add an offering</h2>
-                <form action={createOfferingAction} className="flex flex-wrap items-end gap-2">
+                <form action={createOfferingAction}>
                   <input type="hidden" name="semesterId" value={semesterId} />
-                  <div>
-                    <Label htmlFor="courseId" className="text-xs">
-                      Course
-                    </Label>
-                    <Select id="courseId" name="courseId" required className="w-56">
-                      {courses.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.code} — {c.title}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="sm:col-span-2">
+                      {/* A datalist rather than a select: at 177 courses a
+                          dropdown is a scroll, and this is searchable by
+                          code or title while still being a plain form
+                          control that works with JavaScript off. What is
+                          submitted is the code, which is unique. */}
+                      <Label htmlFor="courseCode" className="text-xs">
+                        Course
+                        <Required />
+                      </Label>
+                      <Input
+                        id="courseCode"
+                        name="courseCode"
+                        list="offering-course-options"
+                        required
+                        autoComplete="off"
+                        placeholder="Type a code or title, e.g. ACCT 301"
+                      />
+                      <datalist id="offering-course-options">
+                        {courses.map((c) => (
+                          <option key={c.id} value={c.code}>
+                            {c.title}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                    <div>
+                      {/* Sections are numbered, not lettered. */}
+                      <Label htmlFor="section" className="text-xs">
+                        Section
+                        <Required />
+                      </Label>
+                      <Input id="section" name="section" required inputMode="numeric" placeholder="1" />
+                    </div>
+                    <div>
+                      <Label htmlFor="room" className="text-xs">
+                        Room
+                        <Required />
+                      </Label>
+                      <Select id="room" name="room" required defaultValue="">
+                        <option value="" disabled>
+                          Select room
                         </option>
-                      ))}
-                    </Select>
+                        {ROOMS.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="startTime" className="text-xs">
+                        Start time
+                        <Required />
+                      </Label>
+                      <Input id="startTime" name="startTime" type="time" required />
+                    </div>
+                    <div>
+                      <Label htmlFor="endTime" className="text-xs">
+                        End time
+                        <Required />
+                      </Label>
+                      <Input id="endTime" name="endTime" type="time" required />
+                    </div>
+                    <div>
+                      <Label htmlFor="instructorName" className="text-xs">
+                        Instructor
+                      </Label>
+                      <Input id="instructorName" name="instructorName" placeholder={DEFAULT_INSTRUCTOR} />
+                    </div>
+                    <div>
+                      <Label htmlFor="capacity" className="text-xs">
+                        Capacity
+                      </Label>
+                      <Input id="capacity" name="capacity" type="number" min={1} placeholder={String(DEFAULT_CAPACITY)} />
+                    </div>
+                    <fieldset className="sm:col-span-2 lg:col-span-4">
+                      {/* Checkboxes rather than a multiple-select: a
+                          multi-select needs ctrl-click to pick a second
+                          option, which is the kind of thing that quietly
+                          produces one-day timetables. */}
+                      <legend className="mb-1 block text-xs font-medium text-fg">
+                        Days
+                        <Required />
+                      </legend>
+                      <div className="flex flex-wrap gap-3">
+                        {DAY_NAMES.slice(1).map((name, index) => (
+                          <label key={name} className="flex items-center gap-1.5 text-sm text-fg">
+                            <input
+                              type="checkbox"
+                              name="days"
+                              value={index + 1}
+                              className="h-4 w-4 rounded border-line-strong text-brand accent-[var(--color-brand)]"
+                            />
+                            {name}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
                   </div>
-                  <div>
-                    {/* Sections are numbered, not lettered. */}
-                    <Label htmlFor="section" className="text-xs">
-                      Section
-                    </Label>
-                    <Input id="section" name="section" required inputMode="numeric" placeholder="1" className="w-20" />
+                  <div className="mt-4 flex items-center gap-3">
+                    <Button type="submit">Add offering</Button>
+                    <p className="text-xs text-fg-muted">
+                      Blank instructor becomes &ldquo;{DEFAULT_INSTRUCTOR}&rdquo;; blank capacity becomes {DEFAULT_CAPACITY}.
+                    </p>
                   </div>
-                  <div>
-                    <Label htmlFor="instructorName" className="text-xs">
-                      Instructor
-                    </Label>
-                    <Input id="instructorName" name="instructorName" className="w-40" />
-                  </div>
-                  <div>
-                    <Label htmlFor="capacity" className="text-xs">
-                      Capacity (optional)
-                    </Label>
-                    <Input id="capacity" name="capacity" type="number" min={1} className="w-24" />
-                  </div>
-                  <Button type="submit">Add offering</Button>
                 </form>
               </CardBody>
             </Card>
@@ -321,10 +421,10 @@ export default async function OfferingsPage({
                     <SortableTh label="Day" column="day" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} />
                     <SortableTh label="Start" column="startTime" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="whitespace-nowrap" />
                     <Th className="whitespace-nowrap">End</Th>
-                    {/* Management is Admin-only; a Super Admin's view of this
-                        table has no Actions column at all rather than an
-                        empty one. */}
-                    {isAdmin && <Th className="text-right">Actions</Th>}
+                    {/* Management is Admin-only and planning is Student-only;
+                        a Super Admin's view of this table has no Actions
+                        column at all rather than an empty one. */}
+                    {(isAdmin || isStudent) && <Th className="text-right">Actions</Th>}
                   </tr>
                 </Thead>
                 <tbody>
@@ -349,13 +449,18 @@ export default async function OfferingsPage({
                         {row.title}
                         {/* Shown for every status, not only the unusual ones:
                             a published offering with no badge reads as "the
-                            badge failed to render", not as "published". */}
-                        <Badge
-                          tone={row.status === "PUBLISHED" ? "success" : row.status === "CANCELLED" ? "danger" : "neutral"}
-                          className="ml-2"
-                        >
-                          {row.status}
-                        </Badge>
+                            badge failed to render", not as "published".
+                            Except to a student, whose RLS policy only ever
+                            returns PUBLISHED rows -- one value repeated on
+                            every row is not information. */}
+                        {!isStudent && (
+                          <Badge
+                            tone={row.status === "PUBLISHED" ? "success" : row.status === "CANCELLED" ? "danger" : "neutral"}
+                            className="ml-2"
+                          >
+                            {row.status}
+                          </Badge>
+                        )}
                       </Td>
                       <Td>{row.section}</Td>
                       <Td className="hidden sm:table-cell">{row.creditHours}</Td>
@@ -371,6 +476,28 @@ export default async function OfferingsPage({
                       </Td>
                       <Td className="whitespace-nowrap">{row.startTime || "—"}</Td>
                       <Td className="whitespace-nowrap">{row.endTime || "—"}</Td>
+                      {isStudent && (
+                        <Td className="px-2 text-right sm:px-3">
+                          {/* One button, one row, one click. Only on the
+                              first row of an offering: adding "the MWF slot"
+                              and "the Friday lab slot" separately would put
+                              the same offering in the plan twice. */}
+                          {firstRowOfOffering.has(i) && planningOpenHere && (
+                            <form action={addOfferingToMyPlanAction}>
+                              <input type="hidden" name="semesterId" value={semesterId} />
+                              <input type="hidden" name="offeringId" value={row.offeringId} />
+                              <SubmitTextButton
+                                pendingLabel="Adding…"
+                                title={`Add ${row.code} section ${row.section} to my plan`}
+                                className={buttonClasses("secondary", "sm")}
+                              >
+                                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                                Add to plan
+                              </SubmitTextButton>
+                            </form>
+                          )}
+                        </Td>
+                      )}
                       {isAdmin && (
                         <Td className="px-2 sm:px-3">
                           <span className="flex items-center justify-end gap-1">
@@ -408,7 +535,20 @@ export default async function OfferingsPage({
                                         </Select>
                                         <Input name="startTime" type="time" required className="w-24 py-1 text-xs" />
                                         <Input name="endTime" type="time" required className="w-24 py-1 text-xs" />
-                                        <Input name="room" placeholder="Room" className="w-20 py-1 text-xs" />
+                                        {/* Same fixed list as the create
+                                            form -- a free-text room here is
+                                            how "PAPE 1" and "Pape1" end up
+                                            in the same timetable. */}
+                                        <Select name="room" required defaultValue="" className="w-24 py-1 text-xs">
+                                          <option value="" disabled>
+                                            Room
+                                          </option>
+                                          {ROOMS.map((r) => (
+                                            <option key={r} value={r}>
+                                              {r}
+                                            </option>
+                                          ))}
+                                        </Select>
                                         <Button type="submit" variant="secondary" size="sm">
                                           Add meeting
                                         </Button>

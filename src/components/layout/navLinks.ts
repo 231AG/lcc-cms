@@ -26,6 +26,7 @@ export const STUDENT_GROUPS: NavGroup[] = [
   {
     label: "",
     links: [
+      { href: "/admin/offerings", label: "Course offerings" },
       { href: "/planning", label: "Course planning" },
       { href: "/grading-policy", label: "Grading policy" },
     ],
