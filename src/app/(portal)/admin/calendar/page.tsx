@@ -1,33 +1,38 @@
 import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterDisplayName, SEMESTER_NAME_OPTIONS } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
-import { legalNextStates, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import {
+  isDeletable,
+  legalNextStatesForRole,
+  reasonRequiredFor,
+  SEMESTER_STATE_DESCRIPTION,
+  SEMESTER_STATE_LABEL,
+  type SemesterState,
+} from "@/lib/academic/semesterStateMachine";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Badge, type Tone } from "@/components/ui/Badge";
+import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { Button } from "@/components/ui/Button";
-import { Label, Input, Select } from "@/components/ui/Form";
+import { Label, Input, Select, Required as RequiredMark } from "@/components/ui/Form";
+import { TableCard } from "@/components/ui/TableCard";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
-import { createAcademicYearAction, createSemesterAction, transitionSemesterAction } from "./actions";
+import { createAcademicYearAction, createSemesterAction, deleteSemesterAction, transitionSemesterAction } from "./actions";
 
 export const metadata: Metadata = { title: "Academic calendar" };
 
-const STATE_TONE: Record<string, Tone> = {
-  DRAFT: "neutral",
-  REGISTRATION: "info",
-  OPEN: "success",
-  IN_PROGRESS: "brand",
-  CLOSED: "neutral",
-};
-
 /**
- * Academic years, semesters, and state transitions (Section 20.4, Stage 4).
- * Visible to both Admin (create years/semesters, advance forward) and Super
- * Admin (move backward/reopen, with a mandatory reason) -- unlike
- * /admin/structure, which is Admin-only, this screen has real content for
- * both roles, matching Section 11.3's "Advance forward is Admin-only, move
- * backwards is Super-Admin-only" split rather than a single-role screen.
+ * Academic years, semesters, and state changes (Section 20.4, Stage 4).
+ *
+ * Creating years and semesters stays Admin-only; CHANGING a semester's
+ * state is now held by both staff roles, which is the one split this screen
+ * still draws. The Super Admin's extra power is the reopen out of Closed,
+ * not a general ability to move a semester backwards -- the lifecycle is
+ * forward-only for everybody (see semesterStateMachine.ts).
+ *
+ * The state control is a dropdown rather than the old forward/back stepper:
+ * you choose the state you want. That reads as a choice even where, as
+ * today, exactly one state is legal from where you are.
  */
 export default async function CalendarPage({
   searchParams,
@@ -98,7 +103,7 @@ export default async function CalendarPage({
           </form>
         )}
 
-        <Card>
+        <TableCard title="Academic years" count={years.length} countLabel="year">
           <Table>
             <Thead>
               <tr>
@@ -117,7 +122,7 @@ export default async function CalendarPage({
               ))}
             </tbody>
           </Table>
-        </Card>
+        </TableCard>
       </section>
 
       {/* Semesters */}
@@ -139,19 +144,24 @@ export default async function CalendarPage({
               </Select>
             </div>
             <div>
-              <Label className="text-xs" htmlFor="sem-sequence">
-                Sequence
-              </Label>
-              <Select id="sem-sequence" name="sequence" required>
-                <option value="1">1 (First)</option>
-                <option value="2">2 (Second)</option>
-              </Select>
-            </div>
-            <div>
+              {/* One control, not two. The old form asked for a free-text
+                  Name and a separate Sequence, which are the same fact
+                  twice and could disagree; the sequence is now derived from
+                  the name chosen. */}
               <Label className="text-xs" htmlFor="sem-name">
                 Name
+                <RequiredMark />
               </Label>
-              <Input id="sem-name" name="name" required placeholder="First Semester" />
+              <Select id="sem-name" name="name" required defaultValue="" className="w-40">
+                <option value="" disabled>
+                  Select
+                </option>
+                {SEMESTER_NAME_OPTIONS.map((o) => (
+                  <option key={o.name} value={o.name}>
+                    {o.name}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div>
               <Label className="text-xs" htmlFor="sem-start">
@@ -169,61 +179,130 @@ export default async function CalendarPage({
           </form>
         )}
 
-        <Card>
+        <TableCard title="Semesters" count={semesters.length} countLabel="semester">
           <Table>
             <Thead>
               <tr>
                 <Th>Academic year</Th>
-                <Th>Seq</Th>
+                {/* "Seq" is semester.sequence: 1 or 2, which semester of
+                    its academic year this is. CR-10 allows exactly two per
+                    year, and it is what orders them and what the Semester
+                    I / Semester II naming is derived from. */}
+                <Th className="hidden sm:table-cell" title="Which semester of the academic year: 1 or 2">
+                  Seq
+                </Th>
                 <Th>Name</Th>
+                <Th className="hidden md:table-cell">Dates</Th>
                 <Th>State</Th>
-                <Th>Transition</Th>
+                <Th>Change state</Th>
               </tr>
             </Thead>
             <tbody>
               {semesters.map((s) => {
                 const currentState = s.state as SemesterState;
-                const availableRules = legalNextStates(currentState).filter((r) => r.actorRole === actor.role);
+                // Both staff roles can move a semester forward now; only a
+                // Super Admin sees the reopen out of Closed. Whichever
+                // states this actor may pick are what the dropdown offers,
+                // so an unavailable move is never rendered as a dead option.
+                const available = legalNextStatesForRole(currentState, actor.role);
+                // Every state has at most one legal next state per role, so
+                // one reason rule covers the whole row.
+                const reasonRequired = available.some((rule) => reasonRequiredFor(rule, actor.role));
+                const isReopen = available.some((rule) => rule.isReopen);
                 return (
                   <Tr key={s.id} className="align-top">
                     <Td>{yearLabel(s.academicYearId)}</Td>
-                    <Td>{s.sequence}</Td>
-                    <Td className="font-medium text-fg">{s.name}</Td>
-                    <Td>
-                      <Badge tone={STATE_TONE[s.state] ?? "neutral"}>{s.state}</Badge>
+                    <Td className="hidden sm:table-cell">{s.sequence}</Td>
+                    <Td className="font-medium text-fg">
+                      {semesterDisplayName(s)}
+                      {/* The name an Admin typed, kept underneath rather than
+                          dropped: the College reads its terms as "Semester I"
+                          and "Semester II", but the stored label is still what
+                          the create form asks for and what tells two
+                          differently-named terms apart. */}
+                      {s.name !== semesterDisplayName(s) && (
+                        <span className="mt-0.5 block text-xs font-normal text-fg-muted">{s.name}</span>
+                      )}
+                    </Td>
+                    <Td className="hidden whitespace-nowrap text-xs text-fg-secondary md:table-cell">
+                      {s.startDate} &ndash; {s.endDate}
                     </Td>
                     <Td>
-                      {availableRules.length === 0 && (
-                        <span className="text-fg-subtle">
-                          {actor.role === "ADMIN" ? "No forward move available" : "No backward move available"}
+                      <SemesterStateBadge state={s.state} />
+                      <p className="mt-1 max-w-56 text-xs text-fg-muted">{SEMESTER_STATE_DESCRIPTION[currentState]}</p>
+                    </Td>
+                    <Td>
+                      {available.length === 0 ? (
+                        <span className="text-xs text-fg-muted">
+                          {currentState === "CLOSED"
+                            ? "Closed and sealed. Only a Super Admin can reopen it."
+                            : "No further change available to you."}
                         </span>
+                      ) : (
+                        /* A dropdown, not a stepper: you pick the state you
+                           want rather than clicking through the ones in
+                           between. The lifecycle is still forward-only --
+                           the select simply lists what is legal from here,
+                           which for every state is at most one thing. */
+                        <form action={transitionSemesterAction} className="flex flex-col gap-2">
+                          <input type="hidden" name="semesterId" value={s.id} />
+                          <div>
+                            <Label htmlFor={`toState-${s.id}`} className="text-xs">
+                              Move to
+                            </Label>
+                            <Select id={`toState-${s.id}`} name="toState" required defaultValue={available[0].to} className="w-40 text-xs">
+                              {available.map((rule) => (
+                                <option key={rule.to} value={rule.to}>
+                                  {SEMESTER_STATE_LABEL[rule.to]}
+                                  {rule.isReopen ? " (reopen)" : ""}
+                                </option>
+                              ))}
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor={`reason-${s.id}`} className="text-xs">
+                              Reason {reasonRequired ? "(required)" : "(optional)"}
+                            </Label>
+                            <Input
+                              id={`reason-${s.id}`}
+                              name="reason"
+                              required={reasonRequired}
+                              placeholder={isReopen ? "Why is this being reopened?" : "Why is this changing?"}
+                              className="w-full max-w-56 py-1 text-xs"
+                            />
+                          </div>
+                          <Button type="submit" variant={isReopen ? "secondary" : "primary"} size="sm" className="w-fit">
+                            {isReopen ? "Reopen semester" : "Change state"}
+                          </Button>
+                        </form>
                       )}
-                      <div className="flex flex-col gap-2">
-                        {availableRules.map((rule) => (
-                          <form key={rule.to} action={transitionSemesterAction} className="flex items-end gap-2">
+
+                      {/* Deleting is possible only from Draft, and only for
+                          the role that creates semesters. Behind a
+                          disclosure rather than a one-click button, because
+                          the app's CSP forbids the inline handler a
+                          confirm() dialog would need. */}
+                      {actor.role === "ADMIN" && isDeletable(currentState) && (
+                        <details className="mt-3">
+                          <summary className="cursor-pointer list-none text-xs font-medium text-danger-fg hover:underline">Delete</summary>
+                          <form action={deleteSemesterAction} className="mt-1.5 flex flex-col gap-1.5">
                             <input type="hidden" name="semesterId" value={s.id} />
-                            <input type="hidden" name="toState" value={rule.to} />
-                            {rule.reasonRequired && (
-                              <input
-                                name="reason"
-                                required
-                                placeholder="Reason (required)"
-                                className="w-48 rounded-md border border-line-strong px-2 py-1 text-xs"
-                              />
-                            )}
-                            <Button type="submit" variant="secondary" size="sm">
-                              {rule.actorRole === "ADMIN" ? "Advance to" : "Move back to"} {rule.to}
+                            <p className="max-w-56 text-xs text-fg-muted">
+                              A Draft has no plans, registrations or grades, so nothing is lost. This cannot be undone.
+                            </p>
+                            <Button type="submit" variant="danger" size="sm" className="w-fit">
+                              Delete this semester
                             </Button>
                           </form>
-                        ))}
-                      </div>
+                        </details>
+                      )}
                     </Td>
                   </Tr>
                 );
               })}
             </tbody>
           </Table>
-        </Card>
+        </TableCard>
       </section>
     </main>
   );

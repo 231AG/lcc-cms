@@ -14,7 +14,7 @@
  * alone on purpose -- that table has no FK to student by design (it's
  * append-only and must survive the entities it describes being deleted).
  *
- * The 2026/2027 First Semester's REGISTRATION state and the two
+ * The 2026/2027 First Semester's state and the two
  * retrospective historical semesters created for this data are NOT touched
  * here -- those are calendar-level decisions, left for a human to make
  * separately.
@@ -87,7 +87,7 @@ async function main() {
     }
   }
 
-  console.log("\nDone. Note: the 2026/2027 First Semester is still in REGISTRATION state, and the two");
+  console.log("\nDone. Note: the 2026/2027 First Semester's state is unchanged, and the two");
   console.log("retrospective historical semesters (2024/2025 and 2025/2026 Second Semester) still exist");
   console.log("with no records against them -- left as-is; delete/revert those manually if you want them gone too.");
 

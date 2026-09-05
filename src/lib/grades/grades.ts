@@ -15,6 +15,8 @@ import {
 } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
+import { listName } from "@/lib/students/name";
+import { isGradeEntryOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { ConflictError, StateError, ValidationError } from "@/lib/errors";
 import { runIdempotent } from "@/lib/tx/idempotent";
 import { deriveLetterFromScore, roundHalfUp, type GradeScaleEntry } from "@/lib/gpa/engine";
@@ -34,8 +36,10 @@ async function getActiveGradeScale(tx: Tx): Promise<GradeScaleEntry[]> {
 async function assertSemesterInGradeSubmission(tx: Tx, semesterId: string): Promise<void> {
   const sem = await tx.query.semester.findFirst({ where: eq(semester.id, semesterId) });
   if (!sem) throw new ValidationError("Semester not found.");
-  if (sem.state !== "GRADE_SUBMISSION") {
-    throw new StateError(`Grading is only permitted while the semester is in Grade Submission (currently ${sem.state}).`);
+  if (!isGradeEntryOpen(sem.state as SemesterState)) {
+    throw new StateError(
+      `Grades can only be entered while the semester is In Progress -- this one is ${SEMESTER_STATE_LABEL[sem.state as SemesterState]}.`,
+    );
   }
 }
 
@@ -74,7 +78,7 @@ export async function getClassRoster(actor: Actor, offeringId: string): Promise<
           registrationId: r.id,
           studentId: r.studentId,
           studentNumber: s?.studentNumber ?? "",
-          studentName: s ? `${s.lastName}, ${s.firstName}` : r.studentId,
+          studentName: s ? listName(s) : r.studentId,
           isRetake: r.isRetake,
           grade: grades.find((g) => g.registrationId === r.id) ?? null,
         };
@@ -582,8 +586,10 @@ export async function requestCorrection(actor: Actor, gradeRecordId: string, inp
     if (sem.state === "CLOSED") {
       throw new StateError("This semester is Closed; a Super Admin must reopen it before a correction can be requested.");
     }
-    if (sem.state !== "GRADE_SUBMISSION") {
-      throw new StateError(`Corrections are only permitted while the semester is in Grade Submission (currently ${sem.state}).`);
+    if (!isGradeEntryOpen(sem.state as SemesterState)) {
+      throw new StateError(
+        `Corrections can only be made while the semester is In Progress -- this one is ${SEMESTER_STATE_LABEL[sem.state as SemesterState]}.`,
+      );
     }
 
     const scale = await getActiveGradeScale(tx);

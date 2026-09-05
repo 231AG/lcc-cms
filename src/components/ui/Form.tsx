@@ -33,6 +33,25 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return <textarea className={cn(fieldBase, className)} {...props} />;
 }
 
+/**
+ * The asterisk that marks a required field.
+ *
+ * `aria-hidden` with a visually-hidden word beside it, rather than a bare
+ * "*": a screen reader announcing "star" tells nobody anything, and the
+ * control's own `required` attribute is what assistive tech actually reads.
+ * This is the sighted reader's half of the same fact.
+ */
+export function Required() {
+  return (
+    <>
+      <span aria-hidden="true" className="ml-0.5 text-danger-fg">
+        *
+      </span>
+      <span className="sr-only"> (required)</span>
+    </>
+  );
+}
+
 /** Label + control wrapper for the common "one field, one label, spaced from the next" case. */
 export function FormField({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("mb-4", className)}>{children}</div>;

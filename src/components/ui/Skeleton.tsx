@@ -18,13 +18,13 @@ export function Skeleton({ className }: { className?: string }) {
 export function SkeletonTable({ columns, rows = 8 }: { columns: number; rows?: number }) {
   return (
     <div aria-hidden="true" className="overflow-hidden">
-      <div className="flex gap-3 border-b border-line bg-surface-subtle px-3 py-2.5">
+      <div className="flex gap-3 border-b border-brand-line bg-brand-subtle-strong px-3 py-2.5">
         {Array.from({ length: columns }, (_, i) => (
           <Skeleton key={i} className={cn("h-3", i === 1 ? "flex-[2]" : "flex-1")} />
         ))}
       </div>
       {Array.from({ length: rows }, (_, r) => (
-        <div key={r} className="flex items-center gap-3 border-b border-line-subtle px-3 py-3">
+        <div key={r} className="flex items-center gap-3 border-b border-brand-line px-3 py-3">
           {Array.from({ length: columns }, (_, i) => (
             <Skeleton key={i} className={cn("h-3.5", i === 1 ? "flex-[2]" : "flex-1")} />
           ))}

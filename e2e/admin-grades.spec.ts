@@ -146,8 +146,7 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
   await addMeeting(adminActor, offering.id, { dayOfWeek: 1, startTime: "09:00", endTime: "10:30", room: "E2E-1" });
   await publishOffering(adminActor, offering.id);
 
-  await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN" });
-  await transitionSemester(adminActor, { semesterId: sem.id, toState: "REGISTRATION" });
+  await transitionSemester(adminActor, { semesterId: sem.id, toState: "OPEN", reason: "Test fixture" });
 
   // Student ID must start with "19" or "20" (STUDENT_ID_PATTERN) --
   // decoupled from yearBase (2300+, fine for an academic year label with
@@ -158,6 +157,7 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
     studentNumber,
     firstName: "Grade",
     lastName: `Fixture-${studentNumber}`,
+    gender: "FEMALE",
     departmentId: dept.id,
     enrolmentYear,
   });
@@ -167,8 +167,7 @@ test("Admin enters and submits a class's grades; a different Super Admin approve
 
   await registerDirect(adminActor, studentRow.id, offering.id, "e2e fixture");
 
-  await transitionSemester(adminActor, { semesterId: sem.id, toState: "IN_PROGRESS" });
-  await transitionSemester(adminActor, { semesterId: sem.id, toState: "GRADE_SUBMISSION" });
+  await transitionSemester(adminActor, { semesterId: sem.id, toState: "IN_PROGRESS", reason: "Test fixture" });
 
   const reg = await db.query.registration.findFirst({ where: eq(registration.offeringId, offering.id) });
   if (!reg) throw new Error("registration fixture setup failed");

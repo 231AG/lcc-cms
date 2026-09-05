@@ -115,8 +115,8 @@ const PERMISSIONS_STAGE_4: Array<{
   { role: "SUPER_ADMIN", action: "calendar.manageSemester", allowed: false, note: "REQ-R04 explicit denial" },
 
   { role: "STUDENT", action: "calendar.transitionSemester", allowed: false, note: "" },
-  { role: "ADMIN", action: "calendar.transitionSemester", allowed: true, note: "Forward transitions only -- see semesterStateMachine.ts" },
-  { role: "SUPER_ADMIN", action: "calendar.transitionSemester", allowed: true, note: "Backward/reopen only -- see semesterStateMachine.ts" },
+  { role: "ADMIN", action: "calendar.transitionSemester", allowed: true, note: "Forward moves, always with a reason -- see semesterStateMachine.ts" },
+  { role: "SUPER_ADMIN", action: "calendar.transitionSemester", allowed: true, note: "Forward moves (reason optional) plus the Closed reopen (reason mandatory) -- see semesterStateMachine.ts" },
 ];
 
 /** Stage 5: student profile edits (name, department, enrolment year,
@@ -272,6 +272,13 @@ const PERMISSIONS_STAGE_11: Array<{
   { role: "ADMIN", action: "audit.view", allowed: false, note: "REQ-R08. Audit log is Super Admin-only (Section 11.3)." },
   { role: "SUPER_ADMIN", action: "audit.view", allowed: true, note: "REQ-R08. Reading the log is itself logged (AUDIT_LOG_VIEWED)." },
 
+  // Grade sheet signature block (institution_setting rows, not a table of
+  // their own). Admin-only, matching every other "the office maintains
+  // this" power; a Super Admin's role is oversight, not data entry.
+  { role: "STUDENT", action: "institution.manageSignatories", allowed: false, note: "" },
+  { role: "ADMIN", action: "institution.manageSignatories", allowed: true, note: "Names/titles printed on the Student Grade Sheet signature block." },
+  { role: "SUPER_ADMIN", action: "institution.manageSignatories", allowed: false, note: "REQ-R04 explicit denial -- oversight, not data entry." },
+
   { role: "STUDENT", action: "gradingPolicy.view", allowed: true, note: "X-08. Read-only view of the active grade scale." },
   { role: "ADMIN", action: "gradingPolicy.view", allowed: true, note: "X-08." },
   { role: "SUPER_ADMIN", action: "gradingPolicy.view", allowed: true, note: "X-08." },
@@ -286,6 +293,13 @@ const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: st
   { key: "academic_standing_probation_below", value: "2.000", description: "REQ-C15, CR-14." },
   { key: "academic_standing_honours_at_or_above", value: "3.500", description: "REQ-C15, CR-14." },
   { key: "institution_display_timezone", value: "Africa/Monrovia", description: "DER-27." },
+  // Grade sheet signature block. Seeded with the names on the College's
+  // existing printed sheet; editable by an Admin from the grade sheet
+  // itself, so a change of dean is a form submission, not a deployment.
+  { key: "grade_sheet_signed_name", value: "Mr. James M. Kaye", description: "Printed on the Student Grade Sheet signature block." },
+  { key: "grade_sheet_signed_title", value: "Dean of Admissions & Records", description: "Printed on the Student Grade Sheet signature block." },
+  { key: "grade_sheet_approved_name", value: "Mr. Justin M. Kanneh", description: "Printed on the Student Grade Sheet signature block." },
+  { key: "grade_sheet_approved_title", value: "Dean of Academic Affairs", description: "Printed on the Student Grade Sheet signature block." },
   { key: "prerequisite_override_enabled", value: false, description: "DEC-12 -- still open. Enable with an expiry date before Stage 9 UAT." },
   // prerequisite_override_expiry (DEC-12) is deliberately NOT seeded: jsonb
   // is NOT NULL on this table, and an absent key is exactly "no window

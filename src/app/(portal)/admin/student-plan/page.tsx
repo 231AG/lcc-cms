@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
+import { fullName, listName } from "@/lib/students/name";
+import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, searchStudents } from "@/lib/students/students";
 import { NotFoundError } from "@/lib/errors";
@@ -82,12 +85,12 @@ export default async function StudentPlanEntryPage({
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semId;
+    return semesterFullLabel(year, sem, semId);
   };
 
   // Same definition of "the current semester" the student-facing page uses,
   // so the Admin lands on the right one without picking it every time.
-  const semesterId = rawSemesterId || semesters.find((s) => s.state === "REGISTRATION")?.id;
+  const semesterId = rawSemesterId || semesters.find((s) => isPlanningOpen(s.state as SemesterState))?.id;
   const semesterState = semesters.find((s) => s.id === semesterId)?.state;
 
   let chosen: Awaited<ReturnType<typeof getStudent>> | undefined;
@@ -145,10 +148,10 @@ export default async function StudentPlanEntryPage({
         </Button>
       </form>
 
-      {semesterId && semesterState !== "REGISTRATION" && (
+      {semesterId && !isPlanningOpen(semesterState as SemesterState) && (
         <Alert tone="warning" className="mb-6">
-          {yearLabel(semesterId)} is {semesterState}, not Registration. Course planning is only open while a semester is in
-          Registration, so a plan cannot be built or submitted for it.
+          {yearLabel(semesterId)} is {SEMESTER_STATE_LABEL[semesterState as SemesterState] ?? semesterState}. Course planning is only
+          open while a semester is Open, so a plan cannot be built or submitted for it.
         </Alert>
       )}
 
@@ -160,7 +163,7 @@ export default async function StudentPlanEntryPage({
           student={chosen}
           semesterId={semesterId}
           semesterLabel={semesterId ? yearLabel(semesterId) : ""}
-          canEdit={semesterState === "REGISTRATION"}
+          canEdit={isPlanningOpen(semesterState as SemesterState)}
           sq={sq}
           q={q}
           page={page}
@@ -183,6 +186,13 @@ async function StudentChooser({
   semesterId?: string;
 }) {
   const results = sq?.trim() ? await searchStudents(actor, { query: sq, page: 1, pageSize: 10 }) : undefined;
+  // Reference data read whole and resolved in memory rather than joined per
+  // row -- tens of departments, and the same approach every other listing
+  // in this app takes.
+  const departments = results?.rows.length
+    ? await asUser(actor.userId, (tx) => tx.query.department.findMany())
+    : [];
+  const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? "—";
 
   return (
     <Card>
@@ -214,24 +224,30 @@ async function StudentChooser({
             <Table>
               <Thead>
                 <tr>
-                  <Th>Student ID</Th>
+                  <Th className="whitespace-nowrap">Student ID</Th>
                   <Th>Name</Th>
-                  <Th>Status</Th>
-                  <Th></Th>
+                  <Th className="hidden sm:table-cell">Department</Th>
+                  <Th className="whitespace-nowrap">Status</Th>
+                  <Th className="text-right">Action</Th>
                 </tr>
               </Thead>
               <tbody>
                 {results.rows.map((s) => (
                   <Tr key={s.id}>
-                    <Td className="font-mono text-xs text-fg-secondary">{s.studentNumber}</Td>
-                    <Td className="font-medium text-fg">
-                      {s.lastName}, {s.firstName}
+                    <Td className="font-mono text-xs whitespace-nowrap text-fg-secondary">{s.studentNumber}</Td>
+                    <Td className="font-medium text-fg">{listName(s)}</Td>
+                    <Td className="hidden text-fg-secondary sm:table-cell">{departmentName(s.departmentId)}</Td>
+                    <Td className="whitespace-nowrap">
+                      <Badge tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status}</Badge>
                     </Td>
-                    <Td>{s.status}</Td>
-                    <Td>
+                    <Td className="text-right">
+                      {/* The same destination the row used to link to, as a
+                          button: this is the action the row exists for, and
+                          a text link beside four data cells did not read as
+                          one. */}
                       <Link
                         href={`/admin/student-plan?studentId=${s.id}${semesterId ? `&semesterId=${semesterId}` : ""}`}
-                        className="font-medium text-brand-fg hover:underline"
+                        className={buttonClasses("secondary", "sm")}
                       >
                         Plan courses
                       </Link>
@@ -271,7 +287,7 @@ async function StudentPlanEditor({
   page,
 }: {
   actor: Actor;
-  student: { id: string; studentNumber: string; firstName: string; lastName: string; status: string };
+  student: { id: string; studentNumber: string; firstName: string; middleName: string | null; lastName: string; status: string };
   semesterId?: string;
   semesterLabel: string;
   canEdit: boolean;
@@ -286,7 +302,7 @@ async function StudentPlanEditor({
       <CardBody className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-medium text-fg">
-            {student.firstName} {student.lastName}
+            {fullName(student)}
           </p>
           <p className="text-xs text-fg-muted">
             <span className="font-mono">{student.studentNumber}</span> &middot; {student.status}
