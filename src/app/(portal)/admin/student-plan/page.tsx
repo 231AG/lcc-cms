@@ -186,6 +186,13 @@ async function StudentChooser({
   semesterId?: string;
 }) {
   const results = sq?.trim() ? await searchStudents(actor, { query: sq, page: 1, pageSize: 10 }) : undefined;
+  // Reference data read whole and resolved in memory rather than joined per
+  // row -- tens of departments, and the same approach every other listing
+  // in this app takes.
+  const departments = results?.rows.length
+    ? await asUser(actor.userId, (tx) => tx.query.department.findMany())
+    : [];
+  const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? "—";
 
   return (
     <Card>
@@ -217,24 +224,30 @@ async function StudentChooser({
             <Table>
               <Thead>
                 <tr>
-                  <Th>Student ID</Th>
+                  <Th className="whitespace-nowrap">Student ID</Th>
                   <Th>Name</Th>
-                  <Th>Status</Th>
-                  <Th></Th>
+                  <Th className="hidden sm:table-cell">Department</Th>
+                  <Th className="whitespace-nowrap">Status</Th>
+                  <Th className="text-right">Action</Th>
                 </tr>
               </Thead>
               <tbody>
                 {results.rows.map((s) => (
                   <Tr key={s.id}>
-                    <Td className="font-mono text-xs text-fg-secondary">{s.studentNumber}</Td>
-                    <Td className="font-medium text-fg">
-                      {listName(s)}
+                    <Td className="font-mono text-xs whitespace-nowrap text-fg-secondary">{s.studentNumber}</Td>
+                    <Td className="font-medium text-fg">{listName(s)}</Td>
+                    <Td className="hidden text-fg-secondary sm:table-cell">{departmentName(s.departmentId)}</Td>
+                    <Td className="whitespace-nowrap">
+                      <Badge tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status}</Badge>
                     </Td>
-                    <Td>{s.status}</Td>
-                    <Td>
+                    <Td className="text-right">
+                      {/* The same destination the row used to link to, as a
+                          button: this is the action the row exists for, and
+                          a text link beside four data cells did not read as
+                          one. */}
                       <Link
                         href={`/admin/student-plan?studentId=${s.id}${semesterId ? `&semesterId=${semesterId}` : ""}`}
-                        className="font-medium text-brand-fg hover:underline"
+                        className={buttonClasses("secondary", "sm")}
                       >
                         Plan courses
                       </Link>

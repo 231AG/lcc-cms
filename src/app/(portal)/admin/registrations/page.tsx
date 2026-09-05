@@ -9,9 +9,11 @@ import { searchStudents } from "@/lib/students/students";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
-import { Label, Input } from "@/components/ui/Form";
+import { Label, Input, Select } from "@/components/ui/Form";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { TableCard, TableEmpty } from "@/components/ui/TableCard";
 import { Pagination } from "@/components/ui/Pagination";
 import { dropRegistrationAction, registerDirectAction } from "./actions";
 
@@ -35,10 +37,18 @@ const OFFERINGS_PER_PAGE = 15;
 export default async function RegistrationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ offeringId?: string; error?: string; oq?: string; opage?: string; sq?: string }>;
+  searchParams: Promise<{
+    offeringId?: string;
+    error?: string;
+    oq?: string;
+    opage?: string;
+    sq?: string;
+    collegeId?: string;
+    departmentId?: string;
+  }>;
 }) {
   const actor = await getCurrentActor();
-  const { offeringId, error, oq, opage, sq } = await searchParams;
+  const { offeringId, error, oq, opage, sq, collegeId, departmentId } = await searchParams;
 
   if (!actor)
     return (
@@ -54,13 +64,29 @@ export default async function RegistrationsPage({
     );
   }
 
-  const [offerings, courses] = await asUser(actor.userId, (tx) =>
+  const [offerings, courses, departments, colleges] = await asUser(actor.userId, (tx) =>
     Promise.all([
       tx.query.courseOffering.findMany({ where: (o, { eq }) => eq(o.status, "PUBLISHED") }),
       tx.query.course.findMany(),
+      tx.query.department.findMany({ orderBy: (d, { asc }) => asc(d.name) }),
+      tx.query.college.findMany({ orderBy: (c, { asc }) => asc(c.name) }),
     ]),
   );
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
+  // An offering's college and department are reached through its course.
+  // Reference tables are tens of rows, read whole once and resolved in
+  // memory -- the same shape every other listing here uses.
+  const departmentForOffering = (o: (typeof offerings)[number]) => {
+    const c = courseFor(o.courseId);
+    return c ? departments.find((d) => d.id === c.departmentId) : undefined;
+  };
+  const collegeForOffering = (o: (typeof offerings)[number]) => {
+    const d = departmentForOffering(o);
+    return d ? colleges.find((c) => c.id === d.collegeId) : undefined;
+  };
+  // The Department filter only offers departments of the chosen college:
+  // a filter that can only ever return nothing is not worth showing.
+  const selectableDepartments = collegeId ? departments.filter((d) => d.collegeId === collegeId) : departments;
   const offeringLabel = (o: (typeof offerings)[number]) => {
     const c = courseFor(o.courseId);
     return `${c ? `${c.code} — ${c.title}` : o.courseId} (Section ${o.section})`;
@@ -85,7 +111,14 @@ export default async function RegistrationsPage({
   // Candidates for direct registration: searched, not enumerated.
   const candidates = sq?.trim() ? await searchStudents(actor, { query: sq, status: "ACTIVE", page: 1, pageSize: 10 }) : undefined;
 
-  const matchingOfferings = filterOfferings(offerings, courses, oq);
+  // Text search first, then the two structural filters. Department wins
+  // over College when both are set -- it is the narrower of the two, and
+  // the picker keeps them consistent anyway.
+  const matchingOfferings = filterOfferings(offerings, courses, oq).filter((o) => {
+    if (departmentId && departmentForOffering(o)?.id !== departmentId) return false;
+    if (collegeId && collegeForOffering(o)?.id !== collegeId) return false;
+    return true;
+  });
   const { rows: pagedOfferings, page: offeringPage, totalPages: offeringPages } = pageSlice(
     matchingOfferings,
     Number(opage) || 1,
@@ -94,7 +127,7 @@ export default async function RegistrationsPage({
 
   const hrefWith = (params: Record<string, string | undefined>) => {
     const sp = new URLSearchParams();
-    const merged = { offeringId, oq, opage: String(offeringPage), sq, ...params };
+    const merged = { offeringId, oq, opage: String(offeringPage), sq, collegeId, departmentId, ...params };
     for (const [k, v] of Object.entries(merged)) if (v) sp.set(k, v);
     return `/admin/registrations?${sp.toString()}`;
   };
@@ -123,41 +156,119 @@ export default async function RegistrationsPage({
               </Link>
             </div>
           ) : (
-            <>
-              <form method="GET" className="mb-3 flex flex-wrap items-end gap-2">
-                <div>
-                  <Label htmlFor="oq" className="text-xs">
-                    Search offerings
-                  </Label>
-                  <Input id="oq" name="oq" defaultValue={oq ?? ""} placeholder="Code, title or instructor" className="w-72" />
-                </div>
-                <Button type="submit" variant="secondary">
-                  Search
-                </Button>
-              </form>
-              <p className="mb-2 text-xs text-fg-muted">
-                {matchingOfferings.length === 0
-                  ? `No published offerings match "${oq}".`
-                  : `${matchingOfferings.length} published offering${matchingOfferings.length === 1 ? "" : "s"}${oq ? ` matching "${oq}"` : ""}.`}
-              </p>
-              <ul className="flex flex-col gap-1.5">
-                {pagedOfferings.map((o) => (
-                  <li key={o.id} className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2 text-sm">
-                    <span>{offeringLabel(o)}</span>
-                    <Link href={hrefWith({ offeringId: o.id })} className="shrink-0 font-medium text-brand-fg hover:underline">
-                      Open
+            <TableCard
+              title="Published offerings"
+              count={matchingOfferings.length}
+              countLabel="offering"
+              filters={
+                /* Search first, then the two structural filters, in the same
+                   order as the Students and Offerings listings. */
+                <form method="GET" className="flex flex-wrap items-end gap-2">
+                  <div className="grow sm:grow-0">
+                    <Label htmlFor="oq" className="text-xs">
+                      Search
+                    </Label>
+                    <Input id="oq" name="oq" defaultValue={oq ?? ""} placeholder="Code, title or instructor" className="w-full sm:w-64" />
+                  </div>
+                  <div>
+                    <Label htmlFor="collegeId" className="text-xs">
+                      College
+                    </Label>
+                    <Select id="collegeId" name="collegeId" defaultValue={collegeId ?? ""} className="max-w-56">
+                      <option value="">All colleges</option>
+                      {colleges.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="departmentId" className="text-xs">
+                      Department
+                    </Label>
+                    <Select id="departmentId" name="departmentId" defaultValue={departmentId ?? ""} className="max-w-56">
+                      <option value="">All departments</option>
+                      {selectableDepartments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button type="submit" variant="secondary">
+                    Apply
+                  </Button>
+                  {(oq || collegeId || departmentId) && (
+                    <Link href="/admin/registrations" className={buttonClasses("ghost", "md")}>
+                      Clear filters
                     </Link>
-                  </li>
-                ))}
-              </ul>
-              <Pagination
-                page={offeringPage}
-                totalPages={offeringPages}
-                hrefForPage={(p) => hrefWith({ opage: String(p) })}
-                className="mt-3"
-                label="Offerings pagination"
-              />
-            </>
+                  )}
+                </form>
+              }
+            >
+              {matchingOfferings.length === 0 ? (
+                <TableEmpty title="No offerings found">
+                  No published offering matches the current search and filters.
+                </TableEmpty>
+              ) : (
+                <>
+                  <Table>
+                    <Thead>
+                      <tr>
+                        <Th className="hidden lg:table-cell">College</Th>
+                        <Th className="hidden md:table-cell">Department</Th>
+                        <Th className="whitespace-nowrap">Course Code</Th>
+                        <Th>Course Title</Th>
+                        <Th className="whitespace-nowrap">Sec</Th>
+                        <Th className="hidden whitespace-nowrap sm:table-cell">Instructor</Th>
+                        <Th className="text-right">Action</Th>
+                      </tr>
+                    </Thead>
+                    <tbody>
+                      {pagedOfferings.map((o) => {
+                        const c = courseFor(o.courseId);
+                        return (
+                          <Tr key={o.id}>
+                            <Td className="hidden text-fg-secondary lg:table-cell">
+                              <span className="block max-w-[14rem] truncate" title={collegeForOffering(o)?.name}>
+                                {collegeForOffering(o)?.name ?? "—"}
+                              </span>
+                            </Td>
+                            <Td className="hidden text-fg-secondary md:table-cell">
+                              <span className="block max-w-[14rem] truncate" title={departmentForOffering(o)?.name}>
+                                {departmentForOffering(o)?.name ?? "—"}
+                              </span>
+                            </Td>
+                            <Td className="font-mono text-xs whitespace-nowrap text-fg-secondary">{c?.code ?? o.courseId}</Td>
+                            <Td className="min-w-[12rem] font-medium text-fg">{c?.title ?? "—"}</Td>
+                            <Td className="whitespace-nowrap">{o.section}</Td>
+                            <Td className="hidden whitespace-nowrap text-fg-secondary sm:table-cell">
+                              {o.instructorName || "—"}
+                            </Td>
+                            <Td className="text-right">
+                              <Link href={hrefWith({ offeringId: o.id })} className={buttonClasses("secondary", "sm")}>
+                                Open
+                              </Link>
+                            </Td>
+                          </Tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                  {offeringPages > 1 && (
+                    <div className="flex justify-end border-t border-line-subtle px-4 py-3 sm:px-5">
+                      <Pagination
+                        page={offeringPage}
+                        totalPages={offeringPages}
+                        hrefForPage={(p) => hrefWith({ opage: String(p) })}
+                        label="Offerings pagination"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </TableCard>
           )}
         </CardBody>
       </Card>
