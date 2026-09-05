@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
-import { semesterDisplayName } from "@/lib/academic/semesterName";
+import { semesterDisplayName, SEMESTER_NAME_OPTIONS } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import {
   isDeletable,
@@ -11,11 +11,11 @@ import {
   type SemesterState,
 } from "@/lib/academic/semesterStateMachine";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { Button } from "@/components/ui/Button";
-import { Label, Input, Select } from "@/components/ui/Form";
+import { Label, Input, Select, Required as RequiredMark } from "@/components/ui/Form";
+import { TableCard } from "@/components/ui/TableCard";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { createAcademicYearAction, createSemesterAction, deleteSemesterAction, transitionSemesterAction } from "./actions";
 
@@ -103,7 +103,7 @@ export default async function CalendarPage({
           </form>
         )}
 
-        <Card>
+        <TableCard title="Academic years" count={years.length} countLabel="year">
           <Table>
             <Thead>
               <tr>
@@ -122,7 +122,7 @@ export default async function CalendarPage({
               ))}
             </tbody>
           </Table>
-        </Card>
+        </TableCard>
       </section>
 
       {/* Semesters */}
@@ -144,19 +144,24 @@ export default async function CalendarPage({
               </Select>
             </div>
             <div>
-              <Label className="text-xs" htmlFor="sem-sequence">
-                Sequence
-              </Label>
-              <Select id="sem-sequence" name="sequence" required>
-                <option value="1">1 (First)</option>
-                <option value="2">2 (Second)</option>
-              </Select>
-            </div>
-            <div>
+              {/* One control, not two. The old form asked for a free-text
+                  Name and a separate Sequence, which are the same fact
+                  twice and could disagree; the sequence is now derived from
+                  the name chosen. */}
               <Label className="text-xs" htmlFor="sem-name">
                 Name
+                <RequiredMark />
               </Label>
-              <Input id="sem-name" name="name" required placeholder="First Semester" />
+              <Select id="sem-name" name="name" required defaultValue="" className="w-40">
+                <option value="" disabled>
+                  Select
+                </option>
+                {SEMESTER_NAME_OPTIONS.map((o) => (
+                  <option key={o.name} value={o.name}>
+                    {o.name}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div>
               <Label className="text-xs" htmlFor="sem-start">
@@ -174,12 +179,18 @@ export default async function CalendarPage({
           </form>
         )}
 
-        <Card className="overflow-hidden">
+        <TableCard title="Semesters" count={semesters.length} countLabel="semester">
           <Table>
             <Thead>
               <tr>
                 <Th>Academic year</Th>
-                <Th className="hidden sm:table-cell">Seq</Th>
+                {/* "Seq" is semester.sequence: 1 or 2, which semester of
+                    its academic year this is. CR-10 allows exactly two per
+                    year, and it is what orders them and what the Semester
+                    I / Semester II naming is derived from. */}
+                <Th className="hidden sm:table-cell" title="Which semester of the academic year: 1 or 2">
+                  Seq
+                </Th>
                 <Th>Name</Th>
                 <Th className="hidden md:table-cell">Dates</Th>
                 <Th>State</Th>
@@ -291,7 +302,7 @@ export default async function CalendarPage({
               })}
             </tbody>
           </Table>
-        </Card>
+        </TableCard>
       </section>
     </main>
   );

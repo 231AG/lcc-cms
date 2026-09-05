@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
+import { sequenceForName } from "@/lib/academic/semesterName";
 import { createAcademicYear, createSemester, deleteSemester, transitionSemester } from "@/lib/academic/calendar";
 import type { SemesterState } from "@/lib/academic/semesterStateMachine";
 
@@ -28,10 +29,15 @@ export async function createAcademicYearAction(formData: FormData): Promise<void
 export async function createSemesterAction(formData: FormData): Promise<void> {
   const actor = await requireActor();
   try {
+    // Name and sequence come from one choice, so they cannot contradict
+    // each other -- see SEMESTER_NAME_OPTIONS.
+    const name = String(formData.get("name") ?? "");
+    const sequence = sequenceForName(name);
+    if (!sequence) errorRedirect("Choose Semester I or Semester II.");
     await createSemester(actor, {
       academicYearId: String(formData.get("academicYearId") ?? ""),
-      sequence: Number(formData.get("sequence") ?? 1) as 1 | 2,
-      name: String(formData.get("name") ?? ""),
+      sequence,
+      name,
       startDate: String(formData.get("startDate") ?? ""),
       endDate: String(formData.get("endDate") ?? ""),
     });

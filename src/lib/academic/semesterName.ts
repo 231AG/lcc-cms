@@ -47,3 +47,22 @@ export function semesterFullLabel(
   const display = semesterDisplayName(semester);
   return year ? `${year.label} — ${display}` : display;
 }
+
+/**
+ * The two names a semester may be given, and the `sequence` each implies.
+ *
+ * The create form used to ask for a free-text Name AND a separate Sequence,
+ * which are two ways of saying the same thing and could disagree -- a
+ * semester named "First Semester" with sequence 2 was accepted. One choice
+ * now produces both, so they cannot.
+ */
+export const SEMESTER_NAME_OPTIONS = [
+  { name: "Semester I", sequence: 1 as const },
+  { name: "Semester II", sequence: 2 as const },
+];
+
+/** The sequence a chosen name implies; undefined for anything not on the
+ *  list, which the service layer then rejects. */
+export function sequenceForName(name: string): 1 | 2 | undefined {
+  return SEMESTER_NAME_OPTIONS.find((o) => o.name === name.trim())?.sequence;
+}
