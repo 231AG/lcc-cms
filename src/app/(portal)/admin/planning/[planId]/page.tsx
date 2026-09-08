@@ -1,12 +1,17 @@
+import { Check, ShieldAlert, X } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
+import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds } from "@/lib/offerings/offerings";
 import { getPlan, getPlanItems } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Form";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { TableCard } from "@/components/ui/TableCard";
+import { expandDays, formatDays } from "@/lib/offerings/offeringRows";
 import {
   approvePlanAction,
   approvePlanItemAction,
@@ -15,7 +20,12 @@ import {
   rejectPlanItemAction,
 } from "../actions";
 
-const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** Every icon control carries the same treatment: a tooltip on hover, and
+ *  an accessible name that says the same thing for anyone not using a
+ *  mouse. Matches the Students and Offerings tables. */
+const iconAction =
+  "inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
 const PLAN_STATUS_TONE: Record<string, Tone> = {
   DRAFT: "neutral",
@@ -92,7 +102,7 @@ export default async function PlanDetailPage({
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
       <PageHeader
-        title={student ? `${student.studentNumber} — ${student.firstName} ${student.lastName}` : plan.studentId}
+        title={student ? `${student.studentNumber} — ${fullName(student)}` : plan.studentId}
         description={
           <>
             {semester?.name ?? plan.semesterId} — status <Badge tone={PLAN_STATUS_TONE[plan.status] ?? "neutral"}>{plan.status}</Badge> —{" "}
@@ -126,92 +136,164 @@ export default async function PlanDetailPage({
         </Alert>
       )}
 
-      <Card className="mb-6">
-        <CardBody>
-          <h2 className="mb-3 font-medium text-fg">Items</h2>
-          <div className="flex flex-col gap-3">
+      <TableCard
+        title="Planned courses"
+        count={items.length}
+        countLabel="course"
+        id="planned-courses"
+      >
+        <Table>
+          <Thead>
+            <tr>
+              <Th className="whitespace-nowrap">Course Code</Th>
+              <Th>Course Title</Th>
+              <Th className="whitespace-nowrap">Sec</Th>
+              <Th className="hidden whitespace-nowrap sm:table-cell">Cr/Hrs</Th>
+              <Th className="hidden whitespace-nowrap md:table-cell">Room</Th>
+              <Th className="whitespace-nowrap">Day</Th>
+              <Th className="hidden whitespace-nowrap lg:table-cell">Start</Th>
+              <Th className="hidden whitespace-nowrap lg:table-cell">End</Th>
+              <Th className="whitespace-nowrap">Status</Th>
+              <Th className="text-right">Actions</Th>
+            </tr>
+          </Thead>
+          <tbody>
             {items.map((i) => {
               const c = courseFor(i.courseId);
               const o = offeringFor(i.offeringId);
-              const meetings = o ? meetingsByOffering.get(o.id) ?? [] : [];
+              const meetings = o ? (meetingsByOffering.get(o.id) ?? []) : [];
+              // The plan shows one row per course, so several meetings are
+              // summarised into the slot a reader needs to see: the days,
+              // and the room and time they share.
+              const days = formatDays(meetings.map((m) => m.dayOfWeek));
+              const first = meetings[0];
+              const decidable = plan.status === "SUBMITTED" && i.status === "PENDING";
               return (
-                <div key={i.id} className="rounded-md border border-line p-3 text-sm">
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="font-medium text-fg">
-                      {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section})
-                    </span>
-                    <span className="flex items-center gap-2 text-xs text-fg-muted">
-                      {o?.frozenCreditHours}cr{i.isRetake && " — retake"}
-                      <Badge tone={ITEM_STATUS_TONE[i.status] ?? "neutral"}>{i.status}</Badge>
-                    </span>
-                  </div>
-                  <p className="mb-2 text-xs text-fg-muted">
-                    {meetings.map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}`).join(", ")}
-                  </p>
-                  {i.status === "REJECTED" && i.rejectionReason && <p className="mb-2 text-xs text-danger-fg">Rejected: {i.rejectionReason}</p>}
-                  {i.prereqOverrideReason && <p className="mb-2 text-xs text-warning-fg">Prerequisite overridden: {i.prereqOverrideReason}</p>}
-
-                  {i.status === "PENDING" && (
-                    <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle pt-2">
-                      {plan.status === "SUBMITTED" && (
+                <Tr key={i.id} className="align-top">
+                  <Td className="font-mono text-xs whitespace-nowrap text-fg-secondary">{c?.code ?? i.courseId}</Td>
+                  <Td className="min-w-[12rem] font-medium text-fg">
+                    {c?.title ?? "—"}
+                    {i.isRetake && (
+                      <Badge tone="warning" className="ml-2">
+                        RETAKE
+                      </Badge>
+                    )}
+                    {i.status === "REJECTED" && i.rejectionReason && (
+                      <p className="mt-1 text-xs text-danger-fg">Rejected: {i.rejectionReason}</p>
+                    )}
+                    {i.prereqOverrideReason && (
+                      <p className="mt-1 text-xs text-warning-fg">Prerequisite overridden: {i.prereqOverrideReason}</p>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap">{o?.section ?? "—"}</Td>
+                  <Td className="hidden whitespace-nowrap sm:table-cell">{o?.frozenCreditHours ?? "—"}</Td>
+                  <Td className="hidden whitespace-nowrap text-fg-secondary md:table-cell">{first?.room || "—"}</Td>
+                  <Td className="whitespace-nowrap" title={expandDays(days)}>
+                    {days || "—"}
+                  </Td>
+                  <Td className="hidden whitespace-nowrap lg:table-cell">{first?.startTime?.slice(0, 5) ?? "—"}</Td>
+                  <Td className="hidden whitespace-nowrap lg:table-cell">{first?.endTime?.slice(0, 5) ?? "—"}</Td>
+                  <Td className="whitespace-nowrap">
+                    <Badge tone={ITEM_STATUS_TONE[i.status] ?? "neutral"}>{i.status}</Badge>
+                  </Td>
+                  <Td className="px-2 sm:px-3">
+                    <span className="flex items-center justify-end gap-1">
+                      {decidable && (
                         <>
                           <form action={approvePlanItemAction}>
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
-                            <Button type="submit" variant="secondary" size="sm">
-                              Approve
-                            </Button>
+                            <button
+                              type="submit"
+                              title={`Approve ${c?.code ?? "this course"}`}
+                              aria-label={`Approve ${c?.code ?? "this course"}`}
+                              className={iconAction}
+                            >
+                              <Check className="h-4 w-4" aria-hidden="true" />
+                            </button>
                           </form>
-                          <form action={rejectPlanItemAction} className="flex items-end gap-2">
-                            <input type="hidden" name="planId" value={planId} />
-                            <input type="hidden" name="planItemId" value={i.id} />
-                            <input name="reason" required placeholder="Reason" className="w-56 rounded-md border border-line-strong px-2 py-1 text-xs" />
-                            <Button type="submit" variant="danger" size="sm">
-                              Reject
-                            </Button>
-                          </form>
+                          {/* Reject needs a reason -- the database refuses a
+                              rejection without one -- so the icon opens the
+                              reason rather than submitting on its own. */}
+                          <details className="relative">
+                            <summary
+                              title={`Reject ${c?.code ?? "this course"}`}
+                              aria-label={`Reject ${c?.code ?? "this course"}`}
+                              className={`${iconAction} list-none`}
+                            >
+                              <X className="h-4 w-4" aria-hidden="true" />
+                            </summary>
+                            <form
+                              action={rejectPlanItemAction}
+                              className="absolute right-0 z-10 mt-1 flex w-64 flex-col gap-2 rounded-md border border-line bg-surface p-3 text-left shadow-lg"
+                            >
+                              <input type="hidden" name="planId" value={planId} />
+                              <input type="hidden" name="planItemId" value={i.id} />
+                              <Input name="reason" required placeholder="Reason for rejection" className="py-1 text-xs" />
+                              <Button type="submit" variant="danger" size="sm">
+                                Reject course
+                              </Button>
+                            </form>
+                          </details>
                         </>
                       )}
-                      {!i.prereqOverrideReason && (
-                        <details>
-                          <summary className="cursor-pointer text-xs font-medium text-brand-fg hover:underline">Override a failed prerequisite</summary>
-                          <form action={overridePrerequisiteAction} className="mt-2 flex flex-wrap items-end gap-2">
+                      {i.status === "PENDING" && !i.prereqOverrideReason && (
+                        <details className="relative">
+                          <summary
+                            title="Override a failed prerequisite"
+                            aria-label="Override a failed prerequisite"
+                            className={`${iconAction} list-none`}
+                          >
+                            <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+                          </summary>
+                          <form
+                            action={overridePrerequisiteAction}
+                            className="absolute right-0 z-10 mt-1 flex w-64 flex-col gap-2 rounded-md border border-line bg-surface p-3 text-left shadow-lg"
+                          >
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
-                            <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-line-strong px-2 py-1 text-xs" />
+                            <Input name="reason" required placeholder="Reason for override" className="py-1 text-xs" />
                             <Button type="submit" variant="secondary" size="sm">
-                              Override
+                              Override prerequisite
                             </Button>
                           </form>
                         </details>
                       )}
-                    </div>
-                  )}
-                </div>
+                      {!decidable && i.status !== "PENDING" && <span className="text-xs text-fg-muted">Decided</span>}
+                    </span>
+                  </Td>
+                </Tr>
               );
             })}
-          </div>
-        </CardBody>
-      </Card>
+          </tbody>
+        </Table>
 
-      {plan.status === "SUBMITTED" && items.some((i) => i.status === "PENDING") && (
-        <section>
-          <p className="mb-2 text-xs text-fg-muted">Convenience actions -- apply to every course still pending above.</p>
-          <div className="flex flex-wrap items-start gap-4">
+        {/* At the bottom of the table, where a reviewer arrives after
+            reading every row, rather than in a separate card below it. */}
+        {plan.status === "SUBMITTED" && items.some((i) => i.status === "PENDING") && (
+          <div className="flex flex-wrap items-start gap-4 border-t border-line-subtle px-4 py-4 sm:px-5">
             <form action={approvePlanAction}>
               <input type="hidden" name="planId" value={planId} />
-              <Button type="submit">Approve all pending</Button>
-            </form>
-            <form action={rejectPlanAction} className="flex items-end gap-2">
-              <input type="hidden" name="planId" value={planId} />
-              <input name="reason" required placeholder="Reason for rejection" className="w-64 rounded-md border border-line-strong px-3 py-2 text-sm" />
-              <Button type="submit" variant="danger">
-                Reject all pending
+              <Button type="submit">
+                <Check className="h-4 w-4" aria-hidden="true" />
+                Approve all
               </Button>
             </form>
+            <form action={rejectPlanAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="planId" value={planId} />
+              <Input name="reason" required placeholder="Reason for rejection" className="w-64" />
+              <Button type="submit" variant="danger">
+                <X className="h-4 w-4" aria-hidden="true" />
+                Reject all
+              </Button>
+            </form>
+            <p className="w-full text-xs text-fg-muted">
+              Both apply to every course still pending above; courses already decided are left alone.
+            </p>
           </div>
-        </section>
-      )}
+        )}
+      </TableCard>
+
     </main>
   );
 }

@@ -3,7 +3,15 @@
 import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
-import { addPlanItem, deleteDraftPlan, getOrCreateDraftPlan, removePlanItem, revisePlan, submitPlan } from "@/lib/planning/planning";
+import {
+  addPlanItem,
+  deleteDraftPlan,
+  getOrCreateDraftPlan,
+  removePlanItem,
+  revisePlan,
+  submitPlan,
+  withdrawPlan,
+} from "@/lib/planning/planning";
 
 /**
  * Every action returns the student to the offerings list they were looking
@@ -67,6 +75,21 @@ export async function submitPlanAction(formData: FormData): Promise<void> {
   const planId = String(formData.get("planId") ?? "");
   try {
     await submitPlan(actor, planId);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(formData, err.message);
+    throw err;
+  }
+  redirect(listUrl(formData));
+}
+
+/** Pulls a submitted plan back out of the review queue so it can be edited
+ *  again. See withdrawPlan for why this is a deliberate step rather than
+ *  something an edit does silently. */
+export async function withdrawPlanAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const planId = String(formData.get("planId") ?? "");
+  try {
+    await withdrawPlan(actor, planId);
   } catch (err) {
     if (err instanceof AppError) errorRedirect(formData, err.message);
     throw err;

@@ -4,6 +4,9 @@ import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
+import { TableCard } from "@/components/ui/TableCard";
+import { Pagination } from "@/components/ui/Pagination";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { SubmitButton } from "@/components/ui/SubmitButton";
@@ -34,10 +37,10 @@ const PAGE_SIZE = 10;
 export default async function AcademicStructurePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; deptPage?: string; coursePage?: string }>;
+  searchParams: Promise<{ error?: string; deptPage?: string; coursePage?: string; deptCollegeId?: string }>;
 }) {
   const actor = await getCurrentActor();
-  const { error, deptPage, coursePage } = await searchParams;
+  const { error, deptPage, coursePage, deptCollegeId } = await searchParams;
 
   if (!actor)
     return (
@@ -66,9 +69,31 @@ export default async function AcademicStructurePage({
   const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? id;
   const courseCode = (id: string) => courses.find((c) => c.id === id)?.code ?? id;
 
+  // Departments filtered by college before they are paged, so page 2 is
+  // page 2 of the filtered list rather than of everything.
+  const activeDeptCollege = deptCollegeId && colleges.some((c) => c.id === deptCollegeId) ? deptCollegeId : undefined;
+  const visibleDepartments = activeDeptCollege
+    ? departments.filter((d) => d.collegeId === activeDeptCollege)
+    : departments;
+
   const deptPageNum = Math.max(1, Number(deptPage) || 1);
-  const totalDeptPages = Math.max(1, Math.ceil(departments.length / PAGE_SIZE));
-  const pagedDepartments = departments.slice((deptPageNum - 1) * PAGE_SIZE, deptPageNum * PAGE_SIZE);
+  const totalDeptPages = Math.max(1, Math.ceil(visibleDepartments.length / PAGE_SIZE));
+  const pagedDepartments = visibleDepartments.slice((deptPageNum - 1) * PAGE_SIZE, deptPageNum * PAGE_SIZE);
+  const deptPageHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (activeDeptCollege) sp.set("deptCollegeId", activeDeptCollege);
+    if (p > 1) sp.set("deptPage", String(p));
+    const qs = sp.toString();
+    return `/admin/structure${qs ? `?${qs}` : ""}#departments`;
+  };
+
+  const coursePageHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (activeDeptCollege) sp.set("deptCollegeId", activeDeptCollege);
+    if (p > 1) sp.set("coursePage", String(p));
+    const qs = sp.toString();
+    return `/admin/structure${qs ? `?${qs}` : ""}#courses`;
+  };
 
   const coursePageNum = Math.max(1, Number(coursePage) || 1);
   const totalCoursePages = Math.max(1, Math.ceil(courses.length / PAGE_SIZE));
@@ -102,7 +127,7 @@ export default async function AcademicStructurePage({
           </div>
           <SubmitButton pendingLabel="Adding…">Add college</SubmitButton>
         </form>
-        <Card>
+        <TableCard title="Colleges" count={colleges.length} countLabel="college">
           <Table>
             <Thead>
               <tr>
@@ -133,7 +158,7 @@ export default async function AcademicStructurePage({
               ))}
             </tbody>
           </Table>
-        </Card>
+        </TableCard>
       </section>
 
       {/* Departments */}
@@ -172,7 +197,45 @@ export default async function AcademicStructurePage({
           </div>
           <SubmitButton pendingLabel="Adding…">Add department</SubmitButton>
         </form>
-        <Card>
+        <TableCard
+          title="Departments"
+          count={visibleDepartments.length}
+          countLabel="department"
+          filters={
+            /* A plain GET form, applied on choice by the same
+               data-auto-submit hook the other listings use, with the button
+               kept as the no-JavaScript path. */
+            <form method="GET" className="flex flex-wrap items-end gap-2">
+              <div>
+                <Label htmlFor="deptCollegeId" className="text-xs">
+                  College
+                </Label>
+                <Select
+                  id="deptCollegeId"
+                  name="deptCollegeId"
+                  defaultValue={activeDeptCollege ?? ""}
+                  className="w-64"
+                  data-auto-submit=""
+                >
+                  <option value="">All colleges</option>
+                  {colleges.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button type="submit" variant="secondary">
+                Apply
+              </Button>
+              {activeDeptCollege && (
+                <Link href="/admin/structure#departments" className={buttonClasses("ghost", "md")}>
+                  Clear filter
+                </Link>
+              )}
+            </form>
+          }
+        >
           <Table>
             <Thead>
               <tr>
@@ -205,22 +268,15 @@ export default async function AcademicStructurePage({
               ))}
             </tbody>
           </Table>
-        </Card>
+        </TableCard>
         {totalDeptPages > 1 && (
-          <div className="mt-3 flex items-center gap-3 text-sm">
-            {deptPageNum > 1 && (
-              <Link href={`/admin/structure?deptPage=${deptPageNum - 1}#departments`} className="font-medium text-brand-fg hover:underline">
-                Previous
-              </Link>
-            )}
-            <span className="text-fg-secondary">
-              Page {deptPageNum} of {totalDeptPages}
-            </span>
-            {deptPageNum < totalDeptPages && (
-              <Link href={`/admin/structure?deptPage=${deptPageNum + 1}#departments`} className="font-medium text-brand-fg hover:underline">
-                Next
-              </Link>
-            )}
+          <div className="mt-4 flex justify-end">
+            <Pagination
+              page={deptPageNum}
+              totalPages={totalDeptPages}
+              hrefForPage={deptPageHref}
+              label="Departments pagination"
+            />
           </div>
         )}
       </section>
@@ -261,7 +317,7 @@ export default async function AcademicStructurePage({
           </div>
           <SubmitButton pendingLabel="Adding…">Add course</SubmitButton>
         </form>
-        <Card>
+        <TableCard title="Courses" count={courses.length} countLabel="course">
           <Table>
             <Thead>
               <tr>
@@ -296,22 +352,15 @@ export default async function AcademicStructurePage({
               ))}
             </tbody>
           </Table>
-        </Card>
+        </TableCard>
         {totalCoursePages > 1 && (
-          <div className="mt-3 flex items-center gap-3 text-sm">
-            {coursePageNum > 1 && (
-              <Link href={`/admin/structure?coursePage=${coursePageNum - 1}#courses`} className="font-medium text-brand-fg hover:underline">
-                Previous
-              </Link>
-            )}
-            <span className="text-fg-secondary">
-              Page {coursePageNum} of {totalCoursePages}
-            </span>
-            {coursePageNum < totalCoursePages && (
-              <Link href={`/admin/structure?coursePage=${coursePageNum + 1}#courses`} className="font-medium text-brand-fg hover:underline">
-                Next
-              </Link>
-            )}
+          <div className="mt-4 flex justify-end">
+            <Pagination
+              page={coursePageNum}
+              totalPages={totalCoursePages}
+              hrefForPage={coursePageHref}
+              label="Courses pagination"
+            />
           </div>
         )}
       </section>

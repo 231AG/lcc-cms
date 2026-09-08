@@ -58,6 +58,7 @@ async function enrollTestStudent() {
     studentNumber,
     firstName: "Gpa",
     lastName: `Fixture-${studentNumber}`,
+    gender: "FEMALE",
     departmentId,
     enrolmentYear,
   });

@@ -59,6 +59,7 @@ async function enrollTestStudent() {
     studentNumber,
     firstName: "Historical",
     lastName: `Fixture-${studentNumber}`,
+    gender: "FEMALE",
     departmentId,
     enrolmentYear,
   });
@@ -317,6 +318,7 @@ describe("enterHistoricalSemester", () => {
       studentNumber: String(laterYear) + studentNumber.slice(4),
       firstName: "Later",
       lastName: "Enrolee",
+      gender: "FEMALE",
       departmentId,
       enrolmentYear: laterYear,
     });

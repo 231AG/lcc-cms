@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db, type Tx } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import {
@@ -19,6 +19,7 @@ import {
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
+import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -279,8 +280,10 @@ function importStatusLabel(status: string): string {
 async function assertSemesterOpenForRegistration(tx: Tx, semesterId: string): Promise<void> {
   const sem = await tx.query.semester.findFirst({ where: eq(semester.id, semesterId) });
   if (!sem) throw new ValidationError("Semester not found.");
-  if (sem.state !== "REGISTRATION") {
-    throw new StateError(`Course planning is not currently open (semester is ${sem.state}, not Registration).`);
+  if (!isPlanningOpen(sem.state as SemesterState)) {
+    throw new StateError(
+      `Course planning is not currently open -- this semester is ${SEMESTER_STATE_LABEL[sem.state as SemesterState]}, and plans can only be built while it is Open.`,
+    );
   }
 }
 
@@ -459,6 +462,63 @@ export async function deleteDraftPlan(actor: Actor, planId: string) {
     if (plan.status !== "DRAFT") throw new StateError("Only a Draft plan can be deleted.");
     await tx.delete(coursePlanItem).where(eq(coursePlanItem.planId, planId));
     await tx.delete(coursePlan).where(eq(coursePlan.id, planId));
+  });
+}
+
+/**
+ * Takes a SUBMITTED plan back to DRAFT so its owner can change it.
+ *
+ * DEC-35 froze a submitted plan precisely so a student could not alter one
+ * an Admin was mid-review on. The owner asked for submitted plans to be
+ * editable again; this is the shape they chose, and it keeps DEC-35's
+ * actual guarantee rather than dropping it: the plan leaves the review
+ * queue BEFORE it can change, so no Admin is ever looking at a plan that
+ * is moving under them. The student re-submits when they are done.
+ *
+ * Refused once any individual course has been decided. At that point the
+ * Admin is not merely holding the plan, they are working through it, and an
+ * APPROVED item already has a registration behind it -- withdrawing would
+ * either strand that registration or silently revoke a decision somebody
+ * made. Neither is something a student's edit should do.
+ */
+export async function withdrawPlan(actor: Actor, planId: string) {
+  return db.transaction(async (tx) => {
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+    await authorizePlanSubject(actor, plan.studentId);
+    if (plan.status !== "SUBMITTED") {
+      throw new StateError(`Only a submitted plan can be withdrawn (currently ${plan.status}).`);
+    }
+    await assertSemesterOpenForRegistration(tx, plan.semesterId);
+
+    const decided = await tx.query.coursePlanItem.findMany({
+      where: and(eq(coursePlanItem.planId, planId), ne(coursePlanItem.status, "PENDING")),
+    });
+    if (decided.length > 0) {
+      throw new StateError(
+        "This plan is already being reviewed course by course and can no longer be withdrawn. " +
+          "Wait for the decision, then revise it if it is rejected.",
+      );
+    }
+
+    const [row] = await tx
+      .update(coursePlan)
+      .set({ status: "DRAFT", submittedAt: null })
+      .where(eq(coursePlan.id, planId))
+      .returning();
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "COURSE_PLAN_WITHDRAWN",
+      entityType: "course_plan",
+      entityId: planId,
+      studentId: plan.studentId,
+      oldValue: { status: "SUBMITTED" },
+      newValue: { status: "DRAFT" },
+    });
+
+    return row;
   });
 }
 

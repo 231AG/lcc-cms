@@ -1,17 +1,28 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentActor } from "@/lib/auth/session";
+import { isPlanningOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds, getOfferingsForSemester } from "@/lib/offerings/offerings";
 import { filterOfferings, pageSlice } from "@/lib/offerings/offeringSearch";
-import { getMyPlan, getPlanItems, getRegistrationsForStudent } from "@/lib/planning/planning";
+import { getMyPlan, getPlanItems, getPlansForStudent, getRegistrationsForStudent } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Label, Select } from "@/components/ui/Form";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { OfferingPicker } from "@/components/planning/OfferingPicker";
-import { startPlanAction, addPlanItemAction, removePlanItemAction, submitPlanAction, revisePlanAction, deleteDraftPlanAction } from "./actions";
+import {
+  startPlanAction,
+  addPlanItemAction,
+  removePlanItemAction,
+  submitPlanAction,
+  withdrawPlanAction,
+  revisePlanAction,
+  deleteDraftPlanAction,
+} from "./actions";
 
 export const metadata: Metadata = { title: "Course planning" };
 
@@ -42,7 +53,7 @@ export default async function PlanningPage({
     );
   }
 
-  const { error, q, page } = await searchParams;
+  const { error, q, page, semesterId: requestedSemesterId } = await searchParams;
 
   // One round trip for all three reference lists rather than three
   // separate asUser() transactions -- each one is a full BEGIN / set role
@@ -55,14 +66,25 @@ export default async function PlanningPage({
       tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true) }),
     ]),
   );
-  const openSemester = semesters.find((s) => s.state === "REGISTRATION");
+  const openSemester = semesters.find((s) => isPlanningOpen(s.state as SemesterState));
+  // Every semester this student has ever planned in, so a past plan stays
+  // reachable after its semester closes -- one small query, and the reason
+  // the picker below can offer anything other than the open semester.
+  const myPlans = await getPlansForStudent(actor, actor.userId);
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semId;
+    return semesterFullLabel(year, sem, semId);
   };
 
-  if (!openSemester) {
+  // What the picker may offer: the semester planning is open in, plus any
+  // the student already has a plan in. Nothing else -- a semester with
+  // neither is a semester there is nothing to see or do in.
+  const selectableSemesters = semesters
+    .filter((s) => s.id === openSemester?.id || myPlans.some((p) => p.semesterId === s.id))
+    .sort((a, b) => b.startDate.localeCompare(a.startDate));
+
+  if (selectableSemesters.length === 0) {
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 outline-none">
         <PageHeader title="Course planning" />
@@ -71,10 +93,19 @@ export default async function PlanningPage({
     );
   }
 
-  const semesterId = openSemester.id;
+  // Defaults to the semester planning is actually open in, which is the one
+  // a student almost always wants; an explicit ?semesterId wins, so a past
+  // plan can still be opened. An unrecognised id falls back rather than
+  // erroring.
+  const semesterId =
+    (requestedSemesterId && selectableSemesters.find((s) => s.id === requestedSemesterId)?.id) ??
+    openSemester?.id ??
+    selectableSemesters[0].id;
+  const viewingSemester = selectableSemesters.find((s) => s.id === semesterId);
+  const planningOpenHere = !!viewingSemester && isPlanningOpen(viewingSemester.state as SemesterState);
   const plan = await getMyPlan(actor, semesterId);
   const items = plan ? await getPlanItems(actor, plan.id) : [];
-  const isEditable = !plan || plan.status === "DRAFT" || plan.status === "REJECTED";
+  const isEditable = planningOpenHere && (!plan || plan.status === "DRAFT" || plan.status === "REJECTED");
 
   const registrations =
     plan?.status === "APPROVED" || plan?.status === "PARTIALLY_APPROVED"
@@ -121,6 +152,36 @@ export default async function PlanningPage({
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
       <PageHeader title="Course planning" description={yearLabel(semesterId)} />
+
+      {/* Only shown when there is something to switch between. Submitting on
+          change keeps this a plain form -- the same data-auto-submit hook
+          the admin pickers use, and it still works without JavaScript. */}
+      {selectableSemesters.length > 1 && (
+        <form method="get" className="mb-4 flex items-end gap-2">
+          <div>
+            <Label htmlFor="semesterId" className="text-xs">
+              Semester
+            </Label>
+            <Select id="semesterId" name="semesterId" defaultValue={semesterId} className="w-64" data-auto-submit="">
+              {selectableSemesters.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {yearLabel(s.id)}
+                  {s.id === openSemester?.id ? " — open for planning" : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button type="submit" variant="ghost" className="mb-px">
+            Show
+          </Button>
+        </form>
+      )}
+
+      {!planningOpenHere && (
+        <Alert tone="info" className="mb-4">
+          Planning is closed for this semester. You can look at your plan, but not change it.
+        </Alert>
+      )}
 
       {error && (
         <Alert tone="danger" className="mb-4">
@@ -243,6 +304,24 @@ export default async function PlanningPage({
                 );
               })}
             </ul>
+
+            {/* Editing a submitted plan means taking it out of the queue
+                first, so nobody is reviewing a plan that is moving. Offered
+                only while every course is still undecided -- once an Admin
+                has started deciding, withdrawing would revoke a decision
+                that may already have created a registration. */}
+            {items.every((i) => i.status === "PENDING") && (
+              <form action={withdrawPlanAction} className="mt-4 border-t border-line pt-3">
+                <input type="hidden" name="planId" value={plan.id} />
+                <input type="hidden" name="semesterId" value={semesterId} />
+                <SubmitButton variant="ghost" pendingLabel="Withdrawing…">
+                  Withdraw for editing
+                </SubmitButton>
+                <p className="mt-2 text-xs text-fg-muted">
+                  Takes this plan back to draft so you can change it. You will need to submit it again.
+                </p>
+              </form>
+            )}
           </CardBody>
         </Card>
       )}

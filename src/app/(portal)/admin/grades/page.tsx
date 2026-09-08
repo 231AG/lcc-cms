@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
+import { isGradeEntryOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { asUser } from "@/lib/db/asUser";
 import { getClassRoster } from "@/lib/grades/grades";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -54,7 +56,7 @@ export default async function GradesPage({
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semId;
+    return semesterFullLabel(year, sem, semId);
   };
   const offeringLabel = (o: (typeof offerings)[number]) => {
     const c = courses.find((c) => c.id === o.courseId);
@@ -91,7 +93,7 @@ export default async function GradesPage({
           <Select name="semesterId" defaultValue={semesterId ?? ""} className="w-72">
             <option value="">Select a semester…</option>
             {semesters
-              .filter((s) => s.state === "GRADE_SUBMISSION")
+              .filter((s) => isGradeEntryOpen(s.state as SemesterState))
               .map((s) => (
                 <option key={s.id} value={s.id}>
                   {yearLabel(s.id)}

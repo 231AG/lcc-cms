@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, type SQL } from "drizzle-orm";
+import { and, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { auditLog } from "@/lib/db/schema";
 import { auditWrite } from "./audit";
@@ -17,7 +17,7 @@ export interface AuditLogGroup {
   entries: Array<typeof auditLog.$inferSelect>;
 }
 
-const PAGE_SIZE = 50;
+export const AUDIT_PAGE_SIZE = 50;
 
 /**
  * X-06 (plan Section 20.5, REQ-R08): "Filterable log with grouped
@@ -31,7 +31,7 @@ export async function getAuditLogPage(
   actor: Actor,
   filters: AuditLogFilters,
   page: number,
-): Promise<{ groups: AuditLogGroup[]; hasMore: boolean; page: number }> {
+): Promise<{ groups: AuditLogGroup[]; hasMore: boolean; page: number; total: number }> {
   await assertCan(actor, "audit.view");
 
   const conditions: SQL[] = [];
@@ -41,17 +41,28 @@ export async function getAuditLogPage(
   if (filters.occurredFrom) conditions.push(gte(auditLog.occurredAt, filters.occurredFrom));
   if (filters.occurredTo) conditions.push(lte(auditLog.occurredAt, filters.occurredTo));
 
-  const safePage = Math.max(0, page);
-  const offset = safePage * PAGE_SIZE;
-  const rows = await db.query.auditLog.findMany({
-    where: conditions.length ? and(...conditions) : undefined,
-    orderBy: (t, { desc }) => desc(t.occurredAt),
-    limit: PAGE_SIZE + 1,
-    offset,
-  });
+  // 1-based, like every other paginated screen in the app -- the audit log
+  // was the one place still counting from zero, which meant its "page 2"
+  // link and the shared Pagination control disagreed about what page 2 was.
+  const safePage = Math.max(1, page);
+  const offset = (safePage - 1) * AUDIT_PAGE_SIZE;
+  const where = conditions.length ? and(...conditions) : undefined;
 
-  const hasMore = rows.length > PAGE_SIZE;
-  const pageRows = rows.slice(0, PAGE_SIZE);
+  // The count runs alongside the page rather than after it: the two are
+  // independent, and a numbered pagination control needs a total, not just
+  // "is there more".
+  const [rows, countRows] = await Promise.all([
+    db.query.auditLog.findMany({
+      where,
+      orderBy: (t, { desc }) => desc(t.occurredAt),
+      limit: AUDIT_PAGE_SIZE + 1,
+      offset,
+    }),
+    db.select({ count: sql<number>`count(*)::int` }).from(auditLog).where(where ?? sql`true`),
+  ]);
+
+  const hasMore = rows.length > AUDIT_PAGE_SIZE;
+  const pageRows = rows.slice(0, AUDIT_PAGE_SIZE);
 
   // Rows already come back ordered by time descending, so entries written
   // by one transaction (sharing a request_id) are adjacent -- grouping
@@ -81,5 +92,5 @@ export async function getAuditLogPage(
     }),
   );
 
-  return { groups, hasMore, page: safePage };
+  return { groups, hasMore, page: safePage, total: countRows[0]?.count ?? 0 };
 }

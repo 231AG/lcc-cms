@@ -94,15 +94,20 @@ test("Admin creates a year and semester and advances it; Super Admin moves it ba
   await expect(page).toHaveURL(/\/admin\/calendar$/);
   const semesterRow = page.getByRole("row", { name: new RegExp(semesterName) });
   await expect(semesterRow).toBeVisible();
-  await expect(semesterRow.getByRole("cell", { name: "DRAFT", exact: true })).toBeVisible();
+  await expect(semesterRow.getByText("Draft", { exact: true })).toBeVisible();
 
   const created = await db.query.semester.findFirst({ where: eq(semester.name, semesterName) });
   if (created) cleanupSemesterIds.push(created.id);
 
-  await semesterRow.getByRole("button", { name: "Advance to OPEN" }).click();
+  // The state control is a dropdown, not a stepper: pick the target state,
+  // give the reason an Admin always owes, and apply. Draft's only legal
+  // next state is Open, so that is the one option offered.
+  await semesterRow.getByLabel("Move to").selectOption("OPEN");
+  await semesterRow.getByLabel("Reason (required)").fill("E2E publish check");
+  await semesterRow.getByRole("button", { name: "Change state" }).click();
 
   await expect(page).toHaveURL(/\/admin\/calendar$/);
-  await expect(page.getByRole("row", { name: new RegExp(semesterName) }).getByRole("cell", { name: "OPEN", exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(semesterName) }).getByText("Open", { exact: true })).toBeVisible();
 
   await page.goto("/login");
   await page.getByLabel("Student ID or Username").fill(superAdmin.username);
@@ -114,14 +119,16 @@ test("Admin creates a year and semester and advances it; Super Admin moves it ba
   const superAdminRow = page.getByRole("row", { name: new RegExp(semesterName) });
   await expect(superAdminRow).toBeVisible();
 
-  // Section 13.4: a Super Admin backward move requires a reason -- the
-  // button must be blocked by the browser's own required-field validation
-  // until one is entered.
-  await superAdminRow.getByPlaceholder("Reason (required)").fill("E2E reopen check");
-  await superAdminRow.getByRole("button", { name: "Move back to DRAFT" }).click();
+  // A Super Admin can move a semester forward too, and their reason is
+  // optional everywhere except the reopen -- so this advance goes through
+  // with the field left empty.
+  await superAdminRow.getByLabel("Move to").selectOption("IN_PROGRESS");
+  await superAdminRow.getByRole("button", { name: "Change state" }).click();
 
   await expect(page).toHaveURL(/\/admin\/calendar$/);
-  await expect(page.getByRole("row", { name: new RegExp(semesterName) }).getByRole("cell", { name: "DRAFT", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: new RegExp(semesterName) }).getByText("In Progress", { exact: true }),
+  ).toBeVisible();
 });
 
 test("a Student sees 'not available to your role' instead of the calendar forms", async ({ page }) => {

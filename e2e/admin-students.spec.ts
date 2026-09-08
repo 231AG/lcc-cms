@@ -66,7 +66,7 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
   await expect(page).toHaveURL(/\/portal$/);
 
   await page.goto("/admin/students");
-  await expect(page.getByRole("heading", { name: "Students", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Student Listing", exact: true })).toBeVisible();
 
   // The nav menu closes when an item is chosen -- including the item for
   // the page already open, which is not a navigation and so used to leave
@@ -77,7 +77,7 @@ test("Admin enrols a student, who logs in, changes password, and sees their own 
   await expect(studentsMenu).toHaveAttribute("aria-current", "true"); // the current section is marked
   await studentsMenu.click();
   await expect(studentsMenu).toHaveAttribute("aria-expanded", "true");
-  await mainNav.getByRole("link", { name: "Students", exact: true }).click();
+  await mainNav.getByRole("link", { name: "Student Listing", exact: true }).click();
   await expect(studentsMenu).toHaveAttribute("aria-expanded", "false");
   // ...and so does a click outside it, and Escape.
   await studentsMenu.click();
@@ -166,7 +166,7 @@ test("Super Admin sees the student list read-only", async ({ page }) => {
   await expect(page).toHaveURL(/\/portal$/);
 
   await page.goto("/admin/students");
-  await expect(page.getByRole("heading", { name: "Students", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Student Listing", exact: true })).toBeVisible();
   // Neither the submit button nor the control that reveals it: a Super
   // Admin cannot enrol a student (REQ-R04), so neither should exist.
   await expect(page.getByRole("button", { name: "Enrol student" })).toHaveCount(0);

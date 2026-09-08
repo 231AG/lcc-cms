@@ -5,7 +5,7 @@ import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
-import { EnrollStudentForm } from "./EnrollStudentForm";
+import { EnrollStudentForm, type DepartmentOption } from "./EnrollStudentForm";
 
 /**
  * Page header plus the "+ Add Student" primary action, with the enrolment
@@ -16,26 +16,25 @@ import { EnrollStudentForm } from "./EnrollStudentForm";
  * slot and the panel below it are far apart in the markup but must open
  * together.
  *
- * The panel itself is the EXISTING EnrollStudentForm, unchanged -- same
- * fields, same labels, same `enrollStudentAction`, same useActionState
- * handling of the one-time temporary password (which is why this is a
- * panel on the page and not a modal or a separate route: the generated
- * password must be shown once, in place, and never put in a URL).
+ * The panel itself is the EnrollStudentForm, which owns its own fields and
+ * the College -> Department cascade. This stays a panel on the page rather
+ * than a modal or a separate route for one reason: the generated temporary
+ * password must be shown once, in place, and never put in a URL.
  */
 export function StudentsHeader({
   canEnrol,
   departments,
 }: {
   canEnrol: boolean;
-  departments: Array<{ id: string; code: string; name: string }>;
+  departments: DepartmentOption[];
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Breadcrumb items={[{ label: "Home", href: "/portal" }, { label: "Students" }]} />
+      <Breadcrumb items={[{ label: "Home", href: "/portal" }, { label: "Student Listing" }]} />
       <PageHeader
-        title="Students"
+        title="Student Listing"
         actions={
           canEnrol ? (
             <Button

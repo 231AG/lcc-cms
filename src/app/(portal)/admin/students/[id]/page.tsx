@@ -1,10 +1,12 @@
 import Link from "next/link";
 import {
   Award,
+  BookMarked,
   BookOpen,
   Building2,
   CalendarDays,
   ClipboardList,
+  FileText,
   GraduationCap,
   History,
   KeyRound,
@@ -12,10 +14,13 @@ import {
   Phone,
   School,
   TrendingUp,
+  UserRound,
 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
+import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
+import { fullName, initials, listName } from "@/lib/students/name";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getPlansForStudent } from "@/lib/planning/planning";
@@ -26,8 +31,9 @@ import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
-import { Label, Input, Select } from "@/components/ui/Form";
+import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { GENDER_LABEL } from "@/lib/students/gender";
 import { updateStudentProfileAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
 
@@ -95,10 +101,6 @@ function Detail({ icon: Icon, label, children }: { icon: typeof Award; label: st
       </div>
     </div>
   );
-}
-
-function initials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
 /**
@@ -172,7 +174,7 @@ export default async function StudentDetailPage({
   const yearLabel = (semesterId: string) => {
     const sem = semesters.find((s) => s.id === semesterId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
-    return sem && year ? `${year.label} — ${sem.name}` : semesterId;
+    return semesterFullLabel(year, sem, semesterId);
   };
   const courseLabel = (courseId: string) => {
     const c = courses.find((c) => c.id === courseId);
@@ -192,17 +194,17 @@ export default async function StudentDetailPage({
   // Students listing now filters by, so both are shown here -- this page
   // is where department-level detail belongs.
   const departmentRecord = departments.find((d) => d.id === record.departmentId);
-  const departmentLabel = departmentRecord ? `${departmentRecord.code} — ${departmentRecord.name}` : record.departmentId;
+  const departmentLabel = departmentRecord?.name ?? record.departmentId;
   const collegeRecord = departmentRecord ? colleges.find((c) => c.id === departmentRecord.collegeId) : undefined;
-  const collegeLabel = collegeRecord ? `${collegeRecord.code} — ${collegeRecord.name}` : "—";
+  const collegeLabel = collegeRecord?.name ?? "—";
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:py-10">
       <Breadcrumb
         items={[
           { label: "Home", href: "/portal" },
-          { label: "Students", href: "/admin/students" },
-          { label: `${record.lastName}, ${record.firstName}` },
+          { label: "Student Listing", href: "/admin/students" },
+          { label: listName(record) },
         ]}
       />
 
@@ -215,11 +217,11 @@ export default async function StudentDetailPage({
               aria-hidden="true"
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-subtle-strong text-lg font-semibold text-brand-fg"
             >
-              {initials(record.firstName, record.lastName)}
+              {initials(record)}
             </span>
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">
-                {record.firstName} {record.lastName}
+                {fullName(record)}
               </h1>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-fg-secondary">{record.studentNumber}</span>
@@ -247,7 +249,7 @@ export default async function StudentDetailPage({
                 </Link>
               ))}
             <Link href="/admin/students" className={buttonClasses("ghost", "md")}>
-              Back to students
+              Back to listing
             </Link>
           </div>
         </CardBody>
@@ -314,23 +316,69 @@ export default async function StudentDetailPage({
               {canEdit ? (
                 <form action={updateStudentProfileAction} className="flex flex-col gap-3">
                   <input type="hidden" name="studentId" value={record.id} />
-                  <div className="flex gap-3">
-                    <div className="flex-1">
+                  {/* Editable, and consequential: the Student ID is also how
+                      the student signs in, so saving a new one moves their
+                      login identifier and Auth account with it. */}
+                  <div>
+                    <Label htmlFor="studentNumber" className="text-xs">
+                      Student ID
+                      <Required />
+                    </Label>
+                    <Input
+                      id="studentNumber"
+                      name="studentNumber"
+                      defaultValue={record.studentNumber}
+                      required
+                      className="max-w-xs font-mono"
+                      aria-describedby="studentNumber-help"
+                    />
+                    <p id="studentNumber-help" className="mt-1 text-xs text-fg-muted">
+                      Changing this also changes how the student signs in.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <div className="min-w-32 flex-1">
                       <Label htmlFor="firstName" className="text-xs">
                         First name
+                        <Required />
                       </Label>
                       <Input id="firstName" name="firstName" defaultValue={record.firstName} required />
                     </div>
-                    <div className="flex-1">
+                    {/* Optional, and clearable: submitting it empty removes a
+                        middle name that was recorded by mistake. */}
+                    <div className="min-w-32 flex-1">
+                      <Label htmlFor="middleName" className="text-xs">
+                        Middle name
+                      </Label>
+                      <Input id="middleName" name="middleName" defaultValue={record.middleName ?? ""} />
+                    </div>
+                    <div className="min-w-32 flex-1">
                       <Label htmlFor="lastName" className="text-xs">
                         Last name
+                        <Required />
                       </Label>
                       <Input id="lastName" name="lastName" defaultValue={record.lastName} required />
                     </div>
                   </div>
+                  {/* Surfaced whether or not it has a value: a student
+                      enrolled before gender existed has none, and an empty
+                      required-looking field is exactly the prompt to fill it
+                      in. The placeholder option is selectable so saving an
+                      unrelated edit does not force a value to be invented. */}
+                  <div>
+                    <Label htmlFor="gender" className="text-xs">
+                      Gender
+                    </Label>
+                    <Select id="gender" name="gender" defaultValue={record.gender ?? ""} className="max-w-xs">
+                      <option value="">Not recorded</option>
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                    </Select>
+                  </div>
                   <div>
                     <Label htmlFor="departmentId" className="text-xs">
                       Department
+                      <Required />
                     </Label>
                     <Select id="departmentId" name="departmentId" defaultValue={record.departmentId}>
                       {departments.map((d) => (
@@ -347,8 +395,14 @@ export default async function StudentDetailPage({
                     <Input id="enrolmentYear" name="enrolmentYear" type="number" defaultValue={record.enrolmentYear} className="w-32" />
                   </div>
                   <div>
+                    <Label htmlFor="minor" className="text-xs">
+                      Minor
+                    </Label>
+                    <Input id="minor" name="minor" defaultValue={record.minor ?? ""} placeholder="None" className="max-w-xs" />
+                  </div>
+                  <div>
                     <Label htmlFor="contactPhone" className="text-xs">
-                      Contact phone
+                      Phone
                     </Label>
                     <Input id="contactPhone" name="contactPhone" defaultValue={record.contactPhone ?? ""} className="max-w-xs" />
                   </div>
@@ -380,11 +434,17 @@ export default async function StudentDetailPage({
                   <Detail icon={Building2} label="Department">
                     {departmentLabel}
                   </Detail>
+                  <Detail icon={UserRound} label="Gender">
+                    {GENDER_LABEL[record.gender ?? ""] ?? "—"}
+                  </Detail>
+                  <Detail icon={BookMarked} label="Minor">
+                    {record.minor || "—"}
+                  </Detail>
                   <Detail icon={CalendarDays} label="Enrolment year">
                     {record.enrolmentYear}
                   </Detail>
-                  <Detail icon={Phone} label="Contact phone">
-                    {record.contactPhone || "Not recorded"}
+                  <Detail icon={Phone} label="Phone">
+                    {record.contactPhone || "—"}
                   </Detail>
                   <Detail icon={ClipboardList} label="Import status">
                     {record.historicalImportStatus}
@@ -470,7 +530,10 @@ export default async function StudentDetailPage({
                       <Th>Course</Th>
                       <Th>Credits</Th>
                       <Th>Grade</Th>
-                      <Th>Semester GPA</Th>
+                      <Th className="whitespace-nowrap">Semester GPA</Th>
+                      <Th>
+                        <span className="sr-only">Grade sheet</span>
+                      </Th>
                     </tr>
                   </Thead>
                   <tbody>
@@ -479,7 +542,11 @@ export default async function StudentDetailPage({
                       const summary = semesterSummaryFor(r.semesterId);
                       return (
                         <Tr key={r.id}>
-                          <Td className="whitespace-nowrap">{yearLabel(r.semesterId)}</Td>
+                          {/* The semester is named once per group, not on
+                              every course row: repeating it six times is
+                              width this narrow column cannot spare, and the
+                              rows are already visually grouped by it. */}
+                          <Td className="whitespace-nowrap">{showSemesterGpa ? yearLabel(r.semesterId) : ""}</Td>
                           <Td>
                             {r.courseCodeSnapshot} — {r.courseTitleSnapshot}
                           </Td>
@@ -489,6 +556,23 @@ export default async function StudentDetailPage({
                             {r.isRepeatDropped && " (R)"}
                           </Td>
                           <Td>{showSemesterGpa ? (summary?.gpa ?? "—") : ""}</Td>
+                          {/* One link per semester, on that semester's first
+                              row -- the grade sheet is a per-semester
+                              document, so a link on every course row would
+                              be the same link a dozen times. Icon-only with
+                              a tooltip, like every other row action. */}
+                          <Td className="whitespace-nowrap">
+                            {showSemesterGpa && (
+                              <Link
+                                href={`/admin/students/${record.id}/grade-sheet/${r.semesterId}`}
+                                title={`Grade sheet for ${yearLabel(r.semesterId)}`}
+                                aria-label={`Grade sheet for ${yearLabel(r.semesterId)}`}
+                                className="inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                              >
+                                <FileText className="h-4 w-4" aria-hidden="true" />
+                              </Link>
+                            )}
+                          </Td>
                         </Tr>
                       );
                     })}

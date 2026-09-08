@@ -107,7 +107,7 @@ test("Admin creates an offering, adds a meeting time, and publishes it", async (
   await expect(page.getByRole("heading", { name: "Course offerings" })).toBeVisible();
 
   await page.getByLabel("Course").selectOption({ value: courseRow.id });
-  await page.getByLabel("Section").fill("A");
+  await page.getByLabel("Section").fill("1");
   await page.getByLabel("Instructor").fill("Dr. Test");
   await page.getByRole("button", { name: "Add offering" }).click();
   // Already on the ?semesterId= URL from the page.goto above, so
@@ -119,20 +119,26 @@ test("Admin creates an offering, adds a meeting time, and publishes it", async (
   const offeringRow = await db.query.courseOffering.findFirst({ where: eq(courseOffering.courseId, courseRow.id) });
   cleanupOfferingIds.push(offeringRow!.id);
 
-  await page.getByText("Add meeting time").click();
+  // The offerings screen is one table for every role now; an Admin's
+  // controls live behind the row's Edit (pencil) disclosure rather than in
+  // a per-offering card.
+  await page.getByLabel(/^Edit /).first().click();
   await page.locator('select[name="dayOfWeek"]').selectOption("1");
   await page.locator('input[name="startTime"]').fill("09:00");
   await page.locator('input[name="endTime"]').fill("10:30");
   await page.locator('input[name="room"]').fill("B4");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add meeting", exact: true }).click();
   // "Add offering" and "Add meeting" both redirect to the exact same
   // ?semesterId= URL, so waitForURL on that pattern resolves immediately
   // here without waiting for this second round trip at all -- wait
   // directly on the resulting DOM instead, with a generous timeout for
   // the real Supabase round trip.
-  await expect(page.getByRole("cell", { name: "Mon", exact: true })).toBeVisible({ timeout: 30_000 });
+  // Days print as timetable letters: Monday is "M".
+  await expect(page.getByRole("cell", { name: "M", exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("09:00", { exact: false })).toBeVisible();
 
+  // Adding the meeting reloaded the page, so the disclosure is closed again.
+  await page.getByLabel(/^Edit /).first().click();
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText("PUBLISHED", { exact: true })).toBeVisible({ timeout: 30_000 });
 });

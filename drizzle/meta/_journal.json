@@ -162,6 +162,27 @@
       "when": 1788200000000,
       "tag": "0022_performance_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788300000000,
+      "tag": "0023_student_middle_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788400000000,
+      "tag": "0024_semester_four_states",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788500000000,
+      "tag": "0025_student_gender_minor",
+      "breakpoints": true
     }
   ]
 }

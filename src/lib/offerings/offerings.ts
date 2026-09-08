@@ -5,20 +5,31 @@ import { course, courseOffering, offeringMeeting, registration, semester } from 
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
+import { isRoom } from "./rooms";
+import {
+  isOfferingEditable,
+  SEMESTER_STATE_LABEL,
+  SEMESTER_STATES,
+  type SemesterState,
+} from "@/lib/academic/semesterStateMachine";
 
 /**
- * Offerings and schedules can only be created or edited while the parent
- * semester is Draft, Open or Registration (Section 13.4: "Refuse;
- * schedules are frozen once teaching starts").
+ * Offerings and schedules can only be created or edited before the term
+ * starts -- Draft or Open under the four-state model (Section 13.4:
+ * "Refuse; schedules are frozen once teaching starts"). From In Progress
+ * onward, changes go through the audited late add/drop path instead.
+ * Derived from the state machine rather than restated, and kept as an
+ * array so the refusal message below can name the states.
  */
-const EDITABLE_SEMESTER_STATES = ["DRAFT", "OPEN", "REGISTRATION"];
+const EDITABLE_SEMESTER_STATES: SemesterState[] = SEMESTER_STATES.filter(isOfferingEditable);
 
 async function assertSemesterEditable(semesterId: string): Promise<void> {
   const sem = await db.query.semester.findFirst({ where: eq(semester.id, semesterId) });
   if (!sem) throw new ValidationError("Semester not found.");
-  if (!EDITABLE_SEMESTER_STATES.includes(sem.state)) {
+  if (!EDITABLE_SEMESTER_STATES.includes(sem.state as SemesterState)) {
     throw new StateError(
-      `Offerings can only be created or edited while the semester is Draft, Open or Registration (currently ${sem.state}) -- schedules are frozen once teaching starts.`,
+      `Offerings can only be created or edited while the semester is ${EDITABLE_SEMESTER_STATES.map((st) => SEMESTER_STATE_LABEL[st]).join(" or ")} ` +
+        `-- this one is ${SEMESTER_STATE_LABEL[sem.state as SemesterState]}, and schedules are frozen once teaching starts.`,
     );
   }
 }
@@ -38,18 +49,53 @@ function isUniqueViolation(err: unknown): boolean {
 
 export interface CreateOfferingInput {
   semesterId: string;
-  courseId: string;
+  /** Either this, or `courseCode` -- the form submits the code, because a
+   *  code is what a searchable picker can actually be searched by. */
+  courseId?: string;
+  courseCode?: string;
   section: string;
+  /** Blank becomes DEFAULT_INSTRUCTOR. */
   instructorName?: string;
+  /** Omitted becomes DEFAULT_CAPACITY. */
   capacity?: number;
+  /** Weekday numbers, 1 = Monday. At least one is required: an offering is
+   *  created with its schedule, not scheduled afterwards. */
+  days?: number[];
+  /** Must be one of ROOMS. */
+  room?: string;
+  startTime?: string;
+  endTime?: string;
 }
+
+/** An offering created with no capacity given seats this many. A number the
+ *  registrar can change per offering; what it is not is NULL, which used to
+ *  mean "unlimited" and was almost never what anyone intended. */
+export const DEFAULT_CAPACITY = 30;
+
+/** ...and one created with no named instructor is taught by "Staff", the
+ *  same placeholder a printed timetable uses before an assignment is made. */
+export const DEFAULT_INSTRUCTOR = "Staff";
 
 export async function createOffering(actor: Actor, input: CreateOfferingInput) {
   await assertCan(actor, "offering.manage");
   await assertSemesterEditable(input.semesterId);
 
-  const courseRow = await db.query.course.findFirst({ where: eq(course.id, input.courseId) });
-  if (!courseRow) throw new ValidationError("Course not found.");
+  // The picker is a datalist, so what arrives is the course CODE typed or
+  // chosen by the user. Codes are unique case-insensitively (0011's
+  // course_code_unique_idx on lower(trim(code))), so this resolves to at
+  // most one course -- and matching the same way the index does means a
+  // code that looks right to the user is never rejected over its casing.
+  const wantedCode = input.courseCode?.trim().toLowerCase();
+  const courseRow = input.courseId
+    ? await db.query.course.findFirst({ where: eq(course.id, input.courseId) })
+    : wantedCode
+      ? (await db.query.course.findMany()).find((c) => c.code.trim().toLowerCase() === wantedCode)
+      : undefined;
+  if (!courseRow) {
+    throw new ValidationError(
+      input.courseCode ? `No course with the code "${input.courseCode.trim()}".` : "Course not found.",
+    );
+  }
   if (!courseRow.isActive) throw new ValidationError("Cannot create an offering for an inactive course.");
 
   const section = normalizeSection(input.section);
@@ -58,27 +104,64 @@ export async function createOffering(actor: Actor, input: CreateOfferingInput) {
     throw new ValidationError("Capacity must be a positive number.");
   }
 
+  // The schedule is now part of creating an offering rather than a second
+  // step afterwards: an offering with no time or room is not yet on
+  // anybody's timetable, and the form that made one was the reason so many
+  // of them sat unscheduled.
+  const days = [...new Set(input.days ?? [])].sort((a, b) => a - b);
+  if (days.length === 0) throw new ValidationError("Choose at least one day.");
+  if (days.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new ValidationError("Invalid day.");
+  const room = input.room?.trim() ?? "";
+  if (!isRoom(room)) throw new ValidationError("Choose a room.");
+  if (!input.startTime || !input.endTime) throw new ValidationError("Start and end time are required.");
+  if (input.endTime <= input.startTime) throw new ValidationError("End time must be after the start time.");
+
+  const capacity = input.capacity ?? DEFAULT_CAPACITY;
+  const instructorName = input.instructorName?.trim() || DEFAULT_INSTRUCTOR;
+
   try {
     return await asUser(actor.userId, async (tx) => {
       const [row] = await tx
         .insert(courseOffering)
         .values({
           semesterId: input.semesterId,
-          courseId: input.courseId,
+          courseId: courseRow.id,
           section,
-          instructorName: input.instructorName?.trim() || null,
-          capacity: input.capacity ?? null,
+          instructorName,
+          capacity,
           status: "DRAFT",
           frozenCreditHours: courseRow.creditHours,
         })
         .returning();
+      // One meeting row per chosen day, all sharing the room and time --
+      // which is exactly the shape getOfferingRows collapses back into a
+      // single "MWF" row.
+      await tx.insert(offeringMeeting).values(
+        days.map((dayOfWeek) => ({
+          offeringId: row.id,
+          dayOfWeek,
+          startTime: input.startTime!,
+          endTime: input.endTime!,
+          room,
+        })),
+      );
       await auditWrite(tx, {
         actorUserId: actor.userId,
         actorRole: actor.role,
         action: "OFFERING_CREATED",
         entityType: "course_offering",
         entityId: row.id,
-        newValue: { semesterId: input.semesterId, courseCode: courseRow.code, section, instructorName: row.instructorName, capacity: row.capacity },
+        newValue: {
+          semesterId: input.semesterId,
+          courseCode: courseRow.code,
+          section,
+          instructorName: row.instructorName,
+          capacity: row.capacity,
+          days,
+          room,
+          startTime: input.startTime,
+          endTime: input.endTime,
+        },
       });
       return row;
     });
@@ -242,6 +325,10 @@ export async function addMeeting(actor: Actor, offeringId: string, input: Meetin
   if (timeToMinutes(input.endTime) <= timeToMinutes(input.startTime)) {
     throw new ValidationError("End time must be after start time.");
   }
+  // The same fixed list the create form offers. Checked here rather than by
+  // a database CHECK so meetings recorded before the list existed stay
+  // valid -- see rooms.ts.
+  if (!isRoom(input.room?.trim() ?? "")) throw new ValidationError("Choose a room.");
 
   const existingMeetings = await db.query.offeringMeeting.findMany({ where: eq(offeringMeeting.offeringId, offeringId) });
   const conflict = existingMeetings.find((m) => meetingsOverlap(input, m));

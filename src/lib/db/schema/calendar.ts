@@ -16,9 +16,11 @@ export const academicYear = appSchema.table("academic_year", {
 });
 
 /**
- * `state` is constrained to the six values of REQ-W01 by a CHECK
- * constraint (Section 10.3: enums as CHECK, not native Postgres enums, so
- * the set can be edited without a schema-lock operation).
+ * `state` is constrained to the four values of the semester lifecycle by a
+ * CHECK constraint (Section 10.3: enums as CHECK, not native Postgres
+ * enums, so the set can be edited without a schema-lock operation -- which
+ * is exactly what 0024_semester_four_states.sql did when the original six
+ * values of REQ-W01 collapsed to these four).
  */
 export const semester = appSchema.table(
   "semester",
@@ -36,7 +38,7 @@ export const semester = appSchema.table(
   (table) => [
     check(
       "semester_state_valid",
-      sql`${table.state} IN ('DRAFT', 'OPEN', 'REGISTRATION', 'IN_PROGRESS', 'GRADE_SUBMISSION', 'CLOSED')`,
+      sql`${table.state} IN ('DRAFT', 'OPEN', 'IN_PROGRESS', 'CLOSED')`,
     ),
   ],
 );

@@ -28,6 +28,13 @@ export default async function PortalLayout({ children }: { children: React.React
       </a>
       <Header actor={actor} />
       {children}
+      {/* The progressive-enhancement helpers (auto-submitting filters, submit
+          spinners, show/hide password). Deferred, same-origin and tiny; every
+          control it touches works without it, so loading it once for the whole
+          signed-in shell costs nothing and means no page has to remember to
+          ask for it. The chromeless screens load it themselves via
+          FocusedScreen, since they are outside this layout. */}
+      <script defer src="/enhance.js" />
     </>
   );
 }

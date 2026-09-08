@@ -66,14 +66,19 @@ export function Header({ actor }: { actor: Actor | null }) {
             <ThemeToggle />
             {actor && (
               <>
-                <Link href="/change-password" className={`${navItem} flex items-center gap-1.5 px-2`}>
+                <Link href="/change-password" aria-label="Change password" className={`${navItem} flex items-center gap-1.5 px-2`}>
                   <KeyRound className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">Change password</span>
                 </Link>
                 <form action={signOutAction}>
-                  <button type="submit" className={`${navItem} flex items-center gap-1.5 px-2`}>
+                  {/* Icon only on mobile, matching Change password beside it:
+                      the label is the first thing worth dropping when the bar
+                      runs out of room. `aria-label` (not `title`) keeps the
+                      accessible name at every width -- the visible text is
+                      hidden, not removed, so nothing announces as "button". */}
+                  <button type="submit" aria-label="Sign out" className={`${navItem} flex items-center gap-1.5 px-2`}>
                     <LogOut className="h-4 w-4" aria-hidden="true" />
-                    <span>Sign out</span>
+                    <span className="hidden sm:inline">Sign out</span>
                   </button>
                 </form>
               </>

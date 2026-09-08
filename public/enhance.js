@@ -51,6 +51,24 @@
     }
   });
 
+  // --- Auto-submitting filters -----------------------------------------------
+  // A filter <select> marked `data-auto-submit` applies as soon as you choose
+  // a value, instead of making you find an Apply button afterwards. The button
+  // is still rendered and still works -- it is what the free-text fields use,
+  // and it is the whole control when scripts are blocked -- so this is purely
+  // additive, exactly like everything else in this file.
+  document.addEventListener("change", function (event) {
+    var control = event.target;
+    if (!control || !control.matches || !control.matches("[data-auto-submit]")) return;
+    var form = control.form;
+    if (!form) return;
+    // requestSubmit() runs the form's own validation and fires `submit`, so a
+    // required field still blocks and the submit-feedback handler below still
+    // sees it; form.submit() would skip both.
+    if (typeof form.requestSubmit === "function") form.requestSubmit();
+    else form.submit();
+  });
+
   // --- Submit feedback -------------------------------------------------------
   // Marks the form as in flight so the button can show a spinner. The button is
   // disabled on a later tick, never synchronously: disabling it inside the

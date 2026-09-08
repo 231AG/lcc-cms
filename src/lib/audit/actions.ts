@@ -20,6 +20,10 @@ export const AUDIT_ACTIONS = [
   // Calendar (Stage 4)
   "ACADEMIC_YEAR_CREATED",
   "SEMESTER_CREATED",
+  "SEMESTER_DELETED",
+
+  // Institution configuration
+  "INSTITUTION_SETTING_UPDATED",
 
   // Course offerings and scheduling (Stage 8) -- not pre-named in the
   // plan's own Section 19.3 vocabulary table (only what must be audited
@@ -62,6 +66,10 @@ export const AUDIT_ACTIONS = [
   "COURSE_PLAN_REJECTED",
   "COURSE_PLAN_PARTIALLY_APPROVED",
   "COURSE_PLAN_REVISED",
+  // A student pulling their own submitted plan back out of the review queue
+  // so they can change it. Recorded because it removes work an Admin may
+  // already have open in front of them.
+  "COURSE_PLAN_WITHDRAWN",
   "COURSE_PLAN_ITEM_APPROVED",
   "COURSE_PLAN_ITEM_REJECTED",
   "PREREQUISITE_OVERRIDDEN",
@@ -78,6 +86,9 @@ export const AUDIT_ACTIONS = [
   "LOGIN_FAILED",
   "STUDENT_CREATED",
   "STUDENT_UPDATED",
+  // The Student ID moving, recorded separately from a general profile
+  // edit because it also changes how the student signs in.
+  "STUDENT_NUMBER_CHANGED",
   "COURSE_CREDIT_HOURS_CHANGED",
   "PREREQUISITE_ADDED",
   "PREREQUISITE_REMOVED",

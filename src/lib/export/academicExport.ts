@@ -10,6 +10,7 @@ export interface ExportRow {
   studentNumber: string;
   studentLastName: string;
   studentFirstName: string;
+  studentMiddleName: string;
   semesterLabel: string;
   courseCode: string;
   courseTitle: string;
@@ -53,6 +54,7 @@ export async function runSemesterExport(actor: Actor, semesterId: string): Promi
         studentNumber: s?.studentNumber ?? r.studentId,
         studentLastName: s?.lastName ?? "",
         studentFirstName: s?.firstName ?? "",
+        studentMiddleName: s?.middleName ?? "",
         semesterLabel: sem.name,
         courseCode: r.courseCodeSnapshot,
         courseTitle: r.courseTitleSnapshot,
@@ -113,6 +115,9 @@ const CSV_COLUMNS: Array<{ key: keyof ExportRow; header: string }> = [
   { key: "studentNumber", header: "Student ID" },
   { key: "studentLastName", header: "Last Name" },
   { key: "studentFirstName", header: "First Name" },
+  // Added alongside the middle_name column; empty for every student who has
+  // none recorded, which is most of them.
+  { key: "studentMiddleName", header: "Middle Name" },
   { key: "semesterLabel", header: "Semester" },
   { key: "courseCode", header: "Course Code" },
   { key: "courseTitle", header: "Course Title" },
