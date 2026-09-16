@@ -60,14 +60,38 @@ interface PlanItemForValidation {
   courseId: string;
   isRetake: boolean;
   prereqOverrideReason: string | null;
+  /** Set once an Admin has accepted this course's timetable clash. */
+  scheduleOverrideReason?: string | null;
 }
+
+/**
+ * When a timetable clash (V6) stops a plan, and when it merely warns.
+ *
+ * A clash is a real problem, but it is not the student's to solve: they can
+ * see two classes overlap and still have a reason to want both. So
+ * SUBMITTING is never blocked by one -- the plan goes into the queue with
+ * the clash attached to it, visible. APPROVING is where somebody has to
+ * decide, which is the point at which a person with the authority to accept
+ * the overlap is actually looking at it.
+ *
+ * "approve" therefore blocks on a clash unless it has been forgiven, which
+ * happens two ways: an Admin overrode it explicitly, or the plan was entered
+ * by an Admin in the first place (see validatePlan's `adminEntered`) -- in
+ * which case the person who chose the courses is the same person who would
+ * be asked to approve them, and asking them to override their own entry is
+ * a click that means nothing.
+ */
+type ValidationPhase = "submit" | "approve";
 
 async function validatePlan(
   tx: Tx,
   studentId: string,
   semesterId: string,
   items: PlanItemForValidation[],
+  options: { phase?: ValidationPhase; adminEntered?: boolean } = {},
 ): Promise<ValidationResult> {
+  const phase: ValidationPhase = options.phase ?? "submit";
+  const adminEntered = options.adminEntered ?? false;
   const blocking: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
 
@@ -154,11 +178,24 @@ async function validatePlan(
           if (overlap) {
             const labelA = courseLabel(items[a].courseId);
             const labelB = courseLabel(items[b].courseId);
-            blocking.push({
+            const detail = `${labelA} (${dayName(ma.dayOfWeek)} ${ma.startTime}-${ma.endTime}) clashes with ${labelB} (${dayName(mb.dayOfWeek)} ${mb.startTime}-${mb.endTime}).`;
+            // Either side carrying a reason forgives the pair: an Admin who
+            // has accepted that BIOL 205 may overlap has accepted it against
+            // everything it overlaps with, not one arbitrary counterpart.
+            const overridden =
+              adminEntered || !!items[a].scheduleOverrideReason || !!items[b].scheduleOverrideReason;
+            const issue: ValidationIssue = {
               code: "V6",
               courseCode: labelA,
-              message: `${labelA} (${dayName(ma.dayOfWeek)} ${ma.startTime}-${ma.endTime}) clashes with ${labelB} (${dayName(mb.dayOfWeek)} ${mb.startTime}-${mb.endTime}).`,
-            });
+              message: overridden
+                ? `${detail} ${adminEntered ? "Accepted automatically: this plan was entered by an administrator." : "Overridden by an administrator."}`
+                : detail,
+            };
+            // Never silently dropped, even when overridden -- an approved
+            // plan that contains an overlap should say so on every screen
+            // that shows it.
+            if (phase === "approve" && !overridden) blocking.push(issue);
+            else warnings.push(issue);
           }
         }
       }
@@ -554,9 +591,15 @@ export async function submitPlan(actor: Actor, planId: string): Promise<SubmitPl
       courseId: i.courseId,
       isRetake: i.isRetake,
       prereqOverrideReason: i.prereqOverrideReason,
+      scheduleOverrideReason: i.scheduleOverrideReason,
     }));
 
-    const result = await validatePlan(tx, plan.studentId, plan.semesterId, itemsForValidation);
+    // Phase "submit": a timetable clash comes back as a warning, so the plan
+    // reaches the queue with the overlap attached to it rather than being
+    // refused here. Every other rule still blocks.
+    const result = await validatePlan(tx, plan.studentId, plan.semesterId, itemsForValidation, {
+      phase: "submit",
+    });
     if (result.blocking.length > 0) {
       throw new ValidationError(
         `This plan cannot be submitted: ${result.blocking.map((i) => i.message).join(" ")}`,
@@ -696,6 +739,88 @@ export async function overridePrerequisite(actor: Actor, planItemId: string, rea
   });
 }
 
+/**
+ * Accepts a timetable clash on one course, so a plan containing it can be
+ * approved.
+ *
+ * Same shape as overridePrerequisite: one course at a time, a reason is
+ * required, and who decided is recorded. Deliberately NOT behind a settings
+ * window the way the prerequisite override is -- that window exists because
+ * unverifiable prerequisites are a first-year data problem that will end,
+ * whereas two classes overlapping is a permanent fact of timetabling, and a
+ * window the office has to remember to open would just be a way for this to
+ * be mysteriously unavailable one morning.
+ *
+ * A clash is between a PAIR of courses, and this marks ONE of them. That is
+ * intentional: an Admin who has accepted that this course may overlap has
+ * accepted it against everything it overlaps with, so the validator treats
+ * a pair as forgiven when either side carries a reason.
+ */
+export async function overrideScheduleConflict(actor: Actor, planItemId: string, reason: string) {
+  await assertCan(actor, "planning.reviewPlan");
+  if (!reason?.trim()) throw new ValidationError("A reason is required to override a timetable clash.");
+
+  return db.transaction(async (tx) => {
+    const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
+    if (!item) throw new ValidationError("Plan item not found.");
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, item.planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+    if (plan.status === "APPROVED") throw new StateError("This plan is already approved; nothing left to override.");
+
+    const courseRow = await tx.query.course.findFirst({ where: eq(course.id, item.courseId) });
+
+    const [row] = await tx
+      .update(coursePlanItem)
+      .set({ scheduleOverrideReason: reason.trim(), scheduleOverrideBy: actor.userId })
+      .where(eq(coursePlanItem.id, planItemId))
+      .returning();
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "SCHEDULE_CONFLICT_OVERRIDDEN",
+      entityType: "course_plan_item",
+      entityId: planItemId,
+      studentId: plan.studentId,
+      newValue: { courseCode: courseRow?.code, reason: reason.trim() },
+      reason: reason.trim(),
+    });
+
+    return row;
+  });
+}
+
+/**
+ * The validation issues a plan currently has, for display.
+ *
+ * Read-only, and it runs the approval-phase rules: the screens that call
+ * this are the ones deciding whether to approve, so what they need to show
+ * is what would stop them. Nothing is written -- unlike the validators
+ * reached through submit and approve, which may auto-flag a retake.
+ */
+export async function getPlanValidation(actor: Actor, planId: string): Promise<ValidationResult> {
+  await assertCan(actor, "planning.reviewPlan");
+  return db.transaction(async (tx) => {
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+    const items = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
+    return validatePlan(
+      tx,
+      plan.studentId,
+      plan.semesterId,
+      items.map((i) => ({
+        id: i.id,
+        offeringId: i.offeringId,
+        courseId: i.courseId,
+        isRetake: i.isRetake,
+        prereqOverrideReason: i.prereqOverrideReason,
+        scheduleOverrideReason: i.scheduleOverrideReason,
+      })),
+      { phase: "approve", adminEntered: plan.enteredBy != null },
+    );
+  });
+}
+
 export interface ApprovePlanResult {
   plan: typeof coursePlan.$inferSelect;
   registrations: Array<typeof registration.$inferSelect>;
@@ -752,8 +877,12 @@ export async function approvePlan(actor: Actor, planId: string): Promise<Approve
       courseId: i.courseId,
       isRetake: i.isRetake,
       prereqOverrideReason: i.prereqOverrideReason,
+      scheduleOverrideReason: i.scheduleOverrideReason,
     }));
-    const result = await validatePlan(tx, plan.studentId, plan.semesterId, itemsForValidation);
+    const result = await validatePlan(tx, plan.studentId, plan.semesterId, itemsForValidation, {
+      phase: "approve",
+      adminEntered: plan.enteredBy != null,
+    });
     if (result.blocking.length > 0) {
       throw new ValidationError(`This plan can no longer be approved: ${result.blocking.map((i) => i.message).join(" ")}`);
     }
@@ -909,9 +1038,22 @@ export async function approvePlanItem(actor: Actor, planItemId: string): Promise
 
     await tx.select().from(courseOffering).where(eq(courseOffering.id, item.offeringId)).for("update");
 
-    const result = await validatePlan(tx, plan.studentId, plan.semesterId, [
-      { id: item.id, offeringId: item.offeringId, courseId: item.courseId, isRetake: item.isRetake, prereqOverrideReason: item.prereqOverrideReason },
-    ]);
+    const result = await validatePlan(
+      tx,
+      plan.studentId,
+      plan.semesterId,
+      [
+        {
+          id: item.id,
+          offeringId: item.offeringId,
+          courseId: item.courseId,
+          isRetake: item.isRetake,
+          prereqOverrideReason: item.prereqOverrideReason,
+          scheduleOverrideReason: item.scheduleOverrideReason,
+        },
+      ],
+      { phase: "approve", adminEntered: plan.enteredBy != null },
+    );
     if (result.blocking.length > 0) {
       throw new ValidationError(`This course can no longer be approved: ${result.blocking.map((i) => i.message).join(" ")}`);
     }
@@ -1079,7 +1221,13 @@ export async function registerDirect(actor: Actor, studentId: string, offeringId
     }
 
     const validation = await validatePlan(tx, studentId, offering.semesterId, [
-      { offeringId, courseId: offering.courseId, isRetake: false, prereqOverrideReason: "admin-direct" },
+      {
+        offeringId,
+        courseId: offering.courseId,
+        isRetake: false,
+        prereqOverrideReason: "admin-direct",
+        scheduleOverrideReason: "admin-direct",
+      },
     ]);
 
     const [row] = await tx

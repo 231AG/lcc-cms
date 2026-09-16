@@ -3,7 +3,14 @@
 import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
-import { approvePlan, approvePlanItem, overridePrerequisite, rejectPlan, rejectPlanItem } from "@/lib/planning/planning";
+import {
+  approvePlan,
+  approvePlanItem,
+  overridePrerequisite,
+  overrideScheduleConflict,
+  rejectPlan,
+  rejectPlanItem,
+} from "@/lib/planning/planning";
 
 function errorRedirect(planId: string, message: string): never {
   redirect(`/admin/planning/${planId}?error=${encodeURIComponent(message)}`);
@@ -54,6 +61,22 @@ export async function rejectPlanItemAction(formData: FormData): Promise<void> {
   const reason = String(formData.get("reason") ?? "");
   try {
     await rejectPlanItem(actor, planItemId, reason);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(planId, err.message);
+    throw err;
+  }
+  redirect(`/admin/planning/${planId}`);
+}
+
+/** Accepts a timetable clash on one planned course. Same form shape as the
+ *  prerequisite override beside it. */
+export async function overrideScheduleConflictAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const planId = String(formData.get("planId") ?? "");
+  const planItemId = String(formData.get("planItemId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  try {
+    await overrideScheduleConflict(actor, planItemId, reason);
   } catch (err) {
     if (err instanceof AppError) errorRedirect(planId, err.message);
     throw err;

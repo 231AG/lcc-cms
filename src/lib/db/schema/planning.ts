@@ -96,6 +96,12 @@ export const coursePlanItem = appSchema.table(
     // 14.5).
     prereqOverrideReason: text("prereq_override_reason"),
     prereqOverrideBy: uuid("prereq_override_by").references(() => appUser.id, { onDelete: "restrict" }),
+    // The same mechanism for a timetable clash (V6). Set by an Admin from
+    // the review screen when they decide an overlap is acceptable, or
+    // implied for a plan an Admin entered themselves. A pair of clashing
+    // courses counts as overridden when EITHER side carries a reason.
+    scheduleOverrideReason: text("schedule_override_reason"),
+    scheduleOverrideBy: uuid("schedule_override_by").references(() => appUser.id, { onDelete: "restrict" }),
     status: text("status").notNull().default("PENDING"), // PENDING | APPROVED | REJECTED
     rejectionReason: text("rejection_reason"),
     decidedBy: uuid("decided_by").references(() => appUser.id, { onDelete: "restrict" }),

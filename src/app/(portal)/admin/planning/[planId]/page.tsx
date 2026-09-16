@@ -1,9 +1,9 @@
-import { Check, ShieldAlert, X } from "lucide-react";
+import { Check, CalendarClock, ShieldAlert, X } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds } from "@/lib/offerings/offerings";
-import { getPlan, getPlanItems } from "@/lib/planning/planning";
+import { getPlan, getPlanItems, getPlanValidation } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
@@ -16,6 +16,7 @@ import {
   approvePlanAction,
   approvePlanItemAction,
   overridePrerequisiteAction,
+  overrideScheduleConflictAction,
   rejectPlanAction,
   rejectPlanItemAction,
 } from "../actions";
@@ -95,6 +96,14 @@ export default async function PlanDetailPage({
     ]),
   );
   const enteredByName = enteredByUser?.displayName;
+  // What would stop this plan being approved, computed fresh. Shown here
+  // because the review screen is where somebody decides -- until now a
+  // clash only surfaced as an error message after Approve had already
+  // failed, which is a poor way to learn what is wrong with something.
+  const validation = await getPlanValidation(actor, planId);
+  const scheduleIssues = [...validation.blocking, ...validation.warnings].filter((i) => i.code === "V6");
+  const blockingScheduleIssues = validation.blocking.filter((i) => i.code === "V6");
+  const otherBlocking = validation.blocking.filter((i) => i.code !== "V6");
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
   const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
   const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, offeringIds);
@@ -133,6 +142,37 @@ export default async function PlanDetailPage({
       {plan.enteredBy && (
         <Alert tone="info" className="mb-4">
           Entered by {enteredByName ?? "an administrator"} on the student&rsquo;s behalf, not submitted by the student.
+        </Alert>
+      )}
+
+      {scheduleIssues.length > 0 && (
+        <Alert tone={blockingScheduleIssues.length > 0 ? "danger" : "warning"} className="mb-4">
+          <p className="font-medium">
+            {blockingScheduleIssues.length > 0
+              ? "This plan has a timetable clash that must be accepted before it can be approved."
+              : "This plan has a timetable clash, already accepted."}
+          </p>
+          <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 text-sm">
+            {scheduleIssues.map((issue, i) => (
+              <li key={i}>{issue.message}</li>
+            ))}
+          </ul>
+          {blockingScheduleIssues.length > 0 && (
+            <p className="mt-2 text-xs">
+              Use the clock icon on either clashing course below to accept the overlap, or reject the plan.
+            </p>
+          )}
+        </Alert>
+      )}
+
+      {otherBlocking.length > 0 && (
+        <Alert tone="danger" className="mb-4">
+          <p className="font-medium">This plan cannot be approved yet:</p>
+          <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 text-sm">
+            {otherBlocking.map((issue, i) => (
+              <li key={i}>{issue.message}</li>
+            ))}
+          </ul>
         </Alert>
       )}
 
@@ -183,6 +223,9 @@ export default async function PlanDetailPage({
                     )}
                     {i.prereqOverrideReason && (
                       <p className="mt-1 text-xs text-warning-fg">Prerequisite overridden: {i.prereqOverrideReason}</p>
+                    )}
+                    {i.scheduleOverrideReason && (
+                      <p className="mt-1 text-xs text-warning-fg">Timetable clash accepted: {i.scheduleOverrideReason}</p>
                     )}
                   </Td>
                   <Td className="whitespace-nowrap">{o?.section ?? "—"}</Td>
@@ -237,6 +280,33 @@ export default async function PlanDetailPage({
                           </details>
                         </>
                       )}
+                      {/* Offered only while this course is actually in an
+                          un-accepted clash -- an icon that does nothing on
+                          every other row is noise. */}
+                      {i.status === "PENDING" &&
+                        !i.scheduleOverrideReason &&
+                        blockingScheduleIssues.some((issue) => issue.courseCode === (c?.code ?? "")) && (
+                          <details className="relative">
+                            <summary
+                              title={`Accept the timetable clash on ${c?.code ?? "this course"}`}
+                              aria-label={`Accept the timetable clash on ${c?.code ?? "this course"}`}
+                              className={`${iconAction} list-none`}
+                            >
+                              <CalendarClock className="h-4 w-4" aria-hidden="true" />
+                            </summary>
+                            <form
+                              action={overrideScheduleConflictAction}
+                              className="absolute right-0 z-10 mt-1 flex w-64 flex-col gap-2 rounded-md border border-line bg-surface p-3 text-left shadow-lg"
+                            >
+                              <input type="hidden" name="planId" value={planId} />
+                              <input type="hidden" name="planItemId" value={i.id} />
+                              <Input name="reason" required placeholder="Why is the overlap acceptable?" className="py-1 text-xs" />
+                              <Button type="submit" variant="secondary" size="sm">
+                                Accept clash
+                              </Button>
+                            </form>
+                          </details>
+                        )}
                       {i.status === "PENDING" && !i.prereqOverrideReason && (
                         <details className="relative">
                           <summary
