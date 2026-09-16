@@ -73,6 +73,9 @@ export const AUDIT_ACTIONS = [
   "COURSE_PLAN_ITEM_APPROVED",
   "COURSE_PLAN_ITEM_REJECTED",
   "PREREQUISITE_OVERRIDDEN",
+  // An Admin accepting that two planned courses overlap, so the plan can be
+  // approved despite the clash.
+  "SCHEDULE_CONFLICT_OVERRIDDEN",
   "REGISTRATION_CREATED",
   "REGISTRATION_DROPPED",
 

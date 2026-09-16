@@ -43,7 +43,17 @@ import {
 
 export const metadata: Metadata = { title: "Course offerings" };
 
-const PAGE_SIZE = 25;
+/**
+ * Ten rows by default, not twenty-five.
+ *
+ * The pager sits under the table, so the page length decides how far you
+ * scroll before you can reach it. Ten keeps the controls on screen with the
+ * data. The picker is there for the case ten is wrong -- reading a whole
+ * semester's timetable at once -- and matches the Students listing, which
+ * already offers the same three sizes.
+ */
+const PAGE_SIZES = [10, 25, 50] as const;
+const DEFAULT_PAGE_SIZE = 10;
 
 /** Icon controls carry a tooltip and a matching accessible name. */
 const iconAction =
@@ -81,10 +91,16 @@ export default async function OfferingsPage({
     page?: string;
     sort?: string;
     dir?: string;
+    pageSize?: string;
   }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId: requestedSemesterId, error, q, collegeId, page, sort, dir } = await searchParams;
+  const { semesterId: requestedSemesterId, error, q, collegeId, page, sort, dir, pageSize } = await searchParams;
+  // An unrecognised size falls back rather than erroring, so a hand-edited
+  // URL cannot produce a page of 10,000 rows.
+  const size = (PAGE_SIZES as readonly number[]).includes(Number(pageSize))
+    ? Number(pageSize)
+    : DEFAULT_PAGE_SIZE;
 
   if (!actor)
     return (
@@ -143,8 +159,8 @@ export default async function OfferingsPage({
   const rows = sortOfferingRows(filtered, sortColumn, sortDirection);
 
   const pageNum = Math.max(1, Number(page) || 1);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const pageRows = rows.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(rows.length / size));
+  const pageRows = rows.slice((pageNum - 1) * size, pageNum * size);
 
   // An offering's slots sit on consecutive rows, so the management controls
   // are attached to the first slot of each offering -- repeating Publish and
@@ -166,6 +182,7 @@ export default async function OfferingsPage({
     if (collegeId) sp.set("collegeId", collegeId);
     if (sortColumn !== "code") sp.set("sort", sortColumn);
     if (sortDirection !== "asc") sp.set("dir", sortDirection);
+    if (size !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(size));
     for (const [k, v] of Object.entries(extra)) {
       if (v) sp.set(k, v);
       else sp.delete(k);
@@ -180,6 +197,7 @@ export default async function OfferingsPage({
     if (semesterId) sp.set("semesterId", semesterId);
     if (q) sp.set("q", q);
     if (collegeId) sp.set("collegeId", collegeId);
+    if (size !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(size));
     sp.set("sort", column);
     sp.set("dir", direction);
     return `/admin/offerings?${sp}`;
@@ -613,9 +631,34 @@ export default async function OfferingsPage({
             {rows.length > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-subtle px-4 py-3 sm:px-5">
                 <p className="text-sm text-fg-secondary">
-                  Showing {(pageNum - 1) * PAGE_SIZE + 1}&ndash;{Math.min(pageNum * PAGE_SIZE, rows.length)} of {rows.length}
+                  Showing {(pageNum - 1) * size + 1}&ndash;{Math.min(pageNum * size, rows.length)} of {rows.length}
                 </p>
-                <Pagination page={pageNum} totalPages={totalPages} hrefForPage={hrefForPage} label="Offerings pagination" />
+                <div className="flex flex-wrap items-center gap-3">
+                  <form method="GET" className="flex items-center gap-1.5">
+                    {/* The current view rides along as hidden fields, so
+                        changing the page length keeps the semester, search
+                        and sort you were looking at. */}
+                    {semesterId && <input type="hidden" name="semesterId" value={semesterId} />}
+                    {q && <input type="hidden" name="q" value={q} />}
+                    {collegeId && <input type="hidden" name="collegeId" value={collegeId} />}
+                    {sort && <input type="hidden" name="sort" value={sort} />}
+                    {dir && <input type="hidden" name="dir" value={dir} />}
+                    <Label htmlFor="pageSize" className="mb-0 text-xs whitespace-nowrap">
+                      Per page
+                    </Label>
+                    <Select id="pageSize" name="pageSize" defaultValue={String(size)} className="w-20 py-1 text-xs">
+                      {PAGE_SIZES.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </Select>
+                    <Button type="submit" variant="secondary" size="sm">
+                      Set
+                    </Button>
+                  </form>
+                  <Pagination page={pageNum} totalPages={totalPages} hrefForPage={hrefForPage} label="Offerings pagination" />
+                </div>
               </div>
             )}
           </Card>
