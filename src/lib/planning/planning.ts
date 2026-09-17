@@ -1346,6 +1346,26 @@ export async function countPlansAwaitingApproval(actor: Actor, semesterIds: stri
 }
 
 /** A-10's read-only "View" -- every plan a student has ever had, across semesters, with its items. Admin-only per Section 9.4.9 (Super Admin has no role in course planning). */
+/**
+ * Every plan the signed-in student has, for their own screens.
+ *
+ * Distinct from getPlansForStudent below, which is the ADMIN read: that one
+ * asserts planning.reviewPlan and goes through the raw connection so an
+ * Admin can see a student's plans from their profile. Calling it as a
+ * student throws, which is exactly the bug this exists to fix -- the
+ * student planning page used it to build its semester picker and therefore
+ * failed for every student who reached it.
+ *
+ * This one asserts nothing and reads through asUser, so row-level security
+ * is what scopes it: a student sees their own rows and no others, the same
+ * way getMyPlan and getPlanItems already work.
+ */
+export async function getMyPlans(actor: Actor) {
+  return asUser(actor.userId, (tx) =>
+    tx.query.coursePlan.findMany({ where: eq(coursePlan.studentId, actor.userId) }),
+  );
+}
+
 export async function getPlansForStudent(actor: Actor, studentId: string) {
   await assertCan(actor, "planning.reviewPlan");
   const plans = await db.query.coursePlan.findMany({ where: eq(coursePlan.studentId, studentId) });

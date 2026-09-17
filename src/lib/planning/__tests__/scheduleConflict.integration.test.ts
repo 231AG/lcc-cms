@@ -19,9 +19,12 @@ import {
 import {
   addPlanItem,
   approvePlan,
+  getMyPlan,
+  getMyPlans,
   getOrCreateDraftPlan,
   getPlanItems,
   getPlanValidation,
+  getPlansForStudent,
   overrideScheduleConflict,
   submitPlan,
 } from "../planning";
@@ -121,7 +124,10 @@ afterAll(async () => {
   await db.delete(student).where(inArray(student.id, [studentId, student2Id]));
   await db.delete(departmentTable).where(inArray(departmentTable.id, [deptId]));
   await db.delete(collegeTable).where(inArray(collegeTable.id, [collegeId]));
-  await db.delete(appUser).where(inArray(appUser.id, [studentId, student2Id, adminId, superId]));
+  // superId is deliberately left behind: a trigger refuses to let the last
+  // active Super Admin be deleted, and this fixture's is the only one in a
+  // freshly seeded database. Each run makes its own, and CI starts clean.
+  await db.delete(appUser).where(inArray(appUser.id, [studentId, student2Id, adminId]));
 });
 
 describe("V6 timetable clash", () => {
@@ -180,5 +186,38 @@ describe("a plan entered by an Admin", () => {
 
     expect(validation.blocking.some((i) => i.code === "V6")).toBe(false);
     expect(validation.warnings.some((i) => i.code === "V6")).toBe(true);
+  });
+});
+
+
+/**
+ * A student's own planning screen must only call reads a student is
+ * actually allowed to make. The page once used getPlansForStudent -- the
+ * ADMIN read -- to build its semester picker, which threw for every
+ * student who opened it and took the whole route down with a 500.
+ */
+describe("the reads a student's own planning page makes", () => {
+  it("lets a student list their own plans", async () => {
+    await getOrCreateDraftPlan(studentActor, semId);
+
+    const plans = await getMyPlans(studentActor);
+
+    expect(plans.length).toBeGreaterThan(0);
+    expect(plans.every((p) => p.studentId === studentId)).toBe(true);
+  });
+
+  it("lets a student read their own plan for a semester, and its items", async () => {
+    const plan = await getMyPlan(studentActor, semId);
+    expect(plan).toBeTruthy();
+    await expect(getPlanItems(studentActor, plan!.id)).resolves.toBeInstanceOf(Array);
+  });
+
+  it("refuses the Admin read to a student -- which is why getMyPlans exists", async () => {
+    await expect(getPlansForStudent(studentActor, studentId)).rejects.toThrow(/planning.reviewPlan/);
+  });
+
+  it("still gives an Admin every plan for a student", async () => {
+    const plans = await getPlansForStudent(adminActor, studentId);
+    expect(plans.length).toBeGreaterThan(0);
   });
 });
