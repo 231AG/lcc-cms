@@ -80,6 +80,59 @@ const iconDanger =
  * Choosing a semester fetches immediately (`data-auto-submit`), with the
  * button still there for the no-JavaScript path.
  */
+/** The reference lists every view of this page needs, read as the signed-in
+ *  user so RLS applies. Pulled out so the page can wrap it in one try. */
+function loadReference(userId: string) {
+  return asUser(userId, (tx) =>
+    Promise.all([
+      tx.query.semester.findMany(),
+      tx.query.academicYear.findMany(),
+      tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
+      tx.query.college.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
+    ]),
+  );
+}
+
+/**
+ * What this page shows instead of falling over.
+ *
+ * The plain message is for whoever hit it -- it says the page could not be
+ * read and that this is not something they did wrong, which is all most
+ * readers need. The technical detail is behind `?debug=1` rather than shown
+ * to everyone: a student browsing the timetable has no use for a Postgres
+ * error, and no business seeing one.
+ */
+function LoadFailure({ stage, err, debug }: { stage: string; err: unknown; debug: boolean }) {
+  const message = err instanceof Error ? err.message : String(err);
+  const stack = err instanceof Error ? (err.stack ?? "") : "";
+  // Logged unconditionally, so a deployment whose logs ARE readable has it
+  // without anybody needing to know about the query parameter.
+  console.error(`[offerings] failed while ${stage}:`, err);
+  return (
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <PageHeader title="Course offerings" />
+      <Alert tone="danger">
+        <p className="font-medium">This page could not be loaded.</p>
+        <p className="mt-1 text-sm">
+          Something went wrong while {stage}. This is a fault in the system, not something you did. Please tell the
+          registrar&rsquo;s office.
+        </p>
+      </Alert>
+      {debug && (
+        <div className="mt-4 rounded-lg border border-line bg-surface p-4">
+          <p className="text-xs font-semibold text-fg">Technical detail</p>
+          <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap text-fg-secondary">{message}</pre>
+          {stack && (
+            <pre className="mt-2 overflow-x-auto text-[11px] whitespace-pre-wrap text-fg-muted">
+              {stack.split("\n").slice(0, 8).join("\n")}
+            </pre>
+          )}
+        </div>
+      )}
+    </main>
+  );
+}
+
 export default async function OfferingsPage({
   searchParams,
 }: {
@@ -92,10 +145,12 @@ export default async function OfferingsPage({
     sort?: string;
     dir?: string;
     pageSize?: string;
+    /** `?debug=1` adds the technical detail to the error card below. */
+    debug?: string;
   }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId: requestedSemesterId, error, q, collegeId, page, sort, dir, pageSize } = await searchParams;
+  const { semesterId: requestedSemesterId, error, q, collegeId, page, sort, dir, pageSize, debug } = await searchParams;
   // An unrecognised size falls back rather than erroring, so a hand-edited
   // URL cannot produce a page of 10,000 rows.
   const size = (PAGE_SIZES as readonly number[]).includes(Number(pageSize))
@@ -115,14 +170,22 @@ export default async function OfferingsPage({
   const isAdmin = actor.role === "ADMIN";
   const isStudent = actor.role === "STUDENT";
 
-  const [semesters, academicYears, courses, colleges] = await asUser(actor.userId, (tx) =>
-    Promise.all([
-      tx.query.semester.findMany(),
-      tx.query.academicYear.findMany(),
-      tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
-      tx.query.college.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
-    ]),
-  );
+  // Reading this page must not be able to produce a blank 500. A single
+  // unreadable row or an unexpected null used to take the whole route down
+  // with a message only the hosting platform's logs could show -- and on a
+  // plan where those logs are not available, that is an error nobody can
+  // diagnose. The reads are wrapped so a failure renders something a person
+  // can act on, and `?debug=1` adds the technical detail for whoever is
+  // actually fixing it.
+  let semesters: Awaited<ReturnType<typeof loadReference>>[0];
+  let academicYears: Awaited<ReturnType<typeof loadReference>>[1];
+  let courses: Awaited<ReturnType<typeof loadReference>>[2];
+  let colleges: Awaited<ReturnType<typeof loadReference>>[3];
+  try {
+    [semesters, academicYears, courses, colleges] = await loadReference(actor.userId);
+  } catch (err) {
+    return <LoadFailure stage="reading the semester and course lists" err={err} debug={debug === "1"} />;
+  }
   const semesterLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
@@ -148,7 +211,12 @@ export default async function OfferingsPage({
   // planning; outside that the table is still readable, just not actionable.
   const planningOpenHere = selectedSemester ? isPlanningOpen(selectedSemester.state as SemesterState) : false;
 
-  const allRows = semesterId ? await getOfferingRows(actor, semesterId) : [];
+  let allRows: Awaited<ReturnType<typeof getOfferingRows>> = [];
+  try {
+    if (semesterId) allRows = await getOfferingRows(actor, semesterId);
+  } catch (err) {
+    return <LoadFailure stage="reading this semester's offerings" err={err} debug={debug === "1"} />;
+  }
   const collegeLabel = collegeId ? colleges.find((c) => c.id === collegeId)?.name : undefined;
   const filtered = filterOfferingRows(allRows, q, collegeId, collegeLabel);
 
