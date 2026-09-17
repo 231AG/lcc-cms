@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
-import { semesterFullLabel } from "@/lib/academic/semesterName";
+import { semesterDisplayName, semesterFullLabel } from "@/lib/academic/semesterName";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { fullName } from "@/lib/students/name";
 import { getStudent } from "@/lib/students/students";
@@ -11,6 +11,7 @@ import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getMyPlan } from "@/lib/planning/planning";
+import { getGradeSheet, trimCredits } from "@/lib/gradesheet/gradeSheet";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
 import { getStudentStatistics, type StudentStatistics } from "@/lib/dashboard/statistics";
@@ -18,10 +19,20 @@ import { BarList, ColumnChart, StatTile, StatusBarList } from "@/components/char
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Table, Tr, Td } from "@/components/ui/Table";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { Label, Select } from "@/components/ui/Form";
+import { buttonClasses } from "@/components/ui/Button";
+import { Download } from "lucide-react";
 import PrintButton from "./PrintButton";
 
 export const metadata: Metadata = { title: "Home" };
+
+/** Icon-only action button -- same shape, hover and focus ring as the
+ *  Students and Offerings tables, with a title and an accessible name so the
+ *  icon is never the only thing carrying the meaning. */
+const iconAction =
+  "inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
 const STANDING_LABEL: Record<string, string> = {
   HONOURS: "Honours",
@@ -37,7 +48,11 @@ const STANDING_LABEL: Record<string, string> = {
  * but every stage since 2 has shipped a real admin page with no way to
  * reach it except typing the URL, which is a genuine dead end.
  */
-export default async function PortalPage() {
+export default async function PortalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; semesterId?: string }>;
+}) {
   const actor = await getCurrentActor();
 
   if (!actor) {
@@ -80,6 +95,39 @@ export default async function PortalPage() {
     // S-03's "single status line if a course plan needs attention" --
     // only fetched when there is a current semester to have a plan in.
     const currentPlan = currentSemester ? await getMyPlan(actor, currentSemester.id) : null;
+
+    // S-04: one semester's results at a time, newest first, chosen with a
+    // year and a semester. Both lists hold only what this student actually
+    // has results in, and the semester list is narrowed to the chosen year,
+    // so the pair cannot be set to a combination with nothing behind it.
+    const resultSemesterIds = [...new Set(history.map((r) => r.semesterId))].sort((a, b) => {
+      const ka = semesterInfo(a)?.sortKey;
+      const kb = semesterInfo(b)?.sortKey;
+      if (!ka || !kb) return 0;
+      return kb.yearStart - ka.yearStart || kb.sequence - ka.sequence;
+    });
+    const yearIdFor = (semesterId: string) => semesters.find((s) => s.id === semesterId)?.academicYearId;
+    const yearLabelFor = (yearId: string) => academicYears.find((y) => y.id === yearId)?.label ?? yearId;
+    // Derived from the semester list rather than listed separately, so the
+    // two controls cannot fall out of step with each other.
+    const resultYearIds = [...new Set(resultSemesterIds.map(yearIdFor).filter((id): id is string => !!id))];
+
+    const { year: requestedYearId, semesterId: requestedSemesterId } = await searchParams;
+    // Changing the year re-submits carrying the old semester, which usually
+    // belongs to a different year; that falls through to the newest semester
+    // of the year just chosen rather than to an error.
+    const selectedYearId =
+      requestedYearId && resultYearIds.includes(requestedYearId) ? requestedYearId : resultYearIds[0];
+    const yearSemesterIds = resultSemesterIds.filter((id) => yearIdFor(id) === selectedYearId);
+    const selectedSemesterId =
+      requestedSemesterId && yearSemesterIds.includes(requestedSemesterId)
+        ? requestedSemesterId
+        : yearSemesterIds[0];
+    // The same assembled figures the printed grade sheet uses, so the screen
+    // and the paper cannot disagree about a grade point or a total.
+    const sheet = selectedSemesterId ? await getGradeSheet(actor, actor.userId, selectedSemesterId) : null;
+    const selectedInfo = selectedSemesterId ? semesterInfo(selectedSemesterId) : null;
+    const selectedSummary = selectedSemesterId ? semesterSummaryFor(selectedSemesterId) : undefined;
     const planStatusLine =
       isPlanningOpen(currentSemester?.state as SemesterState) && !currentPlan
         ? "You have not started your course plan for this semester."
@@ -105,7 +153,7 @@ export default async function PortalPage() {
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-fg-muted">Department</dt>
-                <dd className="mt-0.5 font-medium text-fg">{department ? `${department.code} — ${department.name}` : "—"}</dd>
+                <dd className="mt-0.5 font-medium text-fg">{department ? department.name : "—"}</dd>
               </div>
               <div>
                 <dt className="text-fg-muted">Enrolment year</dt>
@@ -127,8 +175,11 @@ export default async function PortalPage() {
           </CardBody>
         </Card>
 
+        {/* Guidance for the screen, not part of the record: a printed copy
+            of a semester's results should not carry a note about a course
+            plan for a different, later semester. */}
         {planStatusLine && (
-          <Alert tone="warning" className="mb-6">
+          <Alert tone="warning" className="mb-6 print:hidden">
             {planStatusLine}
           </Alert>
         )}
@@ -158,7 +209,7 @@ export default async function PortalPage() {
               <div>
                 <dt className="text-fg-muted">Credits earned</dt>
                 <dd className="mt-0.5 font-medium text-fg">
-                  {cumulative ? `${cumulative.totalCreditsEarned} of 132 -- ${cumulative.creditsToGraduation} remaining` : "—"}
+                  {cumulative ? `${cumulative.totalCreditsEarned} of 132 — ${cumulative.creditsToGraduation} remaining` : "—"}
                 </dd>
               </div>
               <div>
@@ -185,48 +236,148 @@ export default async function PortalPage() {
         )}
 
         <Card>
-          <CardHeader>
-            <CardTitle>Semesters</CardTitle>
+          <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle>Semester results</CardTitle>
+            {sheet && selectedSemesterId && (
+              <div className="flex items-center gap-1 print:hidden">
+                <PrintButton semesterId={selectedSemesterId} />
+                <a
+                  href={`/portal/results/export?semesterId=${encodeURIComponent(selectedSemesterId)}`}
+                  title="Download as CSV"
+                  aria-label="Download as CSV"
+                  className={iconAction}
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                </a>
+              </div>
+            )}
           </CardHeader>
+
+          {resultSemesterIds.length > 0 && (
+            <form method="GET" className="flex flex-wrap items-end gap-2 border-b border-line-subtle px-4 py-3 print:hidden sm:px-5">
+              <div>
+                <Label htmlFor="year" className="text-xs">
+                  Year
+                </Label>
+                {/* Loads on choice; the button is the no-JavaScript fallback. */}
+                <Select id="year" name="year" defaultValue={selectedYearId ?? ""} className="w-40 font-semibold" data-auto-submit="">
+                  {resultYearIds.map((id) => (
+                    <option key={id} value={id}>
+                      {yearLabelFor(id)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="semesterId" className="text-xs">
+                  Semester
+                </Label>
+                {/* Only the chosen year's semesters, so the pair is always a
+                    combination this student has results for. */}
+                <Select
+                  id="semesterId"
+                  name="semesterId"
+                  defaultValue={selectedSemesterId ?? ""}
+                  className="w-40 font-semibold"
+                  data-auto-submit=""
+                >
+                  {yearSemesterIds.map((id) => {
+                    const sem = semesters.find((x) => x.id === id);
+                    return (
+                      <option key={id} value={id}>
+                        {sem ? semesterDisplayName(sem) : id}
+                      </option>
+                    );
+                  })}
+                </Select>
+              </div>
+              <button type="submit" className={buttonClasses("secondary", "md")}>
+                View
+              </button>
+            </form>
+          )}
+
           <CardBody>
-            {history.length === 0 && <p className="text-sm text-fg-muted">No results yet.</p>}
-            {[...new Set(history.map((r) => r.semesterId))].map((semesterId, index) => {
-              const info = semesterInfo(semesterId);
-              const summary = semesterSummaryFor(semesterId);
-              const courses = history.filter((r) => r.semesterId === semesterId);
-              return (
-                <div key={semesterId} className={index > 0 ? "mt-6 border-t border-line-subtle pt-6" : ""}>
-                  <div className="mb-2 flex items-baseline justify-between">
-                    <h3 className="text-sm font-semibold text-fg">{info?.label ?? semesterId}</h3>
-                    <span className="flex items-center gap-2 text-xs text-fg-muted">
-                      GPA {summary?.gpa ?? "—"} {summary?.isProvisional && "(provisional)"}
-                      <PrintButton semesterId={semesterId} />
-                    </span>
-                  </div>
-                  <Table>
-                    <tbody>
-                      {courses.map((c) => (
-                        <Tr key={c.id}>
-                          <Td>
-                            {c.courseCodeSnapshot} — {c.courseTitleSnapshot}
-                          </Td>
-                          <Td>{c.creditHours}cr</Td>
-                          <Td>
-                            {c.letter}
-                            {c.isRepeatDropped && " (R)"}
-                            {c.letter === "I" && info && (
-                              <span className="ml-1 text-xs text-warning-fg">
-                                -- must be resolved by end of {formatSemesterSortKey(computeIncompleteDeadlineSemester(info.sortKey))}
-                              </span>
-                            )}
-                          </Td>
-                        </Tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-              );
-            })}
+            {!sheet && <p className="text-sm text-fg-muted">No results yet.</p>}
+            {sheet && (
+              <>
+                <h3 className="mb-2 text-sm font-semibold text-fg">{selectedInfo?.label ?? selectedSemesterId}</h3>
+                <Table>
+                  <Thead>
+                    <tr>
+                      <Th>Course Title</Th>
+                      <Th className="text-center">Code</Th>
+                      <Th className="text-center">Cr/Hrs</Th>
+                      <Th className="text-center">Grade</Th>
+                      <Th className="text-center">Grade Point</Th>
+                      <Th className="text-center">Grade Points</Th>
+                    </tr>
+                  </Thead>
+                  <tbody>
+                    {sheet.courses.length === 0 && (
+                      <Tr>
+                        <Td colSpan={6} className="text-center text-fg-muted">
+                          No results are recorded for this semester.
+                        </Td>
+                      </Tr>
+                    )}
+                    {sheet.courses.map((c, i) => (
+                      <Tr key={`${c.code}-${i}`} className={i % 2 === 1 ? "bg-brand-subtle" : undefined}>
+                        <Td>
+                          {c.title}
+                          {c.isRepeatDropped && " (R)"}
+                          {c.letter === "I" && selectedInfo && (
+                            <span className="ml-1 text-xs text-warning-fg">
+                              — must be resolved by end of{" "}
+                              {formatSemesterSortKey(computeIncompleteDeadlineSemester(selectedInfo.sortKey))}
+                            </span>
+                          )}
+                        </Td>
+                        <Td className="text-center whitespace-nowrap">{c.code}</Td>
+                        <Td className="text-center">{c.creditHours}</Td>
+                        <Td className="text-center">{c.letter}</Td>
+                        <Td className="text-center">{c.gradePoint ?? "—"}</Td>
+                        <Td className="text-center">{c.gradePoints ?? "—"}</Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                  {/* The semester's own figures belong under the rows they
+                      are drawn from, which is also where the printed sheet
+                      puts them. No fill: the purple band is the heading's
+                      job, and a second one at the foot competes with it.
+                      What separates the totals from the results is a rule
+                      twice the weight of the ones between rows -- a line
+                      the eye reads as "below this is a different kind of
+                      number". CGPA stays in the Academic record card above:
+                      it is cumulative and says nothing about this table. */}
+                  <tfoot className="text-fg">
+                    <tr>
+                      <td colSpan={5} className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
+                        Total Credit Earned
+                      </td>
+                      <td className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
+                        {trimCredits(sheet.summary.creditsEarned)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={5} className="px-3 py-2 text-right font-bold">
+                        Total Grade Points
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold">{sheet.summary.totalGradePoints}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={5} className="px-3 py-2 text-right font-bold">
+                        Semester GPA
+                        {selectedSummary?.isProvisional && (
+                          <span className="ml-1 text-xs font-normal text-fg-muted">(provisional)</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold">{sheet.summary.gpa ?? "—"}</td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </>
+            )}
           </CardBody>
         </Card>
       </main>

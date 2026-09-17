@@ -76,6 +76,18 @@ export interface GradeSheetData {
   isProvisional: boolean;
 }
 
+/**
+ * "18.00" -> "18", "3.50" -> "3.5".
+ *
+ * Every figure above is formatted to two places for the printed sheet,
+ * where a column of aligned decimals is the whole point. Beside a Cr/Hrs
+ * column of plain "3"s -- on screen and in an exported file -- a total of
+ * "18.00" reads as a different kind of number than the ones it adds up.
+ */
+export function trimCredits(value: string): string {
+  return value.includes(".") ? value.replace(/\.?0+$/, "") : value;
+}
+
 const STANDING_LABEL: Record<string, string> = {
   HONOURS: "HONOURS",
   GOOD_STANDING: "GOOD STANDING",
