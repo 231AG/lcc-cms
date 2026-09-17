@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { Download, Pencil, Printer, Trash2 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
@@ -13,12 +13,7 @@ import {
   isOfferingSortColumn,
   sortOfferingRows,
 } from "@/lib/offerings/offeringRows";
-import {
-  ACTIVE_SEMESTER_STATES,
-  isOfferingEditable,
-  isPlanningOpen,
-  type SemesterState,
-} from "@/lib/academic/semesterStateMachine";
+import { ACTIVE_SEMESTER_STATES, isOfferingEditable, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { ROOMS } from "@/lib/offerings/rooms";
 import { DEFAULT_CAPACITY, DEFAULT_INSTRUCTOR } from "@/lib/offerings/offerings";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -27,13 +22,11 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { Button, buttonClasses } from "@/components/ui/Button";
-import { SubmitTextButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td, SortableTh, type SortDirection } from "@/components/ui/Table";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   addMeetingAction,
-  addOfferingToMyPlanAction,
   cancelOfferingAction,
   createOfferingAction,
   publishOfferingAction,
@@ -163,10 +156,12 @@ export default async function OfferingsPage({
         Please sign in.
       </main>
     );
-  // Students read this table too -- it is the course catalogue, and item 6
-  // puts "Add to plan" on it. Everything that manages an offering stays
-  // behind `isAdmin`/`canManage`, so what a student sees is the same table
-  // with a different single action on each row.
+  // Students read this table too: for them it is the course catalogue, and
+  // nothing more. Building a plan happens on /planning, which is the one
+  // place that shows the plan, the running credit total and the Submit
+  // button together -- an "Add to plan" button here was a second way to do
+  // the same thing, on a page that could not show the consequence of
+  // pressing it.
   const isAdmin = actor.role === "ADMIN";
   const isStudent = actor.role === "STUDENT";
 
@@ -207,9 +202,6 @@ export default async function OfferingsPage({
     (requestedSemesterId && semesters.find((s) => s.id === requestedSemesterId)?.id) ?? defaultSemester?.id ?? "";
   const selectedSemester = semesterId ? semesters.find((s) => s.id === semesterId) : undefined;
   const canManage = isAdmin && selectedSemester ? isOfferingEditable(selectedSemester.state as SemesterState) : false;
-  // A student can only add to a plan while the semester is open for
-  // planning; outside that the table is still readable, just not actionable.
-  const planningOpenHere = selectedSemester ? isPlanningOpen(selectedSemester.state as SemesterState) : false;
 
   let allRows: Awaited<ReturnType<typeof getOfferingRows>> = [];
   try {
@@ -507,10 +499,10 @@ export default async function OfferingsPage({
                     <SortableTh label="Day" column="day" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} />
                     <SortableTh label="Start" column="startTime" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="whitespace-nowrap" />
                     <Th className="whitespace-nowrap">End</Th>
-                    {/* Management is Admin-only and planning is Student-only;
-                        a Super Admin's view of this table has no Actions
-                        column at all rather than an empty one. */}
-                    {(isAdmin || isStudent) && <Th className="text-right">Actions</Th>}
+                    {/* Management is Admin-only, so a Super Admin's or a
+                        student's view of this table has no Actions column at
+                        all rather than an empty one. */}
+                    {isAdmin && <Th className="text-right">Actions</Th>}
                   </tr>
                 </Thead>
                 <tbody>
@@ -562,28 +554,6 @@ export default async function OfferingsPage({
                       </Td>
                       <Td className="whitespace-nowrap">{row.startTime || "—"}</Td>
                       <Td className="whitespace-nowrap">{row.endTime || "—"}</Td>
-                      {isStudent && (
-                        <Td className="px-2 text-right sm:px-3">
-                          {/* One button, one row, one click. Only on the
-                              first row of an offering: adding "the MWF slot"
-                              and "the Friday lab slot" separately would put
-                              the same offering in the plan twice. */}
-                          {firstRowOfOffering.has(i) && planningOpenHere && (
-                            <form action={addOfferingToMyPlanAction}>
-                              <input type="hidden" name="semesterId" value={semesterId} />
-                              <input type="hidden" name="offeringId" value={row.offeringId} />
-                              <SubmitTextButton
-                                pendingLabel="Adding…"
-                                title={`Add ${row.code} section ${row.section} to my plan`}
-                                className={buttonClasses("secondary", "sm")}
-                              >
-                                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                                Add to plan
-                              </SubmitTextButton>
-                            </form>
-                          )}
-                        </Td>
-                      )}
                       {isAdmin && (
                         <Td className="px-2 sm:px-3">
                           <span className="flex items-center justify-end gap-1">

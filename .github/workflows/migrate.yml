@@ -1,0 +1,112 @@
+# Applies pending database migrations to production after a merge to main.
+#
+# Why this exists: deploying does not touch the database. `next build` is
+# the whole build step, so merging a pull request that carries a migration
+# shipped new code against an old schema, and every page reading a column
+# that did not exist yet returned a server error. That happened twice in
+# production before this file existed.
+#
+# WHY A WORKFLOW AND NOT THE BUILD COMMAND. Putting `db:migrate` in the
+# build script looks simpler and is wrong: preview deployments build with
+# the same environment variables as production, so every pull request
+# preview would apply its own unmerged migrations to the live database
+# before anybody had reviewed them. This runs on main, after merge, and
+# nowhere else.
+#
+# ORDER, HONESTLY STATED. This job and Vercel's deploy both start from the
+# same push, so they race, and this one is not guaranteed to finish first.
+# That is tolerable because of a rule the project already follows: a
+# migration adds things (a nullable column, a new table) and does not
+# remove or rename what the current code reads. Under that rule either
+# order is safe -- the old code ignores a column it does not know about.
+# A migration that DROPS or RENAMES something still needs the old two-step
+# (ship the migration, then the code that depends on it) and must not rely
+# on this file.
+name: Migrate
+
+on:
+  push:
+    branches: [main]
+  # Also runnable by hand, so a failed run can be retried without an empty
+  # commit, and so the first run can be triggered deliberately.
+  workflow_dispatch:
+
+# One at a time. Two merges in quick succession would otherwise run two
+# migrators against the same database at once.
+concurrency:
+  group: migrate-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    # Skipped rather than failed when the secret is absent, so a fork or a
+    # repository that has not been set up yet does not show a permanent red
+    # X for something it was never meant to do.
+    if: ${{ github.repository == '231AG/lcc-cms' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Whether this workflow can do anything at all. Deliberately a WARNING
+      # and a skip rather than a failure: until the secret is added this
+      # repository has never had automatic migrations, so a red X on every
+      # push would be reporting a regression that has not happened. The
+      # summary below says plainly that nothing ran.
+      - name: Check the migration secret is present
+        id: secret
+        run: |
+          if [ -z "${{ secrets.PRODUCTION_DATABASE_URL }}" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Migrations skipped::PRODUCTION_DATABASE_URL is not set in this repository's secrets, so no migration ran. Add it under Settings > Secrets and variables > Actions, then re-run this workflow."
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Apply migrations
+        id: migrate
+        if: steps.secret.outputs.present == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: npm run db:migrate
+
+      - name: Seed reference data
+        # Permissions, grade scale and institution settings. Idempotent, and
+        # separate from the migration so a seed failure is legible on its own.
+        if: steps.secret.outputs.present == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: npm run db:seed
+
+      # The "notification or alert" half. A failure is already a red X and a
+      # GitHub email to whoever pushed; this adds a readable summary on the
+      # run itself so the successful case is not silent either.
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo "## Production database"
+            echo ""
+            if [ "${{ steps.secret.outputs.present }}" != "true" ]; then
+              echo "**Nothing ran.** \`PRODUCTION_DATABASE_URL\` is not set in this repository's secrets."
+              echo ""
+              echo "Until it is, the database is still migrated by hand. Add it under"
+              echo "*Settings > Secrets and variables > Actions*, then re-run this workflow."
+            elif [ "${{ job.status }}" = "success" ]; then
+              echo "Migrations and seed applied successfully for \`${{ github.sha }}\`."
+            else
+              echo "**Migrations FAILED for \`${{ github.sha }}\`.**"
+              echo ""
+              echo "The code for this commit is deploying or already deployed, and the database may be behind it."
+              echo "Pages that read a new column will return a server error until this is resolved."
+              echo ""
+              echo "Check the *Apply migrations* step above for the reason, fix it, then re-run this workflow."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

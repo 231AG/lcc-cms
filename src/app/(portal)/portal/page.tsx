@@ -399,13 +399,29 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
 
         <Card>
           <CardHeader>
-            <CardTitle>Students by college</CardTitle>
+            <CardTitle>Students by gender</CardTitle>
           </CardHeader>
           <CardBody>
-            <BarList data={stats.byCollege} emptyMessage="No students are enrolled in any college yet." />
+            {/* "Not recorded" is a row here rather than an omission: gender
+                was added after most of these students were enrolled, so for
+                a while it is the largest bar, and a chart that hid it would
+                add up to less than the total beside it. */}
+            <BarList data={stats.byGender} emptyMessage="No students are enrolled yet." />
           </CardBody>
         </Card>
       </div>
+
+      {/* College moved to its own row when gender took its place above:
+          college names are long, and they read far better across the full
+          width than wrapped into a half. */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Students by college</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <BarList data={stats.byCollege} emptyMessage="No students are enrolled in any college yet." />
+        </CardBody>
+      </Card>
 
       <Card className="mb-6">
         <CardHeader>
