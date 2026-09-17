@@ -6,7 +6,7 @@ import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds, getOfferingsForSemester } from "@/lib/offerings/offerings";
 import { filterOfferings, pageSlice } from "@/lib/offerings/offeringSearch";
-import { getMyPlan, getPlanItems, getPlansForStudent, getRegistrationsForStudent } from "@/lib/planning/planning";
+import { getMyPlan, getMyPlans, getPlanItems, getRegistrationsForStudent } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -70,7 +70,9 @@ export default async function PlanningPage({
   // Every semester this student has ever planned in, so a past plan stays
   // reachable after its semester closes -- one small query, and the reason
   // the picker below can offer anything other than the open semester.
-  const myPlans = await getPlansForStudent(actor, actor.userId);
+  // getMyPlans, NOT getPlansForStudent: the latter is the Admin read and
+  // asserts a permission no student has.
+  const myPlans = await getMyPlans(actor);
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);
     const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
