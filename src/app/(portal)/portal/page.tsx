@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
-import { semesterFullLabel } from "@/lib/academic/semesterName";
+import { semesterDisplayName, semesterFullLabel } from "@/lib/academic/semesterName";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { fullName } from "@/lib/students/name";
 import { getStudent } from "@/lib/students/students";
@@ -51,7 +51,7 @@ const STANDING_LABEL: Record<string, string> = {
 export default async function PortalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semesterId?: string }>;
+  searchParams: Promise<{ year?: string; semesterId?: string }>;
 }) {
   const actor = await getCurrentActor();
 
@@ -96,22 +96,33 @@ export default async function PortalPage({
     // only fetched when there is a current semester to have a plan in.
     const currentPlan = currentSemester ? await getMyPlan(actor, currentSemester.id) : null;
 
-    // S-04: one semester's results at a time, newest first. The picker
-    // offers only semesters this student actually has results in -- a year
-    // and a semester as two separate controls can be set to a combination
-    // that has none, and then the page has to explain an empty table it
-    // invited the reader to ask for.
+    // S-04: one semester's results at a time, newest first, chosen with a
+    // year and a semester. Both lists hold only what this student actually
+    // has results in, and the semester list is narrowed to the chosen year,
+    // so the pair cannot be set to a combination with nothing behind it.
     const resultSemesterIds = [...new Set(history.map((r) => r.semesterId))].sort((a, b) => {
       const ka = semesterInfo(a)?.sortKey;
       const kb = semesterInfo(b)?.sortKey;
       if (!ka || !kb) return 0;
       return kb.yearStart - ka.yearStart || kb.sequence - ka.sequence;
     });
-    const { semesterId: requestedSemesterId } = await searchParams;
+    const yearIdFor = (semesterId: string) => semesters.find((s) => s.id === semesterId)?.academicYearId;
+    const yearLabelFor = (yearId: string) => academicYears.find((y) => y.id === yearId)?.label ?? yearId;
+    // Derived from the semester list rather than listed separately, so the
+    // two controls cannot fall out of step with each other.
+    const resultYearIds = [...new Set(resultSemesterIds.map(yearIdFor).filter((id): id is string => !!id))];
+
+    const { year: requestedYearId, semesterId: requestedSemesterId } = await searchParams;
+    // Changing the year re-submits carrying the old semester, which usually
+    // belongs to a different year; that falls through to the newest semester
+    // of the year just chosen rather than to an error.
+    const selectedYearId =
+      requestedYearId && resultYearIds.includes(requestedYearId) ? requestedYearId : resultYearIds[0];
+    const yearSemesterIds = resultSemesterIds.filter((id) => yearIdFor(id) === selectedYearId);
     const selectedSemesterId =
-      requestedSemesterId && resultSemesterIds.includes(requestedSemesterId)
+      requestedSemesterId && yearSemesterIds.includes(requestedSemesterId)
         ? requestedSemesterId
-        : resultSemesterIds[0];
+        : yearSemesterIds[0];
     // The same assembled figures the printed grade sheet uses, so the screen
     // and the paper cannot disagree about a grade point or a total.
     const sheet = selectedSemesterId ? await getGradeSheet(actor, actor.userId, selectedSemesterId) : null;
@@ -245,22 +256,39 @@ export default async function PortalPage({
           {resultSemesterIds.length > 0 && (
             <form method="GET" className="flex flex-wrap items-end gap-2 border-b border-line-subtle px-4 py-3 print:hidden sm:px-5">
               <div>
-                <Label htmlFor="semesterId" className="text-xs">
-                  Year and semester
+                <Label htmlFor="year" className="text-xs">
+                  Year
                 </Label>
                 {/* Loads on choice; the button is the no-JavaScript fallback. */}
+                <Select id="year" name="year" defaultValue={selectedYearId ?? ""} className="w-40 font-semibold" data-auto-submit="">
+                  {resultYearIds.map((id) => (
+                    <option key={id} value={id}>
+                      {yearLabelFor(id)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="semesterId" className="text-xs">
+                  Semester
+                </Label>
+                {/* Only the chosen year's semesters, so the pair is always a
+                    combination this student has results for. */}
                 <Select
                   id="semesterId"
                   name="semesterId"
                   defaultValue={selectedSemesterId ?? ""}
-                  className="w-64"
+                  className="w-40 font-semibold"
                   data-auto-submit=""
                 >
-                  {resultSemesterIds.map((id) => (
-                    <option key={id} value={id}>
-                      {semesterInfo(id)?.label ?? id}
-                    </option>
-                  ))}
+                  {yearSemesterIds.map((id) => {
+                    const sem = semesters.find((x) => x.id === id);
+                    return (
+                      <option key={id} value={id}>
+                        {sem ? semesterDisplayName(sem) : id}
+                      </option>
+                    );
+                  })}
                 </Select>
               </div>
               <button type="submit" className={buttonClasses("secondary", "md")}>
@@ -315,39 +343,36 @@ export default async function PortalPage({
                   </tbody>
                   {/* The semester's own figures belong under the rows they
                       are drawn from, which is also where the printed sheet
-                      puts them -- and each total sits in the column it
-                      totals, credits under Cr/Hrs and points under Grade
-                      Points, rather than floating free at the end of a row.
-                      CGPA stays in the Academic record card: it is
-                      cumulative and says nothing about this table. */}
-                  <tfoot className="bg-brand-subtle-strong text-brand-fg">
+                      puts them. No fill: the purple band is the heading's
+                      job, and a second one at the foot competes with it.
+                      What separates the totals from the results is a rule
+                      twice the weight of the ones between rows -- a line
+                      the eye reads as "below this is a different kind of
+                      number". CGPA stays in the Academic record card above:
+                      it is cumulative and says nothing about this table. */}
+                  <tfoot className="text-fg">
                     <tr>
-                      <Th className="text-right font-semibold normal-case tracking-normal" colSpan={2}>
+                      <td colSpan={5} className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
                         Total Credit Earned
-                      </Th>
-                      <Th className="text-center font-semibold normal-case tracking-normal">
+                      </td>
+                      <td className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
                         {trimCredits(sheet.summary.creditsEarned)}
-                      </Th>
-                      <Th colSpan={3} />
+                      </td>
                     </tr>
                     <tr>
-                      <Th className="text-right font-semibold normal-case tracking-normal" colSpan={5}>
+                      <td colSpan={5} className="px-3 py-2 text-right font-bold">
                         Total Grade Points
-                      </Th>
-                      <Th className="text-center font-semibold normal-case tracking-normal">
-                        {sheet.summary.totalGradePoints}
-                      </Th>
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold">{sheet.summary.totalGradePoints}</td>
                     </tr>
                     <tr>
-                      <Th className="text-right text-sm font-semibold normal-case tracking-normal" colSpan={5}>
+                      <td colSpan={5} className="px-3 py-2 text-right font-bold">
                         Semester GPA
                         {selectedSummary?.isProvisional && (
-                          <span className="ml-1 text-xs font-normal">(provisional)</span>
+                          <span className="ml-1 text-xs font-normal text-fg-muted">(provisional)</span>
                         )}
-                      </Th>
-                      <Th className="text-center text-base font-bold normal-case tracking-normal">
-                        {sheet.summary.gpa ?? "—"}
-                      </Th>
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold">{sheet.summary.gpa ?? "—"}</td>
                     </tr>
                   </tfoot>
                 </Table>
