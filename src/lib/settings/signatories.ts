@@ -35,7 +35,7 @@ export const SIGNATORY_KEYS = {
 } as const;
 
 export const DEFAULT_SIGNATORIES: GradeSheetSignatories = {
-  signedName: "Mr. James M. Kaye",
+  signedName: "Pastor James M. Kaye",
   signedTitle: "Dean of Admissions & Records",
   approvedName: "Mr. Justin M. Kanneh",
   approvedTitle: "Dean of Academic Affairs",

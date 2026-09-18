@@ -5,6 +5,7 @@ import { academicRecord, semester } from "@/lib/db/schema";
 import type { Actor } from "@/lib/permissions/kernel";
 import { NotFoundError } from "@/lib/errors";
 import { fullName } from "@/lib/students/name";
+import { formatCourseCode } from "@/lib/courses/courseCode";
 import { semesterDisplayName, semesterNumeral } from "@/lib/academic/semesterName";
 import { getCumulativeSummary, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { roundHalfUp } from "@/lib/gpa/engine";
@@ -183,7 +184,10 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
     if (points && r.countsInGpa) totalGradePoints = totalGradePoints.plus(points);
     return {
       title: r.courseTitleSnapshot,
-      code: r.courseCodeSnapshot,
+      // Spaced for the reader here rather than in the document, so the
+      // component stays pure presentation and the screen table that reads
+      // this same function cannot disagree with the printed sheet.
+      code: formatCourseCode(r.courseCodeSnapshot),
       creditHours: new Decimal(r.creditHours).toFixed(0),
       letter: r.letter,
       gradePoint: r.gradePoint === null ? null : roundHalfUp(r.gradePoint, 2),
