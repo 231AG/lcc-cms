@@ -1,4 +1,7 @@
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { asUser } from "@/lib/db/asUser";
+import { db } from "@/lib/db/client";
+import { coursePlan, coursePlanItem, registration } from "@/lib/db/schema";
 import { semesterDisplayName } from "@/lib/academic/semesterName";
 import { getOfferingMeetingsForOfferings, getOfferingsForSemester } from "./offerings";
 import type { Actor } from "@/lib/permissions/kernel";
@@ -44,6 +47,12 @@ export interface OfferingRow {
   status: string;
   instructor: string;
   capacity: string;
+  /** Students holding a seat: an approved plan that became a registration. */
+  enrolled: string;
+  /** Students who have asked for a seat and are waiting on a decision --
+   *  an undecided item in a plan that has been submitted. Counted because a
+   *  course fills during the week its registrations do not exist yet. */
+  pending: string;
   /** Not columns; the screen needs these to attach the management controls to
    *  the right offering, and Remove to the right meetings. `meetingIds` is
    *  comma-separated because a row can now cover several meetings -- removing
@@ -68,6 +77,9 @@ export const OFFERING_COLUMNS = [
   { key: "startTime", header: "Start Time", nowrap: true },
   { key: "endTime", header: "End Time", nowrap: true },
   { key: "instructor", header: "Instructor", nowrap: true },
+  { key: "enrolled", header: "Enrolled", nowrap: true },
+  { key: "pending", header: "Pending", nowrap: true },
+  { key: "capacity", header: "Capacity", nowrap: true },
   { key: "status", header: "Status", nowrap: true },
 ] as const;
 
@@ -131,6 +143,58 @@ export function expandDays(formatted: string): string {
   return parts.map((p) => DAY_NAMES[DAY_LETTER.indexOf(p)] ?? p).join(", ");
 }
 
+/**
+ * How many students hold a seat in each offering, and how many are waiting
+ * on one.
+ *
+ * THIS READS THROUGH THE RAW CONNECTION, NOT asUser, AND THAT IS DELIBERATE.
+ * Row-level security on `registration` is "your own rows, or ADMIN":
+ *
+ *     USING (current_user_role() = 'ADMIN' OR student_id = auth.uid())
+ *
+ * Counted through RLS, a student would count only themselves, and -- less
+ * obviously -- a SUPER_ADMIN would count zero, because that policy names
+ * ADMIN and not the role above it. The column would then show three
+ * different wrong numbers to three different readers, quietly. Plan
+ * validation already reads this way for exactly this reason (see the note in
+ * submitPlan about cross-student visibility RLS cannot grant).
+ *
+ * What leaves this function is two integers per offering. No student id, no
+ * name, nothing about who is in the class -- only how many.
+ */
+async function getEnrolmentCounts(offeringIds: string[]): Promise<Map<string, { enrolled: number; pending: number }>> {
+  const counts = new Map<string, { enrolled: number; pending: number }>();
+  if (offeringIds.length === 0) return counts;
+
+  const [registered, awaiting] = await Promise.all([
+    db
+      .select({ offeringId: registration.offeringId, n: sql<number>`count(*)::int` })
+      .from(registration)
+      .where(and(inArray(registration.offeringId, offeringIds), eq(registration.status, "REGISTERED")))
+      .groupBy(registration.offeringId),
+    // An undecided item in a SUBMITTED plan. A DRAFT plan is a student still
+    // making up their mind and claims nothing; an item already APPROVED has
+    // become a registration and would otherwise be counted twice.
+    db
+      .select({ offeringId: coursePlanItem.offeringId, n: sql<number>`count(*)::int` })
+      .from(coursePlanItem)
+      .innerJoin(coursePlan, eq(coursePlanItem.planId, coursePlan.id))
+      .where(
+        and(
+          inArray(coursePlanItem.offeringId, offeringIds),
+          eq(coursePlanItem.status, "PENDING"),
+          eq(coursePlan.status, "SUBMITTED"),
+        ),
+      )
+      .groupBy(coursePlanItem.offeringId),
+  ]);
+
+  for (const id of offeringIds) counts.set(id, { enrolled: 0, pending: 0 });
+  for (const r of registered) counts.set(r.offeringId, { ...counts.get(r.offeringId)!, enrolled: r.n });
+  for (const r of awaiting) counts.set(r.offeringId, { ...counts.get(r.offeringId)!, pending: r.n });
+  return counts;
+}
+
 export async function getOfferingRows(actor: Actor, semesterId: string): Promise<OfferingRow[]> {
   const offerings = await getOfferingsForSemester(actor, semesterId);
   if (offerings.length === 0) return [];
@@ -139,7 +203,7 @@ export async function getOfferingRows(actor: Actor, semesterId: string): Promise
   // than joined per offering -- the same shape the rest of this app uses,
   // and what stops this page reintroducing the N+1 the performance pass
   // removed. Meetings come back in one batched query for the same reason.
-  const [meetingsByOffering, reference] = await Promise.all([
+  const [meetingsByOffering, reference, enrolmentCounts] = await Promise.all([
     getOfferingMeetingsForOfferings(
       actor,
       offerings.map((o) => o.id),
@@ -153,6 +217,9 @@ export async function getOfferingRows(actor: Actor, semesterId: string): Promise
         tx.query.academicYear.findMany(),
       ]),
     ),
+    // One grouped query for the whole page, not one per row -- this page had
+    // an N+1 removed once already.
+    getEnrolmentCounts(offerings.map((o) => o.id)),
   ]);
   const [courses, departments, colleges, semester, years] = reference;
 
@@ -179,6 +246,8 @@ export async function getOfferingRows(actor: Actor, semesterId: string): Promise
       status: offering.status,
       instructor: offering.instructorName ?? "",
       capacity: offering.capacity === null ? "" : String(offering.capacity),
+      enrolled: String(enrolmentCounts.get(offering.id)?.enrolled ?? 0),
+      pending: String(enrolmentCounts.get(offering.id)?.pending ?? 0),
       offeringId: offering.id,
     };
 
@@ -230,6 +299,7 @@ export const SORTABLE_OFFERING_COLUMNS = [
   "room",
   "day",
   "startTime",
+  "enrolled",
 ] as const;
 export type OfferingSortColumn = (typeof SORTABLE_OFFERING_COLUMNS)[number];
 
@@ -249,6 +319,12 @@ export function sortOfferingRows(rows: OfferingRow[], column: OfferingSortColumn
     // Credit hours are a number in a string column; comparing them as text
     // would put "10" before "3".
     if (key === "creditHours") return Number(a[key] || 0) - Number(b[key] || 0);
+    // Sorted by how full a class is, which is the question this column exists
+    // to answer -- and by the seats claimed, not just the seats taken, since
+    // the pending ones are about to become taken.
+    if (key === "enrolled") {
+      return Number(a.enrolled || 0) + Number(a.pending || 0) - (Number(b.enrolled || 0) + Number(b.pending || 0));
+    }
     // An unscheduled row sorts last on the schedule columns rather than
     // first, where an empty string would otherwise put it.
     if ((key === "day" || key === "startTime" || key === "room") && a[key] !== b[key]) {

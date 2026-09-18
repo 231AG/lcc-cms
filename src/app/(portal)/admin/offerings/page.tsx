@@ -49,6 +49,37 @@ const PAGE_SIZES = [10, 25, 50] as const;
 const DEFAULT_PAGE_SIZE = 10;
 
 /** Icon controls carry a tooltip and a matching accessible name. */
+/**
+ * How full a class is: seats taken, out of seats that exist, with the
+ * students still waiting on a decision underneath.
+ *
+ * Pending is shown separately rather than folded into the total because the
+ * two are different facts -- one is a student who has a place, the other is a
+ * student who has asked for one. Adding them would tell an Admin a course is
+ * full when it is not yet, and hide from them that it is about to be.
+ *
+ * The tone changes only at the point a decision is needed: amber once the
+ * pending ones would fill it, red once the seats themselves are gone.
+ */
+function EnrolledCell({ enrolled, pending, capacity }: { enrolled: string; pending: string; capacity: string }) {
+  const taken = Number(enrolled) || 0;
+  const waiting = Number(pending) || 0;
+  const seats = capacity === "" ? null : Number(capacity);
+
+  const full = seats !== null && taken >= seats;
+  const wouldFill = !full && seats !== null && taken + waiting >= seats;
+
+  return (
+    <span className="inline-flex flex-col items-center leading-tight">
+      <span className={full ? "font-semibold text-danger-fg" : wouldFill ? "font-semibold text-warning-fg" : undefined}>
+        {taken}
+        <span className="text-fg-muted"> / {seats === null ? "—" : seats}</span>
+      </span>
+      {waiting > 0 && <span className="text-xs whitespace-nowrap text-fg-muted">+{waiting} pending</span>}
+    </span>
+  );
+}
+
 const iconAction =
   "rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
@@ -499,6 +530,17 @@ export default async function OfferingsPage({
                     <SortableTh label="Day" column="day" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} />
                     <SortableTh label="Start" column="startTime" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="whitespace-nowrap" />
                     <Th className="whitespace-nowrap">End</Th>
+                    {/* Stays visible at every width, unlike Room or Cr/Hrs:
+                        knowing whether a class is full is the reason most
+                        people open this table on a phone. */}
+                    <SortableTh
+                      label="Enrolled"
+                      column="enrolled"
+                      activeColumn={sortColumn}
+                      direction={sortDirection}
+                      hrefFor={hrefForSort}
+                      className="whitespace-nowrap text-center"
+                    />
                     {/* Management is Admin-only, so a Super Admin's or a
                         student's view of this table has no Actions column at
                         all rather than an empty one. */}
@@ -554,6 +596,9 @@ export default async function OfferingsPage({
                       </Td>
                       <Td className="whitespace-nowrap">{row.startTime || "—"}</Td>
                       <Td className="whitespace-nowrap">{row.endTime || "—"}</Td>
+                      <Td className="whitespace-nowrap text-center">
+                        <EnrolledCell enrolled={row.enrolled} pending={row.pending} capacity={row.capacity} />
+                      </Td>
                       {isAdmin && (
                         <Td className="px-2 sm:px-3">
                           <span className="flex items-center justify-end gap-1">
