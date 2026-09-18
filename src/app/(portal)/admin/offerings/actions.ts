@@ -3,7 +3,16 @@
 import { redirect } from "next/navigation";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
-import { addMeeting, cancelOffering, createOffering, publishOffering, removeMeeting, updateOffering } from "@/lib/offerings/offerings";
+import {
+  addMeeting,
+  cancelOffering,
+  createOffering,
+  publishOffering,
+  reinstateOffering,
+  removeMeeting,
+  rescheduleMeetings,
+  updateOffering,
+} from "@/lib/offerings/offerings";
 
 function errorRedirect(semesterId: string, message: string): never {
   redirect(`/admin/offerings?semesterId=${semesterId}&error=${encodeURIComponent(message)}`);
@@ -71,6 +80,40 @@ export async function cancelOfferingAction(formData: FormData): Promise<void> {
   const offeringId = String(formData.get("offeringId") ?? "");
   try {
     await cancelOffering(actor, offeringId);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(semesterId, err.message);
+    throw err;
+  }
+  redirect(`/admin/offerings?semesterId=${semesterId}`);
+}
+
+export async function reinstateOfferingAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const semesterId = String(formData.get("semesterId") ?? "");
+  const offeringId = String(formData.get("offeringId") ?? "");
+  try {
+    await reinstateOffering(actor, offeringId);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(semesterId, err.message);
+    throw err;
+  }
+  redirect(`/admin/offerings?semesterId=${semesterId}`);
+}
+
+/** Moves one timetable slot -- every day of it -- to a new time and room. */
+export async function rescheduleMeetingsAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const semesterId = String(formData.get("semesterId") ?? "");
+  const meetingIds = String(formData.get("meetingIds") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  try {
+    await rescheduleMeetings(actor, meetingIds, {
+      startTime: String(formData.get("startTime") ?? ""),
+      endTime: String(formData.get("endTime") ?? ""),
+      room: String(formData.get("room") ?? ""),
+    });
   } catch (err) {
     if (err instanceof AppError) errorRedirect(semesterId, err.message);
     throw err;

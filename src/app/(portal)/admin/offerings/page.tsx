@@ -31,6 +31,8 @@ import {
   cancelOfferingAction,
   createOfferingAction,
   publishOfferingAction,
+  reinstateOfferingAction,
+  rescheduleMeetingsAction,
   removeMeetingAction,
   updateOfferingAction,
 } from "./actions";
@@ -630,6 +632,59 @@ export default async function OfferingsPage({
                                         </Button>
                                       </form>
 
+                                      {/* CHANGE this slot, as against adding
+                                          another. Without it the only way to
+                                          move a class from 11:00 to 12:00 was
+                                          to add a second slot and delete the
+                                          first -- and stopping half way
+                                          leaves the offering on the timetable
+                                          twice, which reads as the system
+                                          having duplicated it. Days are not
+                                          editable here: changing WHEN a class
+                                          meets is this, changing WHICH DAYS
+                                          is the add and remove below. */}
+                                      {row.meetingIds && (
+                                        <form action={rescheduleMeetingsAction} className="flex flex-wrap items-end gap-2">
+                                          <input type="hidden" name="semesterId" value={semesterId} />
+                                          <input type="hidden" name="meetingIds" value={row.meetingIds} />
+                                          <span className="py-1 text-xs text-fg-muted" title={expandDays(row.day)}>
+                                            Move {row.day}
+                                          </span>
+                                          <Input
+                                            name="startTime"
+                                            type="time"
+                                            required
+                                            defaultValue={row.startTime}
+                                            className="w-24 py-1 text-xs"
+                                            aria-label="New start time"
+                                          />
+                                          <Input
+                                            name="endTime"
+                                            type="time"
+                                            required
+                                            defaultValue={row.endTime}
+                                            className="w-24 py-1 text-xs"
+                                            aria-label="New end time"
+                                          />
+                                          <Select
+                                            name="room"
+                                            required
+                                            defaultValue={row.room}
+                                            className="w-24 py-1 text-xs"
+                                            aria-label="New room"
+                                          >
+                                            {ROOMS.map((r) => (
+                                              <option key={r} value={r}>
+                                                {r}
+                                              </option>
+                                            ))}
+                                          </Select>
+                                          <Button type="submit" variant="secondary" size="sm">
+                                            Change time
+                                          </Button>
+                                        </form>
+                                      )}
+
                                       <form action={addMeetingAction} className="flex flex-wrap items-end gap-2">
                                         <input type="hidden" name="semesterId" value={semesterId} />
                                         <input type="hidden" name="offeringId" value={row.offeringId} />
@@ -657,10 +712,17 @@ export default async function OfferingsPage({
                                           ))}
                                         </Select>
                                         <Button type="submit" variant="secondary" size="sm">
-                                          Add meeting
+                                          Add another day
                                         </Button>
                                       </form>
 
+                                      {/* The lifecycle, and a way back from
+                                          every state. Cancelling used to be
+                                          a one-way door: Publish only ever
+                                          showed for a DRAFT, so a cancelled
+                                          offering could not be brought back
+                                          and the class had to be recreated
+                                          under another section number. */}
                                       <div className="flex flex-wrap items-center gap-3">
                                         {row.status === "DRAFT" && (
                                           <form action={publishOfferingAction}>
@@ -668,6 +730,19 @@ export default async function OfferingsPage({
                                             <input type="hidden" name="offeringId" value={row.offeringId} />
                                             <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
                                               Publish
+                                            </button>
+                                          </form>
+                                        )}
+                                        {row.status === "CANCELLED" && (
+                                          <form action={reinstateOfferingAction}>
+                                            <input type="hidden" name="semesterId" value={semesterId} />
+                                            <input type="hidden" name="offeringId" value={row.offeringId} />
+                                            <button
+                                              type="submit"
+                                              title="Bring this offering back as a draft, then publish it"
+                                              className="text-xs font-medium text-brand-fg hover:underline"
+                                            >
+                                              Reinstate as draft
                                             </button>
                                           </form>
                                         )}
