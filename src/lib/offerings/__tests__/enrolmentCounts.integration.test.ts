@@ -15,7 +15,7 @@ import {
   semester,
   student,
 } from "@/lib/db/schema";
-import { getOfferingRows } from "../offeringRows";
+import { filterOfferingRows, getOfferingRows } from "../offeringRows";
 import type { Actor } from "@/lib/permissions/kernel";
 
 /**
@@ -125,6 +125,18 @@ describe("enrolment counts on the offerings table", () => {
   it("a STUDENT sees the same numbers, not just their own row", async () => {
     // S3 is registered for nothing: counted through RLS this would read 0.
     expect(await countsFor(actorOf(S3, "STUDENT"), OFF_FULL)).toEqual({ enrolled: "2", pending: "1", capacity: "10" });
+  });
+
+  it("finds a course whether or not the typed code has a space in it", async () => {
+    // The stored codes here are unspaced, like CECS201 in production. A person
+    // typing the code as they read it -- with a space -- used to find nothing,
+    // and the screen said the course did not exist.
+    const rows = await getOfferingRows(actorOf(ADMIN, "ADMIN"), SEM);
+    const stored = rows.find((r) => r.offeringId === OFF_FULL)!.code;
+
+    for (const typed of [stored, stored.replace(/\s+/g, ""), stored.toLowerCase(), stored.replace(/\s+/g, "  ")]) {
+      expect(filterOfferingRows(rows, typed).map((r) => r.offeringId), `typed as "${typed}"`).toContain(OFF_FULL);
+    }
   });
 
   it("a DRAFT plan claims no seat", async () => {

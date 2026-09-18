@@ -4,6 +4,7 @@ import { Download, Pencil, Printer, Trash2 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
+import { formatCourseCode } from "@/lib/courses/courseCode";
 import {
   DAY_LETTER,
   DAY_NAMES,
@@ -385,9 +386,14 @@ export default async function OfferingsPage({
                         autoComplete="off"
                         placeholder="Type a code or title, e.g. ACCT 301"
                       />
+                      {/* Offered spaced, matching the table and the grade
+                          sheet. The code typed here is resolved with its
+                          spaces removed, so either spelling is accepted --
+                          which is the point: a code a reader can see is a
+                          code they can type. */}
                       <datalist id="offering-course-options">
                         {courses.map((c) => (
-                          <option key={c.id} value={c.code}>
+                          <option key={c.id} value={formatCourseCode(c.code)}>
                             {c.title}
                           </option>
                         ))}

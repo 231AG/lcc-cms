@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { courseCodeKey } from "@/lib/courses/courseCode";
 import { db } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import { course, courseOffering, offeringMeeting, registration, semester } from "@/lib/db/schema";
@@ -85,11 +86,11 @@ export async function createOffering(actor: Actor, input: CreateOfferingInput) {
   // course_code_unique_idx on lower(trim(code))), so this resolves to at
   // most one course -- and matching the same way the index does means a
   // code that looks right to the user is never rejected over its casing.
-  const wantedCode = input.courseCode?.trim().toLowerCase();
+  const wantedCode = input.courseCode ? courseCodeKey(input.courseCode) : undefined;
   const courseRow = input.courseId
     ? await db.query.course.findFirst({ where: eq(course.id, input.courseId) })
     : wantedCode
-      ? (await db.query.course.findMany()).find((c) => c.code.trim().toLowerCase() === wantedCode)
+      ? (await db.query.course.findMany()).find((c) => courseCodeKey(c.code) === wantedCode)
       : undefined;
   if (!courseRow) {
     throw new ValidationError(

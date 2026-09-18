@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatCourseCode } from "@/lib/courses/courseCode";
+import { courseCodeKey, formatCourseCode } from "@/lib/courses/courseCode";
 
 describe("formatCourseCode", () => {
   it("inserts the space", () => {
@@ -21,5 +21,24 @@ describe("formatCourseCode", () => {
   });
   it("keeps a suffix attached to the number", () => {
     expect(formatCourseCode("ENG101A")).toBe("ENG 101A");
+  });
+});
+
+describe("courseCodeKey", () => {
+  it("makes every spelling of one code the same key", () => {
+    // The real case: CECS201 in the database, "CECS 201" typed by a person.
+    expect(courseCodeKey("CECS 201")).toBe(courseCodeKey("CECS201"));
+    expect(courseCodeKey("cecs201")).toBe(courseCodeKey("CECS  201"));
+    expect(courseCodeKey(" CECS201 ")).toBe("cecs201");
+  });
+
+  it("keeps different courses apart", () => {
+    expect(courseCodeKey("CECS201")).not.toBe(courseCodeKey("CECS210"));
+    expect(courseCodeKey("CECS201")).not.toBe(courseCodeKey("BSPH201"));
+  });
+
+  it("round-trips with the displayed form", () => {
+    // What a reader sees can always be typed back in.
+    expect(courseCodeKey(formatCourseCode("CECS201"))).toBe(courseCodeKey("CECS201"));
   });
 });

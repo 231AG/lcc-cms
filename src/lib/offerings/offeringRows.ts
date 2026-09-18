@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { asUser } from "@/lib/db/asUser";
 import { db } from "@/lib/db/client";
 import { coursePlan, coursePlanItem, registration } from "@/lib/db/schema";
+import { courseCodeKey, formatCourseCode } from "@/lib/courses/courseCode";
 import { semesterDisplayName } from "@/lib/academic/semesterName";
 import { getOfferingMeetingsForOfferings, getOfferingsForSemester } from "./offerings";
 import type { Actor } from "@/lib/permissions/kernel";
@@ -239,7 +240,10 @@ export async function getOfferingRows(actor: Actor, semesterId: string): Promise
       department: department?.name ?? "",
       year: yearLabel,
       semester: semesterName,
-      code: course?.code ?? "",
+      // Shown spaced, matched unspaced -- see courseCodeKey. The grade
+      // sheet already reads "CECS 201"; this is the same code on the
+      // same screen, so it should not read "CECS201" here.
+      code: course ? formatCourseCode(course.code) : "",
       title: course?.title ?? "",
       section: offering.section,
       creditHours: String(offering.frozenCreditHours),
@@ -350,9 +354,15 @@ export function filterOfferingRows(rows: OfferingRow[], query?: string, collegeI
   if (collegeId && collegeLabel) out = out.filter((r) => r.college === collegeLabel);
   const needle = query?.trim().toLowerCase();
   if (!needle) return out;
-  return out.filter((r) =>
-    [r.code, r.title, r.section, r.room, r.day, r.department, r.instructor, expandDays(r.day)].some((value) =>
-      value.toLowerCase().includes(needle),
-    ),
+  // A code is matched with its spaces removed on BOTH sides, so "CECS 201",
+  // "cecs201" and "CECS  201" all find the same course however it happens to
+  // be stored. Everything else is plain substring matching.
+  const codeNeedle = courseCodeKey(needle);
+  return out.filter(
+    (r) =>
+      courseCodeKey(r.code).includes(codeNeedle) ||
+      [r.title, r.section, r.room, r.day, r.department, r.instructor, expandDays(r.day)].some((value) =>
+        value.toLowerCase().includes(needle),
+      ),
   );
 }
