@@ -58,12 +58,14 @@ const CSS = `
   font-family: "DejaVu Sans", "Segoe UI", system-ui, sans-serif;
   font-size: 9.5pt;
   line-height: 1.25;
-  /* The gold double border and the purple inner rule of the reference
-     frame, done as two nested boxes rather than a border-style: double,
-     so the gap between them is a real, controllable distance. */
-  border: 4px double var(--gs-gold);
+  /* A single purple rule inset from the trim. The gold double frame that
+     used to sit outside it is gone: two concentric borders competed with
+     the letterhead for the eye, and the outer one was the first thing a
+     cheap printer clipped. */
   outline: 1px solid var(--gs-purple);
-  outline-offset: -5mm;
+  outline-offset: -4mm;
+  /* The watermark is positioned against this box. */
+  position: relative;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
@@ -215,6 +217,34 @@ const CSS = `
 .gs-footer-rule { height: 1px; background: var(--gs-gold-light); margin: 2.5mm 0 1.5mm; }
 .gs-note { font-family: "DejaVu Serif", Georgia, serif; font-style: italic; font-size: 8pt; color: var(--gs-muted); text-align: center; margin: 0; }
 
+/* ---- Watermark ---- */
+/* The seal, very faint, over the whole sheet -- above the cards rather
+   than behind them, because every card paints its own white ground and a
+   mark behind them would only show in the gaps between.
+   6% is the whole trick: enough to read as the College's paper when you
+   hold it up, not enough to fight a grade for legibility. It is inert --
+   pointer-events: none so it never eats a click on screen, and it
+   carries print-color-adjust: exact so the browser's "save ink" default
+   does not helpfully drop the one thing that marks the sheet as genuine. */
+.gs-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+.gs-watermark img {
+  width: 135mm;
+  height: 135mm;
+  object-fit: contain;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
 /* ---- A long semester ---- */
 /* The sheet is sized so an ordinary semester reads comfortably. A semester
    with many courses would push the signature block onto a second page, so
@@ -248,7 +278,7 @@ const CSS = `
 /* ---- Print ---- */
 @media print {
   @page { size: A4 landscape; margin: 0; }
-  .gs { border-width: 4px; margin: 0; box-shadow: none; }
+  .gs { margin: 0; box-shadow: none; }
   /* A long semester can spill onto a second sheet; when it does, the
      course table repeats its header rather than orphaning bare rows. */
   .gs-courses thead { display: table-header-group; }
@@ -295,6 +325,13 @@ export function GradeSheetDocument({ data, sealSrc = "/lcc-logo.png" }: { data: 
     <>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <article className={dense ? "gs gs--dense" : "gs"}>
+        <div className="gs-watermark" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a fixed
+              physical size on a print document; next/image's responsive
+              srcset machinery has nothing to contribute here. */}
+          <img src={sealSrc} alt="" />
+        </div>
+
         <header className="gs-header">
           {/* Two seals, one image file used twice -- `public/lcc-logo.png`
               is the only seal artwork this project has, and the reference
@@ -426,12 +463,6 @@ export function GradeSheetDocument({ data, sealSrc = "/lcc-logo.png" }: { data: 
         </div>
 
         <div className="gs-signatures">
-          <div className="gs-sign-row">
-            <div className="gs-sign-field">
-              <span>Date Issued:</span>
-              <span className="gs-sign-line" />
-            </div>
-          </div>
           <div className="gs-sign-row">
             <div className="gs-sign-block">
               <div className="gs-sign-field">

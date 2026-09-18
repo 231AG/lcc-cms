@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Download, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 import { buttonClasses } from "@/components/ui/Button";
 import { logSemesterPrintAction } from "../../actions";
 
@@ -14,10 +14,12 @@ import { logSemesterPrintAction } from "../../actions";
  * ship hundreds of kilobytes to produce a second copy of a layout that
  * could then drift from the printed one.
  *
- * Which is why Download and Print are the same act here. The sheet arrives
- * with the dialog already open (`?print=1`), so a reader who clicked the
- * download arrow lands one keystroke from a saved PDF rather than on a
- * page wondering where their file went.
+ * Which is why there is ONE control and not a Print beside a Download.
+ * Both would open this same dialog, and what separates printing from saving
+ * happens inside it, on a Destination menu no page is allowed to preset --
+ * browsers forbid that, or any site could push files at you. Two buttons
+ * would promise a difference the software cannot deliver; one that names
+ * both outcomes tells the truth.
  *
  * The print is logged before the dialog opens -- that is the moment a copy
  * of the record starts leaving the system (Section 20.4).
@@ -40,15 +42,9 @@ export function PrintOwnGradeSheet({ semesterId, auto }: { semesterId: string; a
   }, [auto]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button type="button" className={buttonClasses("primary", "md")} onClick={print}>
-        <Printer className="h-4 w-4" aria-hidden="true" />
-        Print
-      </button>
-      <button type="button" className={buttonClasses("secondary", "md")} onClick={print}>
-        <Download className="h-4 w-4" aria-hidden="true" />
-        Save as PDF
-      </button>
-    </div>
+    <button type="button" className={buttonClasses("primary", "md")} onClick={print}>
+      <Printer className="h-4 w-4" aria-hidden="true" />
+      Print or save as PDF
+    </button>
   );
 }
