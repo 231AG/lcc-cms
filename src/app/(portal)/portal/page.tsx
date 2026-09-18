@@ -22,8 +22,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { Label, Select } from "@/components/ui/Form";
 import { buttonClasses } from "@/components/ui/Button";
-import { Download } from "lucide-react";
-import PrintButton from "./PrintButton";
+import { Download, Printer } from "lucide-react";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -238,17 +237,31 @@ export default async function PortalPage({
         <Card>
           <CardHeader className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>Semester results</CardTitle>
+            {/* Both open the College's grade sheet for the chosen semester
+                -- the letterhead document, A4 landscape, the same one the
+                Registrar prints. They arrive with the print dialog already
+                up, where "Save as PDF" is what saves a copy: the browser
+                renders this exact markup to a real PDF with selectable
+                text, which is why there is no PDF library in this project
+                to produce a second, drifting copy of the same layout. */}
             {sheet && selectedSemesterId && (
               <div className="flex items-center gap-1 print:hidden">
-                <PrintButton semesterId={selectedSemesterId} />
-                <a
-                  href={`/portal/results/export?semesterId=${encodeURIComponent(selectedSemesterId)}`}
-                  title="Download as CSV"
-                  aria-label="Download as CSV"
+                <Link
+                  href={`/portal/grade-sheet/${selectedSemesterId}?print=1`}
+                  title="Print grade sheet"
+                  aria-label="Print grade sheet"
+                  className={iconAction}
+                >
+                  <Printer className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link
+                  href={`/portal/grade-sheet/${selectedSemesterId}?print=1`}
+                  title="Download grade sheet as PDF"
+                  aria-label="Download grade sheet as PDF"
                   className={iconAction}
                 >
                   <Download className="h-4 w-4" aria-hidden="true" />
-                </a>
+                </Link>
               </div>
             )}
           </CardHeader>
