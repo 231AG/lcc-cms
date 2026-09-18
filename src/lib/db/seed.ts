@@ -296,7 +296,7 @@ const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: st
   // Grade sheet signature block. Seeded with the names on the College's
   // existing printed sheet; editable by an Admin from the grade sheet
   // itself, so a change of dean is a form submission, not a deployment.
-  { key: "grade_sheet_signed_name", value: "Mr. James M. Kaye", description: "Printed on the Student Grade Sheet signature block." },
+  { key: "grade_sheet_signed_name", value: "Pastor James M. Kaye", description: "Printed on the Student Grade Sheet signature block." },
   { key: "grade_sheet_signed_title", value: "Dean of Admissions & Records", description: "Printed on the Student Grade Sheet signature block." },
   { key: "grade_sheet_approved_name", value: "Mr. Justin M. Kanneh", description: "Printed on the Student Grade Sheet signature block." },
   { key: "grade_sheet_approved_title", value: "Dean of Academic Affairs", description: "Printed on the Student Grade Sheet signature block." },

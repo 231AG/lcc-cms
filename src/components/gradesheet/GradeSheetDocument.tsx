@@ -45,21 +45,27 @@ const CSS = `
      and the three summary cards each get real width, and the whole document
      lands on one page with margins that are not apologetic. */
   width: 297mm;
-  min-height: 210mm;
+  /* One millimetre under the page box. At exactly 210mm a sub-pixel
+     rounding in either direction tips the sheet onto a second page, and a
+     grade sheet whose signature block prints on page two is not a grade
+     sheet. */
+  min-height: 209mm;
   margin: 0 auto;
-  padding: 10mm 12mm;
+  padding: 7mm 10mm;
   box-sizing: border-box;
   background: var(--gs-paper);
   color: var(--gs-text);
   font-family: "DejaVu Sans", "Segoe UI", system-ui, sans-serif;
-  font-size: 10pt;
-  line-height: 1.35;
-  /* The gold double border and the purple inner rule of the reference
-     frame, done as two nested boxes rather than a border-style: double,
-     so the gap between them is a real, controllable distance. */
-  border: 4px double var(--gs-gold);
+  font-size: 9.5pt;
+  line-height: 1.25;
+  /* A single purple rule inset from the trim. The gold double frame that
+     used to sit outside it is gone: two concentric borders competed with
+     the letterhead for the eye, and the outer one was the first thing a
+     cheap printer clipped. */
   outline: 1px solid var(--gs-purple);
-  outline-offset: -5mm;
+  outline-offset: -4mm;
+  /* The watermark is positioned against this box. */
+  position: relative;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
@@ -76,18 +82,18 @@ const CSS = `
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10mm;
-  padding: 1mm 3mm 3mm;
+  gap: 8mm;
+  padding: 0 3mm 1.5mm;
 }
 /* The seal artwork is a PNG on a white ground, and the sheet's paper is
    cream -- multiply drops the white square into the paper without needing
    a second, alpha-cut copy of the asset. */
-.gs-seal { width: 30mm; height: 30mm; flex: 0 0 auto; object-fit: contain; mix-blend-mode: multiply; }
+.gs-seal { width: 20mm; height: 20mm; flex: 0 0 auto; object-fit: contain; mix-blend-mode: multiply; }
 .gs-titles { text-align: center; min-width: 0; flex: 0 1 auto; }
 .gs-college {
   font-family: "DejaVu Serif", Georgia, serif;
   font-weight: 700;
-  font-size: 19pt;
+  font-size: 16pt;
   letter-spacing: 0.01em;
   color: var(--gs-purple);
   margin: 0;
@@ -98,15 +104,15 @@ const CSS = `
 .gs-address {
   font-family: "DejaVu Serif", Georgia, serif;
   font-style: italic;
-  font-size: 9.5pt;
+  font-size: 8.5pt;
   color: var(--gs-purple-dark);
-  margin: 1mm 0 0;
+  margin: 0.6mm 0 0;
 }
-.gs-rule { height: 1px; background: var(--gs-gold); margin: 2mm auto; width: 62%; }
+.gs-rule { height: 1px; background: var(--gs-gold); margin: 1.2mm auto; width: 62%; }
 .gs-subtitle {
   font-family: "DejaVu Serif", Georgia, serif;
   font-weight: 700;
-  font-size: 13pt;
+  font-size: 11pt;
   color: var(--gs-purple-dark);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -114,20 +120,20 @@ const CSS = `
 }
 
 /* ---- Cards ---- */
-.gs-card { border: 1px solid var(--gs-divider); background: #ffffff; margin-bottom: 4mm; }
+.gs-card { border: 1px solid var(--gs-divider); background: #ffffff; margin-bottom: 2.5mm; }
 .gs-card-head {
   background: var(--gs-purple);
   color: #ffffff;
   font-weight: 700;
-  font-size: 9pt;
+  font-size: 8pt;
   letter-spacing: 0.06em;
-  padding: 1.6mm 3mm;
+  padding: 1.1mm 3mm;
   text-transform: uppercase;
 }
 
 /* ---- Student information: two columns, ruled like the reference ---- */
 .gs-info { width: 100%; border-collapse: collapse; }
-.gs-info td { border: 1px solid var(--gs-divider); padding: 1.6mm 3mm; vertical-align: top; }
+.gs-info td { border: 1px solid var(--gs-divider); padding: 1.1mm 2.5mm; vertical-align: top; }
 .gs-info .gs-label { color: var(--gs-purple); font-weight: 700; width: 26mm; white-space: nowrap; }
 .gs-info .gs-value { width: 44mm; }
 
@@ -136,18 +142,18 @@ const CSS = `
 .gs-courses thead th {
   background: var(--gs-purple-dark);
   color: #ffffff;
-  font-size: 8.5pt;
+  font-size: 8pt;
   font-weight: 700;
   text-align: center;
-  padding: 1.6mm 2mm;
+  padding: 1.1mm 2mm;
   border: 1px solid var(--gs-divider);
 }
 .gs-courses thead th:first-child { text-align: left; }
 .gs-courses td {
   border: 1px solid var(--gs-divider);
-  padding: 1.5mm 2mm;
+  padding: 1mm 2mm;
   text-align: center;
-  font-size: 9pt;
+  font-size: 8.5pt;
 }
 .gs-courses td:first-child { text-align: left; }
 .gs-courses tbody tr:nth-child(even) { background: var(--gs-purple-tint); }
@@ -158,28 +164,28 @@ const CSS = `
    but left the two short ones with the tall one's empty space at the
    bottom; centring each body inside its own card is what makes the row
    read as three cards rather than one tall one and two stubs. */
-.gs-bottom { display: flex; gap: 3mm; align-items: stretch; margin-bottom: 6mm; }
+.gs-bottom { display: flex; gap: 3mm; align-items: stretch; margin-bottom: 3mm; }
 .gs-bottom > * { display: flex; flex-direction: column; }
 .gs-standing { flex: 0 0 29%; border-color: var(--gs-gold); }
 .gs-scale { flex: 1 1 auto; }
 .gs-summary { flex: 0 0 30%; }
-.gs-card-body { padding: 2.5mm 3mm; flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
+.gs-card-body { padding: 2mm 3mm; flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
 
 .gs-standing .gs-card-body { background: var(--gs-purple-tint); text-align: center; }
-.gs-standing-label { font-size: 13pt; font-weight: 700; color: var(--gs-purple-dark); margin: 0; }
+.gs-standing-label { font-size: 12pt; font-weight: 700; color: var(--gs-purple-dark); margin: 0; }
 .gs-standing-note { font-size: 8pt; color: var(--gs-muted); margin: 1mm 0 0; }
 
-.gs-scale-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+.gs-scale-table { width: 100%; border-collapse: collapse; font-size: 7pt; }
 /* Every cell on one line: a wrapped "95 –" over "100" turned a ten-row
    reference card into a twenty-row column twice the height of its
    neighbours. */
-.gs-scale-table td { padding: 0.35mm 1mm; white-space: nowrap; }
+.gs-scale-table td { padding: 0.15mm 1mm; white-space: nowrap; }
 .gs-scale-table .gs-scale-letter { font-weight: 700; color: var(--gs-purple); width: 7mm; }
 .gs-scale-table .gs-scale-range { width: 20mm; }
 .gs-scale-table .gs-scale-points { text-align: right; width: 11mm; }
 .gs-scale-table .gs-scale-desc { color: var(--gs-muted); padding-left: 3mm; }
 
-.gs-summary-row { display: flex; justify-content: space-between; gap: 3mm; font-size: 8.5pt; padding: 0.8mm 0; margin: 0; }
+.gs-summary-row { display: flex; justify-content: space-between; gap: 3mm; font-size: 8.5pt; padding: 0.6mm 0; margin: 0; }
 .gs-summary-row strong { font-variant-numeric: tabular-nums; }
 .gs-gpa {
   display: flex;
@@ -191,15 +197,15 @@ const CSS = `
   margin-top: 1.5mm;
 }
 .gs-gpa-label { font-weight: 700; font-size: 8.5pt; color: var(--gs-purple-dark); letter-spacing: 0.03em; white-space: nowrap; }
-.gs-gpa-value { font-weight: 700; font-size: 16pt; color: var(--gs-purple-dark); }
+.gs-gpa-value { font-weight: 700; font-size: 14pt; color: var(--gs-purple-dark); }
 
 /* ---- Signature block ---- */
-.gs-signatures { margin-top: 6mm; }
-.gs-sign-line { border-bottom: 1px solid var(--gs-text); min-width: 52mm; height: 6mm; }
+.gs-signatures { margin-top: 4mm; }
+.gs-sign-line { border-bottom: 1px solid var(--gs-text); min-width: 52mm; height: 4.5mm; }
 /* Signed at the left margin, Approved at the right -- and "right" is the
    content width, so the block lines up with the table above it instead of
    drifting past its edge. */
-.gs-sign-row { display: flex; gap: 8mm; align-items: flex-end; justify-content: space-between; margin-bottom: 5mm; }
+.gs-sign-row { display: flex; gap: 8mm; align-items: flex-end; justify-content: space-between; margin-bottom: 3mm; }
 .gs-sign-block { flex: 0 0 auto; max-width: 46%; }
 .gs-sign-block--right { text-align: right; }
 .gs-sign-block--right .gs-sign-field { justify-content: flex-end; }
@@ -208,13 +214,71 @@ const CSS = `
 .gs-sign-name { font-weight: 700; }
 .gs-sign-title { color: var(--gs-muted); font-size: 8pt; }
 
-.gs-footer-rule { height: 1px; background: var(--gs-gold-light); margin: 4mm 0 2mm; }
+.gs-footer-rule { height: 1px; background: var(--gs-gold-light); margin: 2.5mm 0 1.5mm; }
 .gs-note { font-family: "DejaVu Serif", Georgia, serif; font-style: italic; font-size: 8pt; color: var(--gs-muted); text-align: center; margin: 0; }
+
+/* ---- Watermark ---- */
+/* The seal, very faint, over the whole sheet -- above the cards rather
+   than behind them, because every card paints its own white ground and a
+   mark behind them would only show in the gaps between.
+   6% is the whole trick: enough to read as the College's paper when you
+   hold it up, not enough to fight a grade for legibility. It is inert --
+   pointer-events: none so it never eats a click on screen, and it
+   carries print-color-adjust: exact so the browser's "save ink" default
+   does not helpfully drop the one thing that marks the sheet as genuine. */
+.gs-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+.gs-watermark img {
+  width: 135mm;
+  height: 135mm;
+  object-fit: contain;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ---- A long semester ---- */
+/* The sheet is sized so an ordinary semester reads comfortably. A semester
+   with many courses would push the signature block onto a second page, so
+   past a threshold the document tightens rather than spills: smaller seals,
+   tighter rows, a denser grading scale. CSS cannot count rows, so the
+   component adds this class -- the alternative is sizing every sheet for
+   the worst case, which makes the common five-course sheet look starved.
+   The institution caps a semester at 21 credits, so twelve rows is past
+   anything a plan can produce; beyond that the table's repeating header
+   takes over and a second page is the honest answer. */
+.gs--dense .gs-header { padding-bottom: 1mm; }
+.gs--dense .gs-seal { width: 16mm; height: 16mm; }
+.gs--dense .gs-college { font-size: 14pt; }
+.gs--dense .gs-address { font-size: 8pt; }
+.gs--dense .gs-subtitle { font-size: 10pt; }
+.gs--dense .gs-rule { margin: 0.9mm auto; }
+.gs--dense .gs-card { margin-bottom: 2mm; }
+.gs--dense .gs-info td { padding: 0.7mm 2.5mm; }
+.gs--dense .gs-courses thead th { padding: 0.7mm 2mm; font-size: 7.5pt; }
+.gs--dense .gs-courses td { padding: 0.5mm 2mm; font-size: 7.8pt; }
+.gs--dense .gs-bottom { margin-bottom: 2mm; }
+.gs--dense .gs-card-body { padding: 1.4mm 3mm; }
+.gs--dense .gs-scale-table { font-size: 6.3pt; }
+.gs--dense .gs-standing-label { font-size: 11pt; }
+.gs--dense .gs-gpa-value { font-size: 13pt; }
+.gs--dense .gs-signatures { margin-top: 2.5mm; }
+.gs--dense .gs-sign-line { height: 3.5mm; }
+.gs--dense .gs-sign-row { margin-bottom: 2mm; }
+.gs--dense .gs-footer-rule { margin: 1.5mm 0 1mm; }
 
 /* ---- Print ---- */
 @media print {
   @page { size: A4 landscape; margin: 0; }
-  .gs { border-width: 4px; margin: 0; box-shadow: none; }
+  .gs { margin: 0; box-shadow: none; }
   /* A long semester can spill onto a second sheet; when it does, the
      course table repeats its header rather than orphaning bare rows. */
   .gs-courses thead { display: table-header-group; }
@@ -253,11 +317,21 @@ function InfoRow({
 
 export function GradeSheetDocument({ data, sealSrc = "/lcc-logo.png" }: { data: GradeSheetData; sealSrc?: string }) {
   const { student, summary, standing, signatories } = data;
+  // Measured, not guessed: at the sizes above, eight course rows is where
+  // the signature block starts reaching for a second page.
+  const dense = data.courses.length > 7;
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
-      <article className="gs">
+      <article className={dense ? "gs gs--dense" : "gs"}>
+        <div className="gs-watermark" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a fixed
+              physical size on a print document; next/image's responsive
+              srcset machinery has nothing to contribute here. */}
+          <img src={sealSrc} alt="" />
+        </div>
+
         <header className="gs-header">
           {/* Two seals, one image file used twice -- `public/lcc-logo.png`
               is the only seal artwork this project has, and the reference
@@ -389,12 +463,6 @@ export function GradeSheetDocument({ data, sealSrc = "/lcc-logo.png" }: { data: 
         </div>
 
         <div className="gs-signatures">
-          <div className="gs-sign-row">
-            <div className="gs-sign-field">
-              <span>Date Issued:</span>
-              <span className="gs-sign-line" />
-            </div>
-          </div>
           <div className="gs-sign-row">
             <div className="gs-sign-block">
               <div className="gs-sign-field">

@@ -22,8 +22,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { Label, Select } from "@/components/ui/Form";
 import { buttonClasses } from "@/components/ui/Button";
-import { Download } from "lucide-react";
-import PrintButton from "./PrintButton";
+import { Printer } from "lucide-react";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -238,18 +237,24 @@ export default async function PortalPage({
         <Card>
           <CardHeader className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>Semester results</CardTitle>
+            {/* One control, not a Print beside a Download. Both would open
+                the same print dialog, and what separates printing from
+                saving happens inside it, on a Destination menu no page is
+                allowed to preset -- browsers forbid that, or any site could
+                push files at a reader. Two icons would promise a difference
+                the software cannot deliver; one that names both outcomes
+                tells the truth. It opens the College's grade sheet for the
+                chosen semester: the letterhead document, A4 landscape, the
+                same one the Registrar prints. */}
             {sheet && selectedSemesterId && (
-              <div className="flex items-center gap-1 print:hidden">
-                <PrintButton semesterId={selectedSemesterId} />
-                <a
-                  href={`/portal/results/export?semesterId=${encodeURIComponent(selectedSemesterId)}`}
-                  title="Download as CSV"
-                  aria-label="Download as CSV"
-                  className={iconAction}
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                </a>
-              </div>
+              <Link
+                href={`/portal/grade-sheet/${selectedSemesterId}?print=1`}
+                title="Print or save as PDF"
+                aria-label="Print or save as PDF"
+                className={`${iconAction} print:hidden`}
+              >
+                <Printer className="h-4 w-4" aria-hidden="true" />
+              </Link>
             )}
           </CardHeader>
 
