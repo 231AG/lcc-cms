@@ -23,6 +23,22 @@ export function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>
 
 /** Section heading used inside a Card/section -- keeps the `<h2 class="font-medium">`
  * convention already used throughout the app, just with consistent sizing. */
-export function CardTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <h2 className={cn("text-base font-bold text-fg", className)}>{children}</h2>;
+/**
+ * Section heading used inside a Card/section.
+ *
+ * `icon` is the small glyph beside the title in the design reference. It is
+ * optional and decorative -- the heading text is the accessible name, and
+ * the icon is hidden from assistive tech by the caller -- so a CardTitle
+ * that passes none renders exactly as it did.
+ */
+export function CardTitle({ icon, children, className }: { icon?: ReactNode; children: ReactNode; className?: string }) {
+  if (!icon) return <h2 className={cn("text-base font-bold text-fg", className)}>{children}</h2>;
+  return (
+    <h2 className={cn("text-fg flex items-center gap-2.5 text-base font-bold", className)}>
+      <span className="bg-brand-subtle text-brand-fg flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+        {icon}
+      </span>
+      {children}
+    </h2>
+  );
 }

@@ -10,12 +10,26 @@ import { getStudent } from "@/lib/students/students";
 import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
-import { getMyPlan } from "@/lib/planning/planning";
+import { getMyPlan, getPlanItems } from "@/lib/planning/planning";
 import { getGradeSheet, trimCredits } from "@/lib/gradesheet/gradeSheet";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
 import { getStudentStatistics, type StudentStatistics } from "@/lib/dashboard/statistics";
-import { Building2, CalendarDays, UserCheck, Users } from "lucide-react";
+import {
+  Award,
+  BookOpen,
+  Building2,
+  CalendarDays,
+  ClipboardCheck,
+  GraduationCap,
+  History,
+  PieChart,
+  School,
+  TrendingUp,
+  UserCheck,
+  Users,
+} from "lucide-react";
+import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { BarList, ColumnChart, StatTile, StatusBarList } from "@/components/charts/Charts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
@@ -23,13 +37,83 @@ import { Alert } from "@/components/ui/Alert";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { Label, Select } from "@/components/ui/Form";
 import { buttonClasses } from "@/components/ui/Button";
-import { Printer } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { ClipboardList, Printer } from "lucide-react";
 
 export const metadata: Metadata = { title: "Home" };
+
+const FACT_CHIP = {
+  brand: "bg-brand-subtle-strong text-brand-fg",
+  accent: "bg-accent-soft text-accent-soft-fg",
+  info: "bg-info-surface text-info-fg",
+  success: "bg-success-surface text-success-fg",
+} as const;
+
+/**
+ * One line of the academic record, as a bordered panel with a glyph -- the
+ * 2x2 the design reference draws inside that card. `emphasis` is for CGPA,
+ * the one figure on the panel that is meant to be read first.
+ */
+function RecordPanel({
+  icon,
+  term,
+  emphasis,
+  children,
+}: {
+  icon: React.ReactNode;
+  term: string;
+  emphasis?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-line-subtle bg-surface-subtle rounded-xl border p-3">
+      <dt className="text-fg-muted flex items-center gap-1.5 text-xs font-semibold">
+        <span className="text-fg-subtle">{icon}</span>
+        {term}
+      </dt>
+      <dd className={emphasis ? "text-brand-fg mt-1 text-2xl font-extrabold" : "text-fg mt-1 text-sm font-bold"}>{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * One fact about the student, as its own card with a tinted glyph -- the
+ * row of four across the top of the design reference's profile screen.
+ *
+ * Still a definition list inside. These are term/value pairs and were
+ * marked up as one before; splitting them across four cards is a visual
+ * change, and it should not quietly cost the semantics.
+ */
+function FactCard({
+  icon,
+  tone,
+  term,
+  value,
+}: {
+  icon: React.ReactNode;
+  tone: keyof typeof FACT_CHIP;
+  term: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="border-line bg-surface flex items-start gap-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgb(16_12_32_/_0.04),0_8px_24px_-12px_rgb(16_12_32_/_0.12)]">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${FACT_CHIP[tone]}`} aria-hidden="true">
+        {icon}
+      </span>
+      <dl className="min-w-0">
+        <dt className="text-fg-muted text-xs font-semibold tracking-wide uppercase">{term}</dt>
+        <dd className="text-fg mt-1 text-sm font-bold">{value}</dd>
+      </dl>
+    </div>
+  );
+}
 
 /** Icon-only action button -- same shape, hover and focus ring as the
  *  Students and Offerings tables, with a title and an accessible name so the
  *  icon is never the only thing carrying the meaning. */
+/** The dashboard subtitle, shared by all three role homes. */
+const WELCOME_TEXT = "Here\u2019s what\u2019s happening at Liberia Christian College.";
+
 const iconAction =
   "inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
@@ -95,6 +179,8 @@ export default async function PortalPage({
     // S-03's "single status line if a course plan needs attention" --
     // only fetched when there is a current semester to have a plan in.
     const currentPlan = currentSemester ? await getMyPlan(actor, currentSemester.id) : null;
+    // Only when a plan exists, so a student with none pays for nothing.
+    const currentPlanItems = currentPlan ? await getPlanItems(actor, currentPlan.id) : [];
 
     // S-04: one semester's results at a time, newest first, chosen with a
     // year and a semester. Both lists hold only what this student actually
@@ -128,65 +214,101 @@ export default async function PortalPage({
     const sheet = selectedSemesterId ? await getGradeSheet(actor, actor.userId, selectedSemesterId) : null;
     const selectedInfo = selectedSemesterId ? semesterInfo(selectedSemesterId) : null;
     const selectedSummary = selectedSemesterId ? semesterSummaryFor(selectedSemesterId) : undefined;
-    const planStatusLine =
+    // EVERY plan state says something now. Three of them used to fall
+    // through to null and show nothing at all: a student with an unsubmitted
+    // DRAFT got no reminder and could miss registration entirely without the
+    // app ever mentioning it, and a student whose plan was APPROVED got no
+    // confirmation that they were registered. Silence is the wrong answer in
+    // both directions.
+    const planCourses = currentPlanItems.length;
+    const planCredits = currentPlan?.totalCredits ?? 0;
+    const planNoun = planCourses === 1 ? "course" : "courses";
+    const planStatus: { tone: "warning" | "info" | "success"; line: string } | null =
       isPlanningOpen(currentSemester?.state as SemesterState) && !currentPlan
-        ? "You have not started your course plan for this semester."
-        : currentPlan?.status === "REJECTED"
-          ? "Your course plan was returned and needs revision."
-          : currentPlan?.status === "SUBMITTED"
-            ? "Your course plan is awaiting approval."
-            : null;
+        ? { tone: "warning", line: "You have not started your course plan for this semester." }
+        : currentPlan?.status === "DRAFT"
+          ? {
+              tone: "warning",
+              line: planCourses
+                ? `Your course plan is still a draft — ${planCourses} ${planNoun} added, not yet submitted.`
+                : "Your course plan is still a draft and has no courses in it yet.",
+            }
+          : currentPlan?.status === "REJECTED"
+            ? { tone: "warning", line: "Your course plan was returned and needs revision." }
+            : currentPlan?.status === "SUBMITTED"
+              ? { tone: "info", line: "Your course plan is awaiting approval." }
+              : currentPlan?.status === "APPROVED"
+                ? {
+                    tone: "success",
+                    line: `Your course plan is approved — ${planCourses} ${planNoun}, ${planCredits} credit hours registered.`,
+                  }
+                : currentPlan?.status === "PARTIALLY_APPROVED"
+                  ? {
+                      tone: "warning",
+                      line: "Some of your courses were approved and registered; others were turned down.",
+                    }
+                  : null;
 
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
+        <Breadcrumb items={[{ label: "Student profile" }]} />
         <PageHeader
           title={
-            <>
+            <span className="inline-flex flex-wrap items-center gap-3">
               {fullName(record)}
-            </>
+              <Badge tone={record.status === "ACTIVE" ? "success" : "neutral"}>{record.status}</Badge>
+            </span>
           }
           description={`Student ID ${record.studentNumber}`}
+          actions={
+            <p className="text-brand-fg border-accent hidden border-b-2 pb-1 text-sm font-semibold italic sm:block">
+              Building Character &middot; Shaping Tomorrow
+            </p>
+          }
         />
 
-        <Card className="mb-6">
-          <CardBody>
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-fg-muted">Department</dt>
-                <dd className="mt-0.5 font-medium text-fg">{department ? department.name : "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-fg-muted">Enrolment year</dt>
-                <dd className="mt-0.5 font-medium text-fg">{record.enrolmentYear}</dd>
-              </div>
-              <div>
-                <dt className="text-fg-muted">Status</dt>
-                <dd className="mt-0.5 font-medium text-fg">{record.status}</dd>
-              </div>
-              <div>
-                <dt className="text-fg-muted">Current semester</dt>
-                <dd className="mt-0.5 font-medium text-fg">
-                  {currentSemesterLabel
-                    ? `${currentSemesterLabel} (${SEMESTER_STATE_LABEL[currentSemester!.state as SemesterState] ?? currentSemester!.state})`
-                    : "No semester is currently open."}
-                </dd>
-              </div>
-            </dl>
-          </CardBody>
-        </Card>
+        {/* The same four facts the definition list carried, one card each
+            as the design reference lays them out. Still a <dl> inside each:
+            these are term/value pairs and the markup should keep saying so. */}
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <FactCard icon={<School className="h-5 w-5" />} tone="brand" term="Department" value={department ? department.name : "—"} />
+          <FactCard icon={<CalendarDays className="h-5 w-5" />} tone="accent" term="Enrolment year" value={record.enrolmentYear} />
+          <FactCard
+            icon={<GraduationCap className="h-5 w-5" />}
+            tone="info"
+            term="Current semester"
+            value={
+              currentSemesterLabel
+                ? `${currentSemesterLabel} (${SEMESTER_STATE_LABEL[currentSemester!.state as SemesterState] ?? currentSemester!.state})`
+                : "No semester is currently open."
+            }
+          />
+          <FactCard icon={<UserCheck className="h-5 w-5" />} tone="success" term="Status" value={record.status} />
+        </div>
 
         {/* Guidance for the screen, not part of the record: a printed copy
             of a semester's results should not carry a note about a course
             plan for a different, later semester. */}
-        {planStatusLine && (
-          <Alert tone="warning" className="mb-6 print:hidden">
-            {planStatusLine}
+        {planStatus && (
+          <Alert tone={planStatus.tone} className="mb-6 print:hidden">
+            <span className="flex flex-wrap items-center justify-between gap-3">
+              <span>{planStatus.line}</span>
+              <Link href="/planning" className={buttonClasses("secondary", "sm", "shrink-0")}>
+                <ClipboardList className="h-4 w-4" aria-hidden="true" />
+                {currentPlan?.status === "APPROVED" ? "View my courses" : "Plan my courses"}
+              </Link>
+            </span>
           </Alert>
         )}
 
-        <Card className="mb-6">
+        {/* Academic record and the semester results sit side by side from
+            xl up, as the design reference pairs them. Below that they stack,
+            because the results table needs the full width long before the
+            record panel does. */}
+        <div className="mb-6 grid items-start gap-4 xl:grid-cols-5">
+        <Card className="xl:col-span-2">
           <CardHeader>
-            <CardTitle>Academic record</CardTitle>
+            <CardTitle icon={<Award className="h-4 w-4" aria-hidden="true" />}>Academic record</CardTitle>
           </CardHeader>
           <CardBody>
             {isProvisional && (
@@ -195,33 +317,25 @@ export default async function PortalPage({
                 Admin office.
               </Alert>
             )}
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-fg-muted">CGPA</dt>
-                <dd className="mt-0.5 text-lg font-semibold text-brand-fg">{cumulative?.cgpa ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-fg-muted">Academic standing</dt>
-                <dd className="mt-0.5 font-medium text-fg">
-                  {cumulative?.standing ? STANDING_LABEL[cumulative.standing] : "Not yet available"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-fg-muted">Credits earned</dt>
-                <dd className="mt-0.5 font-medium text-fg">
-                  {cumulative ? `${cumulative.totalCreditsEarned} of 132 — ${cumulative.creditsToGraduation} remaining` : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-fg-muted">Credits attempted</dt>
-                <dd className="mt-0.5 font-medium text-fg">{cumulative?.totalCreditsAttempted ?? "—"}</dd>
-              </div>
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <RecordPanel icon={<TrendingUp className="h-4 w-4" aria-hidden="true" />} term="CGPA" emphasis>
+                {cumulative?.cgpa ?? "—"}
+              </RecordPanel>
+              <RecordPanel icon={<Award className="h-4 w-4" aria-hidden="true" />} term="Academic standing">
+                {cumulative?.standing ? STANDING_LABEL[cumulative.standing] : "Not yet available"}
+              </RecordPanel>
+              <RecordPanel icon={<BookOpen className="h-4 w-4" aria-hidden="true" />} term="Credits earned">
+                {cumulative ? `${cumulative.totalCreditsEarned} of 132 — ${cumulative.creditsToGraduation} remaining` : "—"}
+              </RecordPanel>
+              <RecordPanel icon={<GraduationCap className="h-4 w-4" aria-hidden="true" />} term="Credits attempted">
+                {cumulative?.totalCreditsAttempted ?? "—"}
+              </RecordPanel>
             </dl>
           </CardBody>
         </Card>
 
         {obligations.length > 0 && (
-          <Card className="mb-6 border-warning-line bg-warning-surface">
+          <Card className="mb-6 border-warning-line bg-warning-surface xl:col-span-5">
             <CardBody>
               <CardTitle className="mb-2">Outstanding repeats</CardTitle>
               <ul className="list-disc pl-5 text-sm text-warning-fg">
@@ -235,9 +349,9 @@ export default async function PortalPage({
           </Card>
         )}
 
-        <Card>
+        <Card className="xl:col-span-3">
           <CardHeader className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>Semester results</CardTitle>
+            <CardTitle icon={<PieChart className="h-4 w-4" aria-hidden="true" />}>Semester results</CardTitle>
             {/* One control, not a Print beside a Download. Both would open
                 the same print dialog, and what separates printing from
                 saving happens inside it, on a Destination menu no page is
@@ -386,6 +500,7 @@ export default async function PortalPage({
             )}
           </CardBody>
         </Card>
+        </div>
       </main>
     );
   }
@@ -397,14 +512,16 @@ export default async function PortalPage({
     const nothingWaiting = summary.submissionsAwaitingApproval === 0 && summary.correctionsAwaitingDecision === 0;
 
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
-        <PageHeader title="Super Admin home" description={`Signed in as ${actor.displayName}.`} />
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
+        <Breadcrumb items={[{ label: "Dashboard" }]} />
+        <PageHeader eyebrow="Overview" title={`Welcome back, ${actor.displayName}!`} description={WELCOME_TEXT} />
 
         <StatisticsSection stats={stats} semesterCount={summary.semesterStates.length} />
 
-        <Card className="mb-6">
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Awaiting your approval</CardTitle>
+            <CardTitle icon={<ClipboardCheck className="h-4 w-4" aria-hidden="true" />}>Awaiting your approval</CardTitle>
           </CardHeader>
           <CardBody>
             {nothingWaiting ? (
@@ -428,7 +545,7 @@ export default async function PortalPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Semester states</CardTitle>
+            <CardTitle icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}>Semester states</CardTitle>
           </CardHeader>
           <CardBody>
             {summary.semesterStates.length === 0 ? (
@@ -445,6 +562,7 @@ export default async function PortalPage({
             )}
           </CardBody>
         </Card>
+        </div>
       </main>
     );
   }
@@ -455,14 +573,16 @@ export default async function PortalPage({
     summary.plansAwaitingApproval === 0 && summary.classesNotYetSubmitted === 0 && summary.rejectedGradesNeedingRework === 0;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
-      <PageHeader title="Admin home" description={`Signed in as ${actor.displayName}.`} />
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
+      <Breadcrumb items={[{ label: "Dashboard" }]} />
+      <PageHeader eyebrow="Overview" title={`Welcome back, ${actor.displayName}!`} description={WELCOME_TEXT} />
 
       <StatisticsSection stats={stats} />
 
-      <Card className="mb-6">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <Card>
         <CardHeader>
-          <CardTitle>Work queues</CardTitle>
+          <CardTitle icon={<ClipboardCheck className="h-4 w-4" aria-hidden="true" />}>Work queues</CardTitle>
         </CardHeader>
         <CardBody>
           {nothingWaiting ? (
@@ -497,7 +617,7 @@ export default async function PortalPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Historical import</CardTitle>
+          <CardTitle icon={<History className="h-4 w-4" aria-hidden="true" />}>Historical import</CardTitle>
         </CardHeader>
         <CardBody>
           <ul className="flex flex-col divide-y divide-line-subtle text-sm">
@@ -513,6 +633,7 @@ export default async function PortalPage({
           </Link>
         </CardBody>
       </Card>
+      </div>
     </main>
   );
 }
@@ -531,23 +652,35 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
   return (
     <>
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Total students" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
+        <StatTile
+          label="Total students"
+          value={stats.total}
+          hint="Across every enrolment year"
+          icon={<Users className="h-5 w-5" />}
+          tone="brand"
+        />
         <StatTile
           label="Active"
           value={stats.byStatus.find((s) => s.label === "ACTIVE")?.count ?? 0}
-          hint={stats.total > 0 ? `${Math.round(((stats.byStatus.find((s) => s.label === "ACTIVE")?.count ?? 0) / stats.total) * 100)}% of all students` : undefined}
+          hint={
+            stats.total > 0
+              ? `${Math.round(((stats.byStatus.find((s) => s.label === "ACTIVE")?.count ?? 0) / stats.total) * 100)}% currently enrolled`
+              : "Currently enrolled"
+          }
           icon={<UserCheck className="h-5 w-5" />}
           tone="success"
         />
         <StatTile
           label="Colleges represented"
           value={stats.byCollege.length}
+          hint="With at least one student"
           icon={<Building2 className="h-5 w-5" />}
           tone="info"
         />
         <StatTile
           label={semesterCount === undefined ? "Enrolment years" : "Semesters"}
           value={semesterCount ?? stats.byEnrolmentYear.length}
+          hint={semesterCount === undefined ? "Represented in the roll" : "On the academic calendar"}
           icon={<CalendarDays className="h-5 w-5" />}
           tone="accent"
         />
@@ -556,7 +689,7 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Students by status</CardTitle>
+            <CardTitle icon={<PieChart className="h-4 w-4" aria-hidden="true" />}>Students by status</CardTitle>
           </CardHeader>
           <CardBody>
             <StatusBarList data={stats.byStatus} />
@@ -565,7 +698,7 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
 
         <Card>
           <CardHeader>
-            <CardTitle>Students by gender</CardTitle>
+            <CardTitle icon={<Users className="h-4 w-4" aria-hidden="true" />}>Students by gender</CardTitle>
           </CardHeader>
           <CardBody>
             {/* "Not recorded" is a row here rather than an omission: gender
@@ -577,26 +710,29 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
         </Card>
       </div>
 
-      {/* College moved to its own row when gender took its place above:
-          college names are long, and they read far better across the full
-          width than wrapped into a half. */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Students by college</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <BarList data={stats.byCollege} emptyMessage="No students are enrolled in any college yet." />
-        </CardBody>
-      </Card>
+      {/* College and enrolment year share a row, as the design reference
+          pairs them -- but not evenly. College names run long ("CHS --
+          College of Health Sciences"), so it takes three fifths and the
+          year columns take two, rather than both wrapping at a half. */}
+      <div className="mb-6 grid items-start gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle icon={<School className="h-4 w-4" aria-hidden="true" />}>Students by college</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <BarList data={stats.byCollege} emptyMessage="No students are enrolled in any college yet." />
+          </CardBody>
+        </Card>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Students by enrolment year</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <ColumnChart data={stats.byEnrolmentYear} />
-        </CardBody>
-      </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle icon={<TrendingUp className="h-4 w-4" aria-hidden="true" />}>Students by enrolment year</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <ColumnChart data={stats.byEnrolmentYear} />
+          </CardBody>
+        </Card>
+      </div>
     </>
   );
 }
