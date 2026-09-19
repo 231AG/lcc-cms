@@ -10,7 +10,7 @@ import { getStudent } from "@/lib/students/students";
 import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
-import { getMyPlan } from "@/lib/planning/planning";
+import { getMyPlan, getPlanItems } from "@/lib/planning/planning";
 import { getGradeSheet, trimCredits } from "@/lib/gradesheet/gradeSheet";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
@@ -179,6 +179,8 @@ export default async function PortalPage({
     // S-03's "single status line if a course plan needs attention" --
     // only fetched when there is a current semester to have a plan in.
     const currentPlan = currentSemester ? await getMyPlan(actor, currentSemester.id) : null;
+    // Only when a plan exists, so a student with none pays for nothing.
+    const currentPlanItems = currentPlan ? await getPlanItems(actor, currentPlan.id) : [];
 
     // S-04: one semester's results at a time, newest first, chosen with a
     // year and a semester. Both lists hold only what this student actually
@@ -212,14 +214,40 @@ export default async function PortalPage({
     const sheet = selectedSemesterId ? await getGradeSheet(actor, actor.userId, selectedSemesterId) : null;
     const selectedInfo = selectedSemesterId ? semesterInfo(selectedSemesterId) : null;
     const selectedSummary = selectedSemesterId ? semesterSummaryFor(selectedSemesterId) : undefined;
-    const planStatusLine =
+    // EVERY plan state says something now. Three of them used to fall
+    // through to null and show nothing at all: a student with an unsubmitted
+    // DRAFT got no reminder and could miss registration entirely without the
+    // app ever mentioning it, and a student whose plan was APPROVED got no
+    // confirmation that they were registered. Silence is the wrong answer in
+    // both directions.
+    const planCourses = currentPlanItems.length;
+    const planCredits = currentPlan?.totalCredits ?? 0;
+    const planNoun = planCourses === 1 ? "course" : "courses";
+    const planStatus: { tone: "warning" | "info" | "success"; line: string } | null =
       isPlanningOpen(currentSemester?.state as SemesterState) && !currentPlan
-        ? "You have not started your course plan for this semester."
-        : currentPlan?.status === "REJECTED"
-          ? "Your course plan was returned and needs revision."
-          : currentPlan?.status === "SUBMITTED"
-            ? "Your course plan is awaiting approval."
-            : null;
+        ? { tone: "warning", line: "You have not started your course plan for this semester." }
+        : currentPlan?.status === "DRAFT"
+          ? {
+              tone: "warning",
+              line: planCourses
+                ? `Your course plan is still a draft — ${planCourses} ${planNoun} added, not yet submitted.`
+                : "Your course plan is still a draft and has no courses in it yet.",
+            }
+          : currentPlan?.status === "REJECTED"
+            ? { tone: "warning", line: "Your course plan was returned and needs revision." }
+            : currentPlan?.status === "SUBMITTED"
+              ? { tone: "info", line: "Your course plan is awaiting approval." }
+              : currentPlan?.status === "APPROVED"
+                ? {
+                    tone: "success",
+                    line: `Your course plan is approved — ${planCourses} ${planNoun}, ${planCredits} credit hours registered.`,
+                  }
+                : currentPlan?.status === "PARTIALLY_APPROVED"
+                  ? {
+                      tone: "warning",
+                      line: "Some of your courses were approved and registered; others were turned down.",
+                    }
+                  : null;
 
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
@@ -261,13 +289,13 @@ export default async function PortalPage({
         {/* Guidance for the screen, not part of the record: a printed copy
             of a semester's results should not carry a note about a course
             plan for a different, later semester. */}
-        {planStatusLine && (
-          <Alert tone="warning" className="mb-6 print:hidden">
+        {planStatus && (
+          <Alert tone={planStatus.tone} className="mb-6 print:hidden">
             <span className="flex flex-wrap items-center justify-between gap-3">
-              <span>{planStatusLine}</span>
+              <span>{planStatus.line}</span>
               <Link href="/planning" className={buttonClasses("secondary", "sm", "shrink-0")}>
                 <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                Plan my courses
+                {currentPlan?.status === "APPROVED" ? "View my courses" : "Plan my courses"}
               </Link>
             </span>
           </Alert>
