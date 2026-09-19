@@ -136,7 +136,7 @@ function LoadFailure({ stage, err, debug }: { stage: string; err: unknown; debug
   // without anybody needing to know about the query parameter.
   console.error(`[offerings] failed while ${stage}:`, err);
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
       <PageHeader title="Course offerings" />
       <Alert tone="danger">
         <p className="font-medium">This page could not be loaded.</p>
@@ -301,7 +301,7 @@ export default async function OfferingsPage({
   const hasFilters = Boolean(q || collegeId);
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
       <PageHeader title="Course offerings" />
 
       {error && (

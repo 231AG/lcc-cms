@@ -161,7 +161,7 @@ export default async function PlanningPage({
   };
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
       <PageHeader title="Course planning" description={yearLabel(semesterId)} />
 
       {/* Only shown when there is something to switch between. Submitting on

@@ -250,7 +250,7 @@ export default async function PortalPage({
                   : null;
 
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
         <Breadcrumb items={[{ label: "Student profile" }]} />
         <PageHeader
           title={
@@ -512,7 +512,7 @@ export default async function PortalPage({
     const nothingWaiting = summary.submissionsAwaitingApproval === 0 && summary.correctionsAwaitingDecision === 0;
 
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
         <Breadcrumb items={[{ label: "Dashboard" }]} />
         <PageHeader eyebrow="Overview" title={`Welcome back, ${actor.displayName}!`} description={WELCOME_TEXT} />
 
@@ -573,7 +573,7 @@ export default async function PortalPage({
     summary.plansAwaitingApproval === 0 && summary.classesNotYetSubmitted === 0 && summary.rejectedGradesNeedingRework === 0;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
       <Breadcrumb items={[{ label: "Dashboard" }]} />
       <PageHeader eyebrow="Overview" title={`Welcome back, ${actor.displayName}!`} description={WELCOME_TEXT} />
 

@@ -66,7 +66,7 @@ export default async function CalendarPage({
   const yearLabel = (id: string) => years.find((y) => y.id === id)?.label ?? id;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
       <PageHeader title="Academic calendar" />
 
       {error && (
