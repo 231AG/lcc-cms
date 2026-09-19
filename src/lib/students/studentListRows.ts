@@ -1,3 +1,4 @@
+import { csvCell } from "@/lib/export/csvCell";
 import { asUser } from "@/lib/db/asUser";
 import { exportStudents } from "@/lib/students/students";
 import { listName } from "@/lib/students/name";
@@ -90,7 +91,9 @@ export async function getStudentListRows(
 /** RFC 4180 quoting: double the quotes, wrap anything containing a comma,
  *  quote, or newline. Same rule the semester export already uses. */
 export function toCsv(columns: ReadonlyArray<{ key: string; header: string }>, rows: Array<Record<string, string>>): string {
-  const escape = (value: string) => (/[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+  // csvCell, not a local quoter: RFC 4180 quoting alone leaves a leading
+  // "=" as a live spreadsheet formula. See lib/export/csvCell.ts.
+  const escape = csvCell;
   const lines = [columns.map((c) => escape(c.header)).join(",")];
   for (const row of rows) {
     lines.push(columns.map((c) => escape(row[c.key] ?? "")).join(","));
