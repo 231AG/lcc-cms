@@ -107,7 +107,11 @@ export default async function PlanningPage({
   const planningOpenHere = !!viewingSemester && isPlanningOpen(viewingSemester.state as SemesterState);
   const plan = await getMyPlan(actor, semesterId);
   const items = plan ? await getPlanItems(actor, plan.id) : [];
-  const isEditable = planningOpenHere && (!plan || plan.status === "DRAFT" || plan.status === "REJECTED");
+  // A partly-approved plan is still the student's to work on: the courses
+  // that were refused are the reason they came back.
+  const isEditable =
+    planningOpenHere && (!plan || plan.status === "DRAFT" || plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED");
+  const hasRegisteredItems = items.some((i) => i.status === "APPROVED");
 
   const registrations =
     plan?.status === "APPROVED" || plan?.status === "PARTIALLY_APPROVED"
@@ -118,9 +122,14 @@ export default async function PlanningPage({
   // being built. Once it is submitted or decided, only the handful of
   // offerings the plan and its registrations actually reference matter.
   const availableOfferings = isEditable ? await getOfferingsForSemester(actor, semesterId) : [];
-  const referencedOfferings = isEditable
-    ? []
-    : await getOfferingsByIds(actor, [...new Set([...items.map((i) => i.offeringId), ...registrations.map((r) => r.offeringId)])]);
+  // Anything the plan or its registrations point at that the catalogue does
+  // not cover -- a cancelled offering, or any offering at all once the plan
+  // is past editing.
+  const catalogueIds = new Set(availableOfferings.map((o) => o.id));
+  const referencedIds = [...new Set([...items.map((i) => i.offeringId), ...registrations.map((r) => r.offeringId)])].filter(
+    (id) => !catalogueIds.has(id),
+  );
+  const referencedOfferings = referencedIds.length > 0 ? await getOfferingsByIds(actor, referencedIds) : [];
   const offeringById = new Map([...availableOfferings, ...referencedOfferings].map((o) => [o.id, o]));
 
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
@@ -198,13 +207,31 @@ export default async function PlanningPage({
         </form>
       )}
 
-      {plan && (plan.status === "DRAFT" || plan.status === "REJECTED") && (
+      {plan && (plan.status === "DRAFT" || ((plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED") && planningOpenHere)) && (
         <>
-          {plan.status === "REJECTED" && (
-            <Card className="mb-6 border-danger-line bg-danger-surface">
+          {(plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED") && (
+            <Card
+              className={
+                plan.status === "REJECTED" ? "mb-6 border-danger-line bg-danger-surface" : "mb-6 border-warning-line bg-warning-surface"
+              }
+            >
               <CardBody>
-                <CardTitle className="mb-1 text-danger-fg">Rejected</CardTitle>
-                <p className="mb-3 text-sm text-danger-fg">{plan.rejectionReason}</p>
+                {plan.status === "REJECTED" ? (
+                  <>
+                    <h2 className="mb-1 text-sm font-semibold text-danger-fg">Rejected</h2>
+                    <p className="mb-3 text-sm text-danger-fg">
+                      {plan.rejectionReason ?? "Every course in this plan was turned down."} Change the courses below and submit again.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="mb-1 text-sm font-semibold text-warning-fg">Partly approved</h2>
+                    <p className="mb-3 text-sm text-warning-fg">
+                      The approved courses are registered and cannot be changed here. Replace the ones that were turned down and submit
+                      again.
+                    </p>
+                  </>
+                )}
                 <form action={revisePlanAction}>
                   {Object.entries(contextFields).map(([name, value]) => (
                     <input key={name} type="hidden" name={name} value={value} />
@@ -229,19 +256,29 @@ export default async function PlanningPage({
                   const c = courseFor(i.courseId);
                   const o = offeringById.get(i.offeringId);
                   return (
-                    <li key={i.id} className="flex items-center justify-between rounded-md border border-line px-3 py-2 text-sm">
+                    <li key={i.id} className="flex items-start justify-between gap-3 rounded-md border border-line px-3 py-2 text-sm">
                       <span>
                         {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section}){i.isRetake && " — retake"}
+                        {i.status === "REJECTED" && (
+                          <span className="mt-0.5 block text-xs text-danger-fg">
+                            Turned down{i.rejectionReason ? `: ${i.rejectionReason}` : ""}
+                          </span>
+                        )}
+                        {i.status === "APPROVED" && <span className="mt-0.5 block text-xs text-success-fg">Approved — registered</span>}
                       </span>
-                      <form action={removePlanItemAction}>
-                        {Object.entries(contextFields).map(([name, value]) => (
-                          <input key={name} type="hidden" name={name} value={value} />
-                        ))}
-                        <input type="hidden" name="planItemId" value={i.id} />
-                        <SubmitTextButton pendingLabel="Removing…" className="text-xs font-medium text-danger-fg hover:underline">
-                          Remove
-                        </SubmitTextButton>
-                      </form>
+                      {i.status === "APPROVED" ? (
+                        <span className="shrink-0 text-xs text-fg-muted">Locked</span>
+                      ) : (
+                        <form action={removePlanItemAction}>
+                          {Object.entries(contextFields).map(([name, value]) => (
+                            <input key={name} type="hidden" name={name} value={value} />
+                          ))}
+                          <input type="hidden" name="planItemId" value={i.id} />
+                          <SubmitTextButton pendingLabel="Removing…" className="text-xs font-medium text-danger-fg hover:underline">
+                            Remove
+                          </SubmitTextButton>
+                        </form>
+                      )}
                     </li>
                   );
                 })}
@@ -254,7 +291,7 @@ export default async function PlanningPage({
                   <input type="hidden" name="planId" value={plan.id} />
                   <SubmitButton pendingLabel="Submitting…">Submit</SubmitButton>
                 </form>
-                {plan.status === "DRAFT" && (
+                {plan.status === "DRAFT" && !hasRegisteredItems && (
                   <form action={deleteDraftPlanAction}>
                     <input type="hidden" name="semesterId" value={semesterId} />
                     <input type="hidden" name="planId" value={plan.id} />
@@ -349,11 +386,15 @@ export default async function PlanningPage({
         </Card>
       )}
 
-      {plan && plan.status === "PARTIALLY_APPROVED" && (
+      {plan && (plan.status === "PARTIALLY_APPROVED" || plan.status === "REJECTED") && !planningOpenHere && (
         <Card className="border-warning-line bg-warning-surface">
           <CardBody>
-            <CardTitle className="mb-2 text-warning-fg">Partially approved</CardTitle>
-            <p className="mb-3 text-sm text-warning-fg">Some courses were approved and registered; others were rejected.</p>
+            <h2 className="mb-2 text-sm font-semibold text-warning-fg">
+              {plan.status === "PARTIALLY_APPROVED" ? "Partially approved" : "Rejected"}
+            </h2>
+            <p className="mb-3 text-sm text-warning-fg">
+              Planning has closed for this semester, so this plan can no longer be changed. See the Registrar if you need to.
+            </p>
             <ul className="flex flex-col gap-1 text-sm">
               {items.map((i) => {
                 const c = courseFor(i.courseId);

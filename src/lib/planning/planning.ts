@@ -151,7 +151,12 @@ async function validatePlan(
       const registered = await tx.query.registration.findMany({
         where: and(eq(registration.offeringId, offering.id), eq(registration.status, "REGISTERED")),
       });
-      if (registered.length >= offering.capacity) {
+      // A seat this student already occupies is not one they need again.
+      // Resubmitting a partly-approved plan (Section 14.2) brings its
+      // already-registered courses back through here, and without this a
+      // full class would block the student out of their own seat.
+      const holdsSeat = registered.some((r) => r.studentId === studentId);
+      if (!holdsSeat && registered.length >= offering.capacity) {
         blocking.push({ code: "V5", courseCode: label, message: `${label} has no seats remaining.` });
       }
     }
@@ -427,13 +432,25 @@ export async function getOrCreateDraftPlan(actor: Actor, semesterId: string, for
   });
 }
 
+/**
+ * The states a student may still change a plan in: one they are still
+ * building, one the Registrar turned down whole, and one the Registrar
+ * turned down in part. The last of those is Section 14.2's "again if
+ * rejected" read the way a student reads it -- four courses approved and
+ * one refused still leaves them a course short, and the refusal is the
+ * thing they came back to fix. The approved courses inside such a plan are
+ * registered, so they are locked one at a time by assertItemNotRegistered
+ * rather than by locking the whole plan.
+ */
+const EDITABLE_PLAN_STATUSES = new Set(["DRAFT", "REJECTED", "PARTIALLY_APPROVED"]);
+
 /** Loads a plan that the actor may edit -- their own, or (Admin, DEV-20) a
  * student's that they are entering on that student's behalf. */
 async function loadEditablePlan(tx: Tx, actor: Actor, planId: string) {
   const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
   if (!plan) throw new ValidationError("Plan not found.");
   const { onBehalf } = await authorizePlanSubject(actor, plan.studentId);
-  if (plan.status !== "DRAFT" && plan.status !== "REJECTED") {
+  if (!EDITABLE_PLAN_STATUSES.has(plan.status)) {
     throw new StateError(`This plan cannot be edited while ${plan.status}.`);
   }
   await assertSemesterOpenForRegistration(tx, plan.semesterId);
@@ -451,8 +468,10 @@ export async function addPlanItem(actor: Actor, planId: string, offeringId: stri
     if (!offering) throw new ValidationError("Offering not found.");
     if (offering.semesterId !== plan.semesterId) throw new ValidationError("That offering does not belong to this plan's semester.");
 
-    const wasRejected = plan.status === "REJECTED";
-    if (wasRejected) {
+    // Adding a course to a decided plan hands it back to the student. The
+    // decisions already made on the courses inside it are untouched --
+    // submitPlan is where a refused course is put up for review again.
+    if (plan.status !== "DRAFT") {
       await tx.update(coursePlan).set({ status: "DRAFT" }).where(eq(coursePlan.id, planId));
     }
 
@@ -470,11 +489,21 @@ export async function addPlanItem(actor: Actor, planId: string, offeringId: stri
   });
 }
 
+/** An APPROVED item has a registration hanging off it -- approvePlan writes
+ * the two together. Dropping a registered course is the Registrar's job,
+ * not something a student does by editing the plan it came from. */
+function assertItemNotRegistered(item: { status: string }) {
+  if (item.status === "APPROVED") {
+    throw new StateError("That course is already approved and registered. Ask the Registrar to drop it.");
+  }
+}
+
 export async function removePlanItem(actor: Actor, planItemId: string) {
   return db.transaction(async (tx) => {
     const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
     if (!item) throw new ValidationError("Plan item not found.");
     await loadEditablePlan(tx, actor, item.planId);
+    assertItemNotRegistered(item);
     await tx.delete(coursePlanItem).where(eq(coursePlanItem.id, planItemId));
   });
 }
@@ -484,6 +513,7 @@ export async function setPlanItemRetake(actor: Actor, planItemId: string, isReta
     const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
     if (!item) throw new ValidationError("Plan item not found.");
     await loadEditablePlan(tx, actor, item.planId);
+    assertItemNotRegistered(item);
     const [row] = await tx.update(coursePlanItem).set({ isRetake }).where(eq(coursePlanItem.id, planItemId)).returning();
     return row;
   });
@@ -497,6 +527,15 @@ export async function deleteDraftPlan(actor: Actor, planId: string) {
     if (!plan) throw new ValidationError("Plan not found.");
     await authorizePlanSubject(actor, plan.studentId);
     if (plan.status !== "DRAFT") throw new StateError("Only a Draft plan can be deleted.");
+    // A partly-approved plan reopens as a DRAFT once the student edits it,
+    // and its approved courses are registered. Deleting the plan would
+    // cascade those rows away, so it is refused while any of them remain.
+    const registered = await tx.query.coursePlanItem.findMany({
+      where: and(eq(coursePlanItem.planId, planId), eq(coursePlanItem.status, "APPROVED")),
+    });
+    if (registered.length > 0) {
+      throw new StateError("This plan has approved, registered courses in it and cannot be deleted.");
+    }
     await tx.delete(coursePlanItem).where(eq(coursePlanItem.planId, planId));
     await tx.delete(coursePlan).where(eq(coursePlan.id, planId));
   });
@@ -579,12 +618,18 @@ export async function submitPlan(actor: Actor, planId: string): Promise<SubmitPl
     const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
     if (!plan) throw new ValidationError("Plan not found.");
     const { onBehalf } = await authorizePlanSubject(actor, plan.studentId);
-    if (plan.status !== "DRAFT" && plan.status !== "REJECTED") {
+    if (!EDITABLE_PLAN_STATUSES.has(plan.status)) {
       throw new StateError(`This plan cannot be submitted while ${plan.status}.`);
     }
     await assertSemesterOpenForRegistration(tx, plan.semesterId);
 
     const items = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
+    // Every course already approved and registered -- the student took the
+    // refused ones out rather than replacing them, which is them accepting
+    // the partial approval. There is nothing to put to the Registrar, so the
+    // plan settles back on the decisions already made instead of joining the
+    // queue with no pending item in it (a plan nobody could then move).
+    const nothingToDecide = items.length > 0 && items.every((i) => i.status === "APPROVED");
     const itemsForValidation: PlanItemForValidation[] = items.map((i) => ({
       id: i.id,
       offeringId: i.offeringId,
@@ -615,13 +660,26 @@ export async function submitPlan(actor: Actor, planId: string): Promise<SubmitPl
       }
     }
 
+    // Resubmitting is the student asking for a refused course to be looked
+    // at again, so its decision is cleared here. Without this the item stays
+    // REJECTED through the submit: the Registrar's queue then holds a plan
+    // with nothing PENDING in it, which can be neither approved nor
+    // rejected nor edited -- a plan nobody can move.
+    const reopened = items.filter((i) => i.status === "REJECTED");
+    for (const item of reopened) {
+      await tx
+        .update(coursePlanItem)
+        .set({ status: "PENDING", rejectionReason: null, decidedBy: null, decidedAt: null })
+        .where(eq(coursePlanItem.id, item.id));
+    }
+
     const totalCredits = await sumPlanCredits(tx, itemsForValidation);
     const requestId = randomUUID();
 
     const [row] = await tx
       .update(coursePlan)
       .set({
-        status: "SUBMITTED",
+        status: nothingToDecide ? "APPROVED" : "SUBMITTED",
         totalCredits,
         submittedAt: new Date(),
         rejectionReason: null,
@@ -643,7 +701,7 @@ export async function submitPlan(actor: Actor, planId: string): Promise<SubmitPl
       entityType: "course_plan",
       entityId: planId,
       studentId: plan.studentId,
-      newValue: { totalCredits, itemCount: items.length, version: row.version, enteredOnBehalf: onBehalf },
+      newValue: { totalCredits, itemCount: items.length, reopenedCount: reopened.length, status: row.status, version: row.version, enteredOnBehalf: onBehalf },
       requestId,
     });
 
@@ -659,15 +717,20 @@ async function sumPlanCredits(tx: Tx, items: PlanItemForValidation[]): Promise<n
   return items.reduce((sum, i) => sum + (byId.get(i.offeringId) ?? 0), 0);
 }
 
-/** REJECTED -> DRAFT (Section 14.2). The rejection reason and reviewer
- * stay on the row until the next decision overwrites them; the audit log
- * keeps the original regardless. */
+/** REJECTED or PARTIALLY_APPROVED -> DRAFT (Section 14.2). The rejection
+ * reason and reviewer stay on the row until the next decision overwrites
+ * them; the audit log keeps the original regardless. Any course already
+ * approved out of a partly-approved plan stays approved and registered --
+ * only the refused ones are back in play. */
 export async function revisePlan(actor: Actor, planId: string) {
   return db.transaction(async (tx) => {
     const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
     if (!plan) throw new ValidationError("Plan not found.");
     await authorizePlanSubject(actor, plan.studentId);
-    if (plan.status !== "REJECTED") throw new StateError("Only a rejected plan can be revised.");
+    if (plan.status !== "REJECTED" && plan.status !== "PARTIALLY_APPROVED") {
+      throw new StateError("Only a rejected or partly approved plan can be revised.");
+    }
+    await assertSemesterOpenForRegistration(tx, plan.semesterId);
 
     const [row] = await tx.update(coursePlan).set({ status: "DRAFT" }).where(eq(coursePlan.id, planId)).returning();
 
@@ -678,7 +741,7 @@ export async function revisePlan(actor: Actor, planId: string) {
       entityType: "course_plan",
       entityId: planId,
       studentId: plan.studentId,
-      oldValue: { status: "REJECTED" },
+      oldValue: { status: plan.status },
       newValue: { status: "DRAFT" },
     });
 
@@ -1167,7 +1230,7 @@ async function resolvePlanIfComplete(tx: Tx, actor: Actor, planId: string): Prom
       totalCredits,
       reviewedBy: actor.userId,
       reviewedAt: new Date(),
-      rejectionReason: allRejected ? "Every planned course was rejected individually -- see each course's own reason." : plan.rejectionReason,
+      rejectionReason: allRejected ? "Every planned course was turned down individually; each course's reason is shown with it." : plan.rejectionReason,
     })
     .where(eq(coursePlan.id, planId))
     .returning();
