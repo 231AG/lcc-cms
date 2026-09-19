@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { fullName, listName } from "@/lib/students/name";
-import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { SEMESTER_STATE_LABEL, isPlanningOpen, pickPlanningSemester, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, searchStudents } from "@/lib/students/students";
 import { NotFoundError } from "@/lib/errors";
@@ -90,7 +90,7 @@ export default async function StudentPlanEntryPage({
 
   // Same definition of "the current semester" the student-facing page uses,
   // so the Admin lands on the right one without picking it every time.
-  const semesterId = rawSemesterId || semesters.find((s) => isPlanningOpen(s.state as SemesterState))?.id;
+  const semesterId = rawSemesterId || pickPlanningSemester(semesters)?.id;
   const semesterState = semesters.find((s) => s.id === semesterId)?.state;
 
   let chosen: Awaited<ReturnType<typeof getStudent>> | undefined;

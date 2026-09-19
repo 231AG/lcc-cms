@@ -50,6 +50,10 @@ export const STUDENT_GROUPS: NavGroup[] = [
     links: [
       { href: "/admin/offerings", label: "Course offerings", icon: BookOpen },
       { href: "/planning", label: "Course planning", icon: ClipboardList },
+      // Grades had no menu item at all: a student's results were reachable
+      // only by scrolling their own profile. /portal/grades is the screen
+      // for them, and this is the way in.
+      { href: "/portal/grades", label: "My grades", icon: GraduationCap },
       { href: "/grading-policy", label: "Grading policy", icon: Scale },
     ],
   },

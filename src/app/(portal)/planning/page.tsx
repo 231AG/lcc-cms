@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentActor } from "@/lib/auth/session";
-import { isPlanningOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { isPlanningOpen, pickPlanningSemester, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds, getOfferingsForSemester } from "@/lib/offerings/offerings";
@@ -66,7 +66,11 @@ export default async function PlanningPage({
       tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true) }),
     ]),
   );
-  const openSemester = semesters.find((s) => isPlanningOpen(s.state as SemesterState));
+  // The newest OPEN semester, not simply the first one the query returned:
+  // nothing limits the College to one OPEN semester at a time, and an
+  // unordered pick here could land on a different semester than the one
+  // the dashboard's status line was describing.
+  const openSemester = pickPlanningSemester(semesters);
   // Every semester this student has ever planned in, so a past plan stays
   // reachable after its semester closes -- one small query, and the reason
   // the picker below can offer anything other than the open semester.
@@ -247,7 +251,7 @@ export default async function PlanningPage({
 
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Your plan -- {totalCredits} credit hours</CardTitle>
+              <CardTitle>Your plan — {totalCredits} credit hours</CardTitle>
             </CardHeader>
             <CardBody>
               {items.length === 0 && <p className="mb-3 text-sm text-fg-muted">No courses added yet.</p>}
@@ -326,23 +330,36 @@ export default async function PlanningPage({
       {plan && plan.status === "SUBMITTED" && (
         <Card>
           <CardBody>
-            <CardTitle className="mb-2">Submitted -- awaiting a decision</CardTitle>
+            <CardTitle className="mb-2">Submitted — awaiting a decision</CardTitle>
+            {/* The date only when there is one. It rendered as a stray
+                " ." on a row with no submitted_at, which is a sentence
+                claiming a submission date the record does not have. */}
             <p className="mb-3 text-sm text-fg-muted">
-              {totalCredits} credit hours, submitted {plan.submittedAt?.toISOString().slice(0, 10)}.
+              {totalCredits} credit hours
+              {plan.submittedAt ? `, submitted ${plan.submittedAt.toISOString().slice(0, 10)}` : ""}.
             </p>
-            <ul className="flex flex-col gap-1 text-sm">
-              {items.map((i) => {
-                const c = courseFor(i.courseId);
-                return (
-                  <li key={i.id} className="flex items-center justify-between">
-                    <span>{c ? `${c.code} — ${c.title}` : i.courseId}</span>
-                    <span className="text-xs text-fg-muted">
-                      {i.status === "PENDING" ? "Awaiting decision" : i.status === "APPROVED" ? "Approved" : "Rejected"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            {/* An empty list here used to render as a blank card, which
+                read as "nothing was ever planned" whatever the status
+                above said. If the rows are gone, say that. */}
+            {items.length === 0 ? (
+              <Alert tone="warning">
+                This plan has no courses in it. Please contact the Admin office — it cannot be approved as it stands.
+              </Alert>
+            ) : (
+              <ul className="flex flex-col gap-1 text-sm">
+                {items.map((i) => {
+                  const c = courseFor(i.courseId);
+                  return (
+                    <li key={i.id} className="flex items-center justify-between">
+                      <span>{c ? `${c.code} — ${c.title}` : i.courseId}</span>
+                      <span className="text-xs text-fg-muted">
+                        {i.status === "PENDING" ? "Awaiting decision" : i.status === "APPROVED" ? "Approved" : "Rejected"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
             {/* Editing a submitted plan means taking it out of the queue
                 first, so nobody is reviewing a plan that is moving. Offered
@@ -370,6 +387,9 @@ export default async function PlanningPage({
           <CardBody>
             <CardTitle className="mb-2 text-success-fg">Approved</CardTitle>
             <p className="mb-3 text-sm text-success-fg">{totalCredits} credit hours registered.</p>
+            {registrations.filter((r) => r.status === "REGISTERED").length === 0 && (
+              <p className="text-sm text-success-fg">No registrations are recorded against this plan.</p>
+            )}
             <ul className="flex flex-col gap-1 text-sm text-success-fg">
               {registrations.filter((r) => r.status === "REGISTERED").map((r) => {
                 const o = offeringById.get(r.offeringId);

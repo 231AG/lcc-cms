@@ -154,3 +154,43 @@ export function isDeletable(state: SemesterState): boolean {
 /** The two states that are "live" for work-queue purposes: a published
  *  semester students can plan in, and one whose term is running. */
 export const ACTIVE_SEMESTER_STATES = ["OPEN", "IN_PROGRESS"] as const satisfies readonly SemesterState[];
+
+// ---------------------------------------------------------------------------
+// Choosing "the" semester
+// ---------------------------------------------------------------------------
+// Nothing in the schema or the transition table limits the College to one
+// OPEN semester at a time, and the start dates of two semesters can be
+// equal. Three pages used to answer "which semester is the current one?"
+// with an unordered `.find()` over whatever order the query came back in,
+// each reaching its own answer -- which is how a student could be told on
+// the dashboard that their plan was awaiting approval and then land on a
+// planning page showing a different semester with nothing in it.
+//
+// These two functions are that decision, made once. Both are pure, both
+// sort rather than find, and both break a tie on the id so that every
+// caller gets the same row for the same data.
+
+export interface SemesterChoice {
+  id: string;
+  state: string;
+  startDate: string; // ISO "YYYY-MM-DD", so a lexical compare is a date compare
+}
+
+/** Newest first; the id decides ties. */
+export function compareSemestersNewestFirst(a: SemesterChoice, b: SemesterChoice): number {
+  return b.startDate.localeCompare(a.startDate) || b.id.localeCompare(a.id);
+}
+
+/** The semester a student may build and submit a course plan in. */
+export function pickPlanningSemester<T extends SemesterChoice>(semesters: readonly T[]): T | undefined {
+  return semesters.filter((s) => isPlanningOpen(s.state as SemesterState)).sort(compareSemestersNewestFirst)[0];
+}
+
+/** The semester the College is currently in: published, or its term
+ *  running. Wider than the planning one, because a student still has a
+ *  plan to look at after planning has closed. */
+export function pickCurrentSemester<T extends SemesterChoice>(semesters: readonly T[]): T | undefined {
+  return semesters
+    .filter((s) => (ACTIVE_SEMESTER_STATES as readonly string[]).includes(s.state))
+    .sort(compareSemestersNewestFirst)[0];
+}

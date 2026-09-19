@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
-import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
+import { isPlanningOpen, pickCurrentSemester, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { semesterDisplayName, semesterFullLabel } from "@/lib/academic/semesterName";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { fullName } from "@/lib/students/name";
@@ -11,8 +11,7 @@ import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getMyPlan, getPlanItems } from "@/lib/planning/planning";
-import { getGradeSheet, trimCredits } from "@/lib/gradesheet/gradeSheet";
-import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
+import { getGradeSheet } from "@/lib/gradesheet/gradeSheet";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
 import { getStudentStatistics, type StudentStatistics } from "@/lib/dashboard/statistics";
 import {
@@ -33,9 +32,9 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { BarList, ColumnChart, StatTile, StatusBarList } from "@/components/charts/Charts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
+import { RecordPanel } from "@/components/ui/RecordPanel";
 import { Alert } from "@/components/ui/Alert";
-import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
-import { Label, Select } from "@/components/ui/Form";
+import { SemesterResultsPicker, SemesterResultsTable } from "@/components/grades/SemesterResults";
 import { buttonClasses } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ClipboardList, Printer } from "lucide-react";
@@ -49,32 +48,6 @@ const FACT_CHIP = {
   success: "bg-success-surface text-success-fg",
 } as const;
 
-/**
- * One line of the academic record, as a bordered panel with a glyph -- the
- * 2x2 the design reference draws inside that card. `emphasis` is for CGPA,
- * the one figure on the panel that is meant to be read first.
- */
-function RecordPanel({
-  icon,
-  term,
-  emphasis,
-  children,
-}: {
-  icon: React.ReactNode;
-  term: string;
-  emphasis?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="border-line-subtle bg-surface-subtle rounded-xl border p-3">
-      <dt className="text-fg-muted flex items-center gap-1.5 text-xs font-semibold">
-        <span className="text-fg-subtle">{icon}</span>
-        {term}
-      </dt>
-      <dd className={emphasis ? "text-brand-fg mt-1 text-2xl font-extrabold" : "text-fg mt-1 text-sm font-bold"}>{children}</dd>
-    </div>
-  );
-}
 
 /**
  * One fact about the student, as its own card with a tinted glyph -- the
@@ -171,9 +144,12 @@ export default async function PortalPage({
 
     // S-03 (plan Section 20.3): "current semester and its state" -- the
     // most recently started semester that is not DRAFT or CLOSED, if any.
-    const currentSemester = semesters
-      .filter((s) => s.state !== "DRAFT" && s.state !== "CLOSED")
-      .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
+    // pickCurrentSemester rather than a sort written out here, so that the
+    // planning page this card links to resolves the same row: two
+    // semesters may share a start date, and two independent picks over the
+    // same tie is exactly how the status line below came to describe one
+    // semester while the button beside it opened another.
+    const currentSemester = pickCurrentSemester(semesters);
     const currentSemesterLabel = currentSemester ? semesterInfo(currentSemester.id)?.label : null;
 
     // S-03's "single status line if a course plan needs attention" --
@@ -220,9 +196,14 @@ export default async function PortalPage({
     // app ever mentioning it, and a student whose plan was APPROVED got no
     // confirmation that they were registered. Silence is the wrong answer in
     // both directions.
+    // Counted from the plan items actually read back, never from a status
+    // word alone: course_plan.total_credits is a snapshot written at submit
+    // and again at approval, so it can outlive the rows it was counted
+    // from. Anything this line claims, the student can go and see.
     const planCourses = currentPlanItems.length;
-    const planCredits = currentPlan?.totalCredits ?? 0;
-    const planNoun = planCourses === 1 ? "course" : "courses";
+    const approvedCourses = currentPlanItems.filter((i) => i.status === "APPROVED").length;
+    const rejectedCourses = currentPlanItems.filter((i) => i.status === "REJECTED").length;
+    const noun = (n: number) => (n === 1 ? "course" : "courses");
     const planStatus: { tone: "warning" | "info" | "success"; line: string } | null =
       isPlanningOpen(currentSemester?.state as SemesterState) && !currentPlan
         ? { tone: "warning", line: "You have not started your course plan for this semester." }
@@ -230,24 +211,58 @@ export default async function PortalPage({
           ? {
               tone: "warning",
               line: planCourses
-                ? `Your course plan is still a draft — ${planCourses} ${planNoun} added, not yet submitted.`
+                ? `Your course plan is still a draft — ${planCourses} ${noun(planCourses)} added, not yet submitted.`
                 : "Your course plan is still a draft and has no courses in it yet.",
             }
           : currentPlan?.status === "REJECTED"
             ? { tone: "warning", line: "Your course plan was returned and needs revision." }
             : currentPlan?.status === "SUBMITTED"
-              ? { tone: "info", line: "Your course plan is awaiting approval." }
+              ? {
+                  tone: "info",
+                  line: planCourses
+                    ? `Your course plan is awaiting approval — ${planCourses} ${noun(planCourses)} submitted.`
+                    : // A submitted plan with nothing in it is not a state the
+                      // app can produce, so saying "awaiting approval" here
+                      // would send the student to an empty page wondering
+                      // which courses were meant. Name what is actually
+                      // there instead.
+                      "Your course plan was submitted, but it has no courses in it. Please contact the Admin office.",
+                }
               : currentPlan?.status === "APPROVED"
                 ? {
                     tone: "success",
-                    line: `Your course plan is approved — ${planCourses} ${planNoun}, ${planCredits} credit hours registered.`,
+                    line: approvedCourses
+                      ? `Your course plan is approved — ${approvedCourses} ${noun(approvedCourses)} registered.`
+                      : "Your course plan is approved.",
                   }
                 : currentPlan?.status === "PARTIALLY_APPROVED"
                   ? {
                       tone: "warning",
-                      line: "Some of your courses were approved and registered; others were turned down.",
+                      line:
+                        approvedCourses || rejectedCourses
+                          ? `${approvedCourses} ${noun(approvedCourses)} approved and registered; ${rejectedCourses} turned down.`
+                          : "Some of your courses were approved and registered; others were turned down.",
                     }
                   : null;
+
+    // What the button does depends on what the plan is, not on one status
+    // being singled out: every state that is read-only says "view", every
+    // state the student still has work in says what that work is.
+    const planActionLabel = !currentPlan
+      ? "Plan my courses"
+      : currentPlan.status === "DRAFT"
+        ? planCourses
+          ? "Continue my plan"
+          : "Plan my courses"
+        : currentPlan.status === "REJECTED"
+          ? "Revise my plan"
+          : currentPlan.status === "PARTIALLY_APPROVED"
+            ? "Review my plan"
+            : "View my courses";
+    // Carrying the semester is the whole point: the planning page picks its
+    // own default otherwise, and with more than one semester OPEN that
+    // default is not necessarily the semester this line is about.
+    const planHref = currentSemester ? `/planning?semesterId=${currentSemester.id}` : "/planning";
 
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
@@ -293,9 +308,9 @@ export default async function PortalPage({
           <Alert tone={planStatus.tone} className="mb-6 print:hidden">
             <span className="flex flex-wrap items-center justify-between gap-3">
               <span>{planStatus.line}</span>
-              <Link href="/planning" className={buttonClasses("secondary", "sm", "shrink-0")}>
+              <Link href={planHref} className={buttonClasses("secondary", "sm", "shrink-0")}>
                 <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                {currentPlan?.status === "APPROVED" ? "View my courses" : "Plan my courses"}
+                {planActionLabel}
               </Link>
             </span>
           </Alert>
@@ -305,8 +320,13 @@ export default async function PortalPage({
             xl up, as the design reference pairs them. Below that they stack,
             because the results table needs the full width long before the
             record panel does. */}
+        {/* min-w-0 on the children, not decoration: a grid item defaults to
+            min-width:auto, so a Table's own overflow-x-auto cannot contain
+            it and the whole page scrolls sideways instead. At 390px this
+            made the document 572px wide and left the top bar ending
+            mid-screen. */}
         <div className="mb-6 grid items-start gap-4 xl:grid-cols-5">
-        <Card className="xl:col-span-2">
+        <Card className="min-w-0 xl:col-span-2">
           <CardHeader>
             <CardTitle icon={<Award className="h-4 w-4" aria-hidden="true" />}>Academic record</CardTitle>
           </CardHeader>
@@ -335,7 +355,7 @@ export default async function PortalPage({
         </Card>
 
         {obligations.length > 0 && (
-          <Card className="mb-6 border-warning-line bg-warning-surface xl:col-span-5">
+          <Card className="mb-6 min-w-0 border-warning-line bg-warning-surface xl:col-span-5">
             <CardBody>
               <CardTitle className="mb-2">Outstanding repeats</CardTitle>
               <ul className="list-disc pl-5 text-sm text-warning-fg">
@@ -349,7 +369,7 @@ export default async function PortalPage({
           </Card>
         )}
 
-        <Card className="xl:col-span-3">
+        <Card className="min-w-0 xl:col-span-3">
           <CardHeader className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle icon={<PieChart className="h-4 w-4" aria-hidden="true" />}>Semester results</CardTitle>
             {/* One control, not a Print beside a Download. Both would open
@@ -374,129 +394,26 @@ export default async function PortalPage({
           </CardHeader>
 
           {resultSemesterIds.length > 0 && (
-            <form method="GET" className="flex flex-wrap items-end gap-2 border-b border-line-subtle px-4 py-3 print:hidden sm:px-5">
-              <div>
-                <Label htmlFor="year" className="text-xs">
-                  Year
-                </Label>
-                {/* Loads on choice; the button is the no-JavaScript fallback. */}
-                <Select id="year" name="year" defaultValue={selectedYearId ?? ""} className="w-40 font-semibold" data-auto-submit="">
-                  {resultYearIds.map((id) => (
-                    <option key={id} value={id}>
-                      {yearLabelFor(id)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="semesterId" className="text-xs">
-                  Semester
-                </Label>
-                {/* Only the chosen year's semesters, so the pair is always a
-                    combination this student has results for. */}
-                <Select
-                  id="semesterId"
-                  name="semesterId"
-                  defaultValue={selectedSemesterId ?? ""}
-                  className="w-40 font-semibold"
-                  data-auto-submit=""
-                >
-                  {yearSemesterIds.map((id) => {
-                    const sem = semesters.find((x) => x.id === id);
-                    return (
-                      <option key={id} value={id}>
-                        {sem ? semesterDisplayName(sem) : id}
-                      </option>
-                    );
-                  })}
-                </Select>
-              </div>
-              <button type="submit" className={buttonClasses("secondary", "md")}>
-                View
-              </button>
-            </form>
+            <SemesterResultsPicker
+              years={resultYearIds.map((id) => ({ id, label: yearLabelFor(id) }))}
+              semesters={yearSemesterIds.map((id) => {
+                const sem = semesters.find((x) => x.id === id);
+                return { id, label: sem ? semesterDisplayName(sem) : id };
+              })}
+              selectedYearId={selectedYearId}
+              selectedSemesterId={selectedSemesterId}
+            />
           )}
 
           <CardBody>
             {!sheet && <p className="text-sm text-fg-muted">No results yet.</p>}
             {sheet && (
-              <>
-                <h3 className="mb-2 text-sm font-semibold text-fg">{selectedInfo?.label ?? selectedSemesterId}</h3>
-                <Table>
-                  <Thead>
-                    <tr>
-                      <Th>Course Title</Th>
-                      <Th className="text-center">Code</Th>
-                      <Th className="text-center">Cr/Hrs</Th>
-                      <Th className="text-center">Grade</Th>
-                      <Th className="text-center">Grade Point</Th>
-                      <Th className="text-center">Grade Points</Th>
-                    </tr>
-                  </Thead>
-                  <tbody>
-                    {sheet.courses.length === 0 && (
-                      <Tr>
-                        <Td colSpan={6} className="text-center text-fg-muted">
-                          No results are recorded for this semester.
-                        </Td>
-                      </Tr>
-                    )}
-                    {sheet.courses.map((c, i) => (
-                      <Tr key={`${c.code}-${i}`} className={i % 2 === 1 ? "bg-brand-subtle" : undefined}>
-                        <Td>
-                          {c.title}
-                          {c.isRepeatDropped && " (R)"}
-                          {c.letter === "I" && selectedInfo && (
-                            <span className="ml-1 text-xs text-warning-fg">
-                              — must be resolved by end of{" "}
-                              {formatSemesterSortKey(computeIncompleteDeadlineSemester(selectedInfo.sortKey))}
-                            </span>
-                          )}
-                        </Td>
-                        <Td className="text-center whitespace-nowrap">{c.code}</Td>
-                        <Td className="text-center">{c.creditHours}</Td>
-                        <Td className="text-center">{c.letter}</Td>
-                        <Td className="text-center">{c.gradePoint ?? "—"}</Td>
-                        <Td className="text-center">{c.gradePoints ?? "—"}</Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                  {/* The semester's own figures belong under the rows they
-                      are drawn from, which is also where the printed sheet
-                      puts them. No fill: the purple band is the heading's
-                      job, and a second one at the foot competes with it.
-                      What separates the totals from the results is a rule
-                      twice the weight of the ones between rows -- a line
-                      the eye reads as "below this is a different kind of
-                      number". CGPA stays in the Academic record card above:
-                      it is cumulative and says nothing about this table. */}
-                  <tfoot className="text-fg">
-                    <tr>
-                      <td colSpan={5} className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
-                        Total Credit Earned
-                      </td>
-                      <td className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
-                        {trimCredits(sheet.summary.creditsEarned)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan={5} className="px-3 py-2 text-right font-bold">
-                        Total Grade Points
-                      </td>
-                      <td className="px-3 py-2 text-right font-bold">{sheet.summary.totalGradePoints}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan={5} className="px-3 py-2 text-right font-bold">
-                        Semester GPA
-                        {selectedSummary?.isProvisional && (
-                          <span className="ml-1 text-xs font-normal text-fg-muted">(provisional)</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right font-bold">{sheet.summary.gpa ?? "—"}</td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </>
+              <SemesterResultsTable
+                sheet={sheet}
+                label={selectedInfo?.label ?? selectedSemesterId ?? ""}
+                sortKey={selectedInfo?.sortKey}
+                isProvisional={selectedSummary?.isProvisional}
+              />
             )}
           </CardBody>
         </Card>
