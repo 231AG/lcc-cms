@@ -101,7 +101,12 @@
   --gray-200: #e4e4e7;
   --gray-300: #d4d4d8;
   --gray-400: #a1a1aa;
-  --gray-500: #888888;
+  /* 5.0:1 on white. The #888888 this replaces measured 3.54:1 -- under the
+     4.5 AA needs for body text -- which axe-core found on 257 nodes across
+     the app. Pre-dates the redesign; fixed here because this is the pass
+     that owns the colour tokens. Dark mode uses --ink-300, which already
+     measures 4.7:1 on the card surface and is unchanged. */
+  --gray-500: #6f6f74;
   --gray-600: #6b6b70;
   --gray-700: #555555;
   --gray-900: #111111;

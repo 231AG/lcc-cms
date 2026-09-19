@@ -26,7 +26,12 @@ import { cn } from "./cn";
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="overflow-x-auto">
+    /* tabIndex on the scroll container, not the table: a region that
+       scrolls sideways is unreachable by keyboard without it, which is
+       what axe's scrollable-region-focusable catches on a narrow viewport.
+       role="group" with a name keeps it from announcing as an unlabelled
+       focusable div. */
+    <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Table, scrollable">
       <table className={cn("w-full border-collapse text-sm", className)} {...props} />
     </div>
   );
