@@ -7,6 +7,7 @@ import { appUser } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkPasswordPolicy, isObviousPassword, passwordPolicyFor } from "@/lib/identity/passwordPolicy";
+import { resolveLoginIdentifierToEmail } from "@/lib/identity/resolve";
 import type { Role } from "@/lib/permissions/kernel";
 
 /**
@@ -45,8 +46,39 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
 
   // The role is read from the database, never from the form: the policy a
   // password is judged against must not be something the client can pick.
-  const [row] = await db.select({ role: appUser.role }).from(appUser).where(eq(appUser.id, user.id)).limit(1);
+  const [row] = await db
+    .select({ role: appUser.role, mustChangePassword: appUser.mustChangePassword, loginIdentifier: appUser.loginIdentifier })
+    .from(appUser)
+    .where(eq(appUser.id, user.id))
+    .limit(1);
   const policy = passwordPolicyFor(row?.role as Role | undefined);
+
+  // REAUTHENTICATION. Holding a session was previously enough to change the
+  // password, which turns any borrowed or hijacked session into a permanent
+  // account takeover: the attacker sets a new password and the real owner is
+  // locked out of their own record with no way back except an Admin reset.
+  //
+  // Required only when this is NOT a forced change. The forced path is first
+  // login or the minute after an Admin reset, where the user reached this
+  // screen by typing the very password we would be asking for again.
+  //
+  // `mustChangePassword` is read from the database, not the form -- a client
+  // that could assert "this is a forced change" could skip the check.
+  if (!row?.mustChangePassword) {
+    const currentPassword = String(formData.get("currentPassword") ?? "");
+    if (!currentPassword) redirect("/change-password?error=3");
+
+    const identifier = row?.loginIdentifier;
+    if (!identifier) redirect("/change-password?error=3");
+
+    // Verified against Supabase Auth rather than compared locally: this app
+    // never sees a password hash, and must not start handling one.
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+      email: resolveLoginIdentifierToEmail(identifier),
+      password: currentPassword,
+    });
+    if (reauthError) redirect("/change-password?error=3");
+  }
 
   if (newPassword !== confirmPassword || checkPasswordPolicy(newPassword, policy)) {
     redirect("/change-password?error=1");

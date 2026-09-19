@@ -1,3 +1,4 @@
+import { csvCell } from "@/lib/export/csvCell";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
@@ -130,10 +131,9 @@ const CSV_COLUMNS: Array<{ key: keyof ExportRow; header: string }> = [
   { key: "isVoid", header: "Void" },
 ];
 
-function csvEscape(value: unknown): string {
-  const s = value === null || value === undefined ? "" : String(value);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+/** RFC 4180 quoting plus formula neutralisation -- see csvCell.ts for why
+ * the quoting alone was not enough. */
+const csvEscape = csvCell;
 
 /** Openable without the system (Section 11.3's own wording) -- plain CSV, no proprietary format. */
 export function toCsv(rows: ExportRow[]): string {

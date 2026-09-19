@@ -83,6 +83,29 @@ function withSecurityHeaders(response: NextResponse, csp: string): NextResponse 
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("X-Frame-Options", "DENY");
+
+  // Browser features this app never uses. Denying them outright means a
+  // script that somehow does run cannot quietly reach for a camera or a
+  // location -- cheap defence in depth behind the CSP, not a substitute
+  // for it.
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+  );
+
+  // HSTS, production only. Vercel sets this on its own domains, but that is
+  // the host's choice rather than this app's, and it does not follow the
+  // app onto a custom domain or any other host. Sent from here so the
+  // guarantee travels with the code.
+  //
+  // Not in development: `next dev` is plain HTTP, and a browser that has
+  // once seen this header will refuse http://localhost for the next two
+  // years -- a genuinely painful thing to do to a developer's machine.
+  // No `preload`: that is a one-way submission to a browser-vendor list
+  // and is the project owner's call to make, not a default to slip in.
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
+  }
   return response;
 }
 
