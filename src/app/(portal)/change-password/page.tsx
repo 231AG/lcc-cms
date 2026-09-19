@@ -62,7 +62,22 @@ export default async function ChangePasswordPage({
             </Alert>
           )}
 
+          {error === "3" && (
+            <Alert tone="danger" className="mb-4">
+              That is not your current password.
+            </Alert>
+          )}
           <form action={changePasswordAction} className="flex flex-col gap-4">
+            {/* Only on the self-service path. A forced change (first login,
+                or straight after an Admin reset) is already gated by the
+                temporary password the user just signed in with, and asking
+                for it twice in the same minute is friction with no gain. */}
+            {!actor.mustChangePassword && (
+              <div>
+                <Label htmlFor="currentPassword">Current password</Label>
+                <Input id="currentPassword" name="currentPassword" type="password" required autoComplete="current-password" />
+              </div>
+            )}
             <div>
               <Label htmlFor="newPassword">New password</Label>
               <Input
