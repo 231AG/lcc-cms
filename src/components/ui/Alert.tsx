@@ -18,7 +18,7 @@ const tones: Record<AlertTone, string> = {
  */
 export function Alert({ tone = "info", children, className }: { tone?: AlertTone; children: ReactNode; className?: string }) {
   return (
-    <div role={tone === "danger" ? "alert" : undefined} className={cn("rounded-md border px-3 py-2 text-sm", tones[tone], className)}>
+    <div role={tone === "danger" ? "alert" : undefined} className={cn("rounded-xl border px-4 py-3 text-sm", tones[tone], className)}>
       {children}
     </div>
   );

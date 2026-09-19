@@ -59,7 +59,7 @@ export default async function HistoricalEntryPage({
 
   if (!studentId) {
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
         <PageHeader title="Historical import" />
         <p className="text-sm text-fg-secondary">
           Open a student&apos;s record from{" "}
@@ -99,7 +99,7 @@ export default async function HistoricalEntryPage({
   const selectedSemester = semesterId ? semesters.find((s) => s.id === semesterId) : undefined;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <PageHeader
         title={
           <>

@@ -108,7 +108,7 @@ export default async function StudentPlanEntryPage({
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <PageHeader
         title="Course plan entry"
         description="Build and submit a course plan for a student who cannot use the app themselves. It goes to Course plan review like any other plan."

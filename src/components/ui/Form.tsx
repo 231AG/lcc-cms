@@ -13,12 +13,12 @@ import { cn } from "./cn";
 // the part that carries the state -- a border colour shift on its own is close
 // to invisible against a dark surface.
 const fieldBase =
-  "w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-fg " +
+  "w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-fg transition-colors " +
   "placeholder:text-fg-subtle focus:border-brand focus:outline focus:outline-2 focus:outline-focus-ring " +
   "disabled:cursor-not-allowed disabled:border-disabled-line disabled:bg-disabled-surface disabled:text-disabled-fg";
 
 export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
-  return <label className={cn("mb-1 block text-sm font-medium text-fg", className)} {...props} />;
+  return <label className={cn("mb-1.5 block text-sm font-semibold text-fg", className)} {...props} />;
 }
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {

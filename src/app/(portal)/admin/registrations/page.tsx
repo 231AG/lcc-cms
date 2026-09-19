@@ -133,7 +133,7 @@ export default async function RegistrationsPage({
   };
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <PageHeader title="Registrations" />
 
       {error && (

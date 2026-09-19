@@ -44,7 +44,7 @@ export default async function ExportPage() {
   const unpublishedCounts = await Promise.all(semesters.map((s) => countUnpublishedGrades(s.id)));
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <PageHeader
         title="Semester-end academic data export"
         description="A full copy of a semester's academic data leaves the system when you download it. Every export is recorded in the audit log."

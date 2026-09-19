@@ -88,7 +88,7 @@ export default async function PlanningPage({
 
   if (selectableSemesters.length === 0) {
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 outline-none">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 outline-none">
         <PageHeader title="Course planning" />
         <p className="text-sm text-fg-muted">Course planning is not currently open.</p>
       </main>
@@ -161,7 +161,7 @@ export default async function PlanningPage({
   };
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <PageHeader title="Course planning" description={yearLabel(semesterId)} />
 
       {/* Only shown when there is something to switch between. Submitting on

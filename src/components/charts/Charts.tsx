@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { CountByLabel } from "@/lib/dashboard/statistics";
 import { cn } from "@/components/ui/cn";
 
@@ -37,13 +38,55 @@ const STATUS_COLOR: Record<string, string> = {
   INACTIVE: "var(--fg-subtle)",
 };
 
-/** A single headline figure. Not a chart -- one number does not need one. */
-export function StatTile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+/** The tinted icon chips on the stat cards. Four tones so a row of four
+ * reads as four different things at a glance, which is what the design
+ * reference uses them for -- they carry no meaning of their own, so nothing
+ * depends on telling them apart. The number and its label do all the work. */
+export type StatTone = "brand" | "accent" | "info" | "success";
+
+const STAT_CHIP: Record<StatTone, string> = {
+  brand: "bg-brand-subtle-strong text-brand-fg",
+  accent: "bg-accent-soft text-accent-soft-fg",
+  info: "bg-info-surface text-info-fg",
+  success: "bg-success-surface text-success-fg",
+};
+
+/** A single headline figure. Not a chart -- one number does not need one.
+ *
+ * `icon` and `tone` are optional: a caller that passes neither gets the
+ * plain tile it always got, so this did not have to be threaded through
+ * every call site at once. There is deliberately no "up 12%" chip like the
+ * reference shows -- nothing in this app computes a period-over-period
+ * delta, and a number that looks measured but is not is worse than no
+ * number. */
+export function StatTile({
+  label,
+  value,
+  hint,
+  icon,
+  tone = "brand",
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  icon?: ReactNode;
+  tone?: StatTone;
+}) {
   return (
-    <div className="rounded-lg border border-line bg-surface p-4 shadow-sm">
-      <p className="text-xs font-medium tracking-wide text-fg-muted uppercase">{label}</p>
-      <p className="mt-1 text-3xl font-semibold text-fg tabular-nums">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-fg-muted">{hint}</p>}
+    <div className="border-line bg-surface flex items-start gap-3.5 rounded-2xl border p-4 shadow-[0_1px_2px_rgb(16_12_32_/_0.04),0_8px_24px_-12px_rgb(16_12_32_/_0.12)] sm:p-5">
+      {icon && (
+        <span
+          className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", STAT_CHIP[tone])}
+          aria-hidden="true"
+        >
+          {icon}
+        </span>
+      )}
+      <div className="min-w-0">
+        <p className="text-fg-muted text-xs font-semibold tracking-wide uppercase">{label}</p>
+        <p className="text-fg mt-1 text-3xl font-extrabold tabular-nums">{value}</p>
+        {hint && <p className="text-fg-muted mt-0.5 text-xs">{hint}</p>}
+      </div>
     </div>
   );
 }

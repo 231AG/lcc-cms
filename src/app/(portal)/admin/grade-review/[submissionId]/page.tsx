@@ -75,7 +75,7 @@ export default async function GradeReviewDetailPage({
   const undecided = grades.filter((g) => g.status === "SUBMITTED");
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <PageHeader
         title={`${course ? `${course.code} — ${course.title}` : submission.offeringId} (Section ${offering?.section})`}
         description={
