@@ -2,9 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { LogOut, KeyRound } from "lucide-react";
 import type { Actor } from "@/lib/auth/session";
-import { navGroupsForRole } from "./navLinks";
 import { signOutAction } from "@/app/actions";
-import { MainNav } from "./MainNav";
 import { navItem } from "./navStyles";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -15,29 +13,18 @@ const ROLE_LABEL: Record<Actor["role"], string> = {
 };
 
 /**
- * The persistent header/nav the app never had (every page used to be a
- * lone `<main>` with no shell at all -- the brief's single highest-impact
- * change). Server Component: takes the already-resolved actor from the
- * root layout rather than re-querying, so it costs nothing extra per
- * request. Shows no nav links while a forced password change is pending
- * (every other route redirects there anyway, per src/proxy.ts), and no
- * nav/account controls at all when signed out (public pages).
+ * The slim bar for the two states that get no sidebar: a signed-out visitor
+ * on a public page, and a user who must change their password before
+ * anything else. Neither can navigate anywhere, so neither is offered
+ * navigation -- which is why this carries no nav links at all now that
+ * AppSidebar handles the signed-in case.
  *
- * The bar itself is a neutral surface rather than a solid brand fill, with
- * Deep Orchid reserved for the wordmark, hover text and the gradient hairline
- * -- a full-width saturated purple band is exactly the "large bright-purple
- * section" the dark theme is meant to avoid. The theme toggle sits outside the
- * `actor` branch so it is available to every role and to signed-out visitors.
- *
- * The links themselves live in MainNav, the one client component in this
- * shell: menu open/closed state and "which item is current" both depend on
- * the route the user is actually on, which a shared layout cannot see after
- * a client navigation. See the comment at the top of MainNav.tsx.
+ * Server Component: takes the already-resolved actor from the (portal)
+ * layout rather than re-querying, so it costs nothing extra per request.
+ * The theme toggle sits outside the `actor` branch so it is available to
+ * signed-out visitors too.
  */
 export function Header({ actor }: { actor: Actor | null }) {
-  const groups = actor ? navGroupsForRole(actor.role) : [];
-  const hasLinks = groups.some((g) => g.links.length > 0);
-
   return (
     <header className="print:hidden border-b border-line bg-surface text-fg">
       {/* The one Deep Orchid -> Lavender Haze gradient in the app chrome:
@@ -85,8 +72,6 @@ export function Header({ actor }: { actor: Actor | null }) {
             )}
           </div>
         </div>
-
-        {actor && !actor.mustChangePassword && hasLinks && <MainNav groups={groups} />}
       </div>
     </header>
   );

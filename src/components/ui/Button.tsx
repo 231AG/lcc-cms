@@ -10,12 +10,12 @@ export type ButtonSize = "sm" | "md";
 // pseudo-class so they outrank the variant's own background regardless of the
 // order the classes are concatenated in.
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors " +
+  "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring " +
   "disabled:cursor-not-allowed disabled:border-disabled-line disabled:bg-disabled-surface disabled:text-disabled-fg";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-active",
+  primary: "bg-primary text-on-primary shadow-sm hover:bg-primary-hover active:bg-primary-active",
   // Outlined, not a neutral fill: a plain white/near-white button overpowers
   // the surrounding UI in dark mode.
   secondary:
@@ -26,8 +26,8 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "px-2.5 py-1.5 text-xs",
-  md: "px-4 py-2 text-sm",
+  sm: "px-3 py-1.5 text-xs",
+  md: "px-4 py-2.5 text-sm",
 };
 
 /**

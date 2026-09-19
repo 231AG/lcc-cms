@@ -7,22 +7,22 @@ import { cn } from "./cn";
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("rounded-lg border border-line bg-surface shadow-sm", className)}
+      className={cn("rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgb(16_12_32_/_0.04),0_8px_24px_-12px_rgb(16_12_32_/_0.12)]", className)}
       {...props}
     />
   );
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("border-b border-line-subtle px-4 py-3 sm:px-5", className)} {...props} />;
+  return <div className={cn("border-b border-line-subtle px-5 py-4 sm:px-6", className)} {...props} />;
 }
 
 export function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-4 py-4 sm:px-5", className)} {...props} />;
+  return <div className={cn("px-5 py-5 sm:px-6", className)} {...props} />;
 }
 
 /** Section heading used inside a Card/section -- keeps the `<h2 class="font-medium">`
  * convention already used throughout the app, just with consistent sizing. */
 export function CardTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <h2 className={cn("text-sm font-semibold text-fg", className)}>{children}</h2>;
+  return <h2 className={cn("text-base font-bold text-fg", className)}>{children}</h2>;
 }

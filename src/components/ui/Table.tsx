@@ -36,7 +36,7 @@ export function Thead({ className, ...props }: HTMLAttributes<HTMLTableSectionEl
   return (
     <thead
       className={cn(
-        "bg-brand-subtle-strong text-left text-xs font-semibold uppercase tracking-wide text-brand-fg",
+        "bg-brand-subtle text-left text-[11px] font-bold uppercase tracking-[0.06em] text-brand-fg",
         className,
       )}
       {...props}
@@ -45,15 +45,15 @@ export function Thead({ className, ...props }: HTMLAttributes<HTMLTableSectionEl
 }
 
 export function Th({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className={cn("border border-brand-line px-3 py-2 font-semibold", className)} {...props} />;
+  return <th className={cn("border border-brand-line px-3.5 py-3 font-bold", className)} {...props} />;
 }
 
 export function Td({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("border border-brand-line px-3 py-2 align-top", className)} {...props} />;
+  return <td className={cn("border border-brand-line px-3.5 py-3 align-top", className)} {...props} />;
 }
 
 export function Tr({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("hover:bg-surface-hover", className)} {...props} />;
+  return <tr className={cn("transition-colors hover:bg-surface-hover", className)} {...props} />;
 }
 
 export type SortDirection = "asc" | "desc";
