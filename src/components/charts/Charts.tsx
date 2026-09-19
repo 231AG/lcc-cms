@@ -153,32 +153,81 @@ export function ColumnChart({ data, className }: { data: CountByLabel[]; classNa
   if (data.length === 0) return <p className="text-sm text-fg-muted">No enrolment years recorded yet.</p>;
   const max = Math.max(...data.map((d) => d.count), 1);
 
+  // Round the top of the scale up so the ticks are whole numbers rather than
+  // four divisions of an arbitrary maximum. Four intervals is what the design
+  // reference draws and is enough to read a column against without crowding.
+  const magnitude = Math.pow(10, Math.max(0, String(Math.ceil(max / 4)).length - 1));
+  const step = Math.ceil(max / 4 / magnitude) * magnitude;
+  const top = step * 4;
+  const PLOT = 176;
+
   return (
-    <div className={cn("overflow-x-auto", className)}>
-      {/* One continuous baseline under the whole series, not a stub rule per
-          column -- the gaps between columns turned a per-label border into a
-          dashed axis that read as broken. */}
-      <div className="flex items-end gap-2 border-b border-line">
-        {data.map((row) => (
-          <div key={row.label} className="flex min-w-12 flex-1 flex-col items-center gap-1">
-            <span className="text-xs font-semibold text-fg tabular-nums">{row.count}</span>
-            {/* Anchored to the baseline with a rounded top; a floor of 4px so
-                a year with a single student is still visibly a bar rather than
-                a hairline that reads as zero. */}
-            <div
-              className="w-full rounded-t bg-primary"
-              style={{ height: `${Math.max((row.count / max) * 120, 4)}px` }}
-              title={`${row.label}: ${row.count}`}
-            />
+    <div className={cn("overflow-x-auto pt-5", className)}>
+      <div className="flex">
+        {/* The y-axis: a tick per gridline, bottom-aligned with the baseline.
+            The columns keep their printed numbers as well -- height is still
+            never the only channel carrying a value. */}
+        <div className="relative w-10 shrink-0" style={{ height: `${PLOT}px` }} aria-hidden="true">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span
+              key={i}
+              // fg-muted, not fg-subtle: an axis label has to be readable, and
+              // subtle measures 2.56:1 on white against the 4.5 AA needs.
+              className="text-fg-muted absolute right-2 -translate-y-1/2 text-[10px] tabular-nums"
+              style={{ top: `${PLOT - (i * PLOT) / 4}px` }}
+            >
+              {i * step}
+            </span>
+          ))}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="border-line relative border-b" style={{ height: `${PLOT}px` }}>
+            {/* Behind the columns: z-0 against the z-10 below, because an
+                absolutely positioned element otherwise paints over the
+                in-flow bars and draws lines across them. */}
+            <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="border-line-subtle absolute inset-x-0 border-t"
+                  style={{ top: `${PLOT - (i * PLOT) / 4}px` }}
+                />
+              ))}
+            </div>
+
+            <div className="absolute inset-0 z-10 flex items-end justify-center gap-3">
+              {data.map((row) => {
+                // A floor of 4px so a year with a single student is still
+                // visibly a column rather than a hairline that reads as zero.
+                const height = Math.max((row.count / top) * PLOT, 4);
+                return (
+                  <div key={row.label} className="relative h-full min-w-12 max-w-20 flex-1">
+                    <div
+                      className="bg-primary absolute inset-x-0 bottom-0 rounded-t"
+                      style={{ height: `${height}px` }}
+                      title={`${row.label}: ${row.count}`}
+                    />
+                    <span
+                      className="text-fg absolute inset-x-0 text-center text-xs font-bold tabular-nums"
+                      style={{ bottom: `${height + 4}px` }}
+                    >
+                      {row.count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        {data.map((row) => (
-          <span key={row.label} className="min-w-12 flex-1 pt-1 text-center text-xs whitespace-nowrap text-fg-muted">
-            {row.label}
-          </span>
-        ))}
+
+          <div className="flex justify-center gap-3">
+            {data.map((row) => (
+              <span key={row.label} className="text-fg-muted min-w-12 max-w-20 flex-1 pt-1.5 text-center text-xs whitespace-nowrap">
+                {row.label}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

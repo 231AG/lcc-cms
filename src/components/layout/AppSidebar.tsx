@@ -60,7 +60,7 @@ export function AppSidebar({ actor }: { actor: Actor }) {
         </button>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 px-3 pt-2 pb-6">
+      <nav className="flex flex-col gap-5 px-3 pt-2 pb-6">
         {groups.map((group, i) => (
           <div key={group.label || i} className="flex flex-col gap-1">
             {group.label && (
@@ -76,6 +76,13 @@ export function AppSidebar({ actor }: { actor: Actor }) {
           </div>
         ))}
       </nav>
+
+      {/* The College's own line, at the foot of the rail. Hidden when the
+          rail is collapsed, where there is no room for it to read as
+          anything but noise. */}
+      <p className="sidebar-full-only text-sidebar-fg-muted mt-auto px-4 pb-6 text-center text-[10px] tracking-[0.08em] whitespace-nowrap uppercase">
+        Excellence &middot; Faith &middot; Service
+      </p>
     </aside>
   );
 }
