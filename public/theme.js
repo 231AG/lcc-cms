@@ -26,9 +26,15 @@
  *      own (`color-scheme: light` in globals.css), so a first visit needs no
  *      JavaScript at all.
  *   2. Register one delegated click listener for the header toggle.
+ *
+ * The sidebar's collapsed state rides along for the same two reasons: it has
+ * to be on <html> before first paint (or the page loads with a full-width
+ * sidebar that snaps narrow), and handling it here keeps the whole app shell
+ * a Server Component with no client React at all.
  */
 (function () {
   var STORAGE_KEY = "lcc-theme";
+  var SIDEBAR_KEY = "lcc-sidebar";
   var root = document.documentElement;
 
   function stored() {
@@ -45,9 +51,61 @@
   var preference = stored();
   if (preference) root.dataset.theme = preference;
 
+  // Collapsed is opt-in and desktop-only; below lg the CSS ignores it and
+  // uses the off-canvas drawer instead, so it is safe to apply unconditionally.
+  try {
+    if (localStorage.getItem(SIDEBAR_KEY) === "collapsed") root.dataset.sidebar = "collapsed";
+  } catch {
+    // Storage unavailable: the sidebar just starts expanded.
+  }
+
+  function setExpanded(selector, expanded) {
+    var controls = document.querySelectorAll(selector);
+    for (var i = 0; i < controls.length; i++) controls[i].setAttribute("aria-expanded", String(expanded));
+  }
+
+  function closeDrawer() {
+    delete root.dataset.drawer;
+    setExpanded("[data-drawer-toggle]", false);
+  }
+
   document.addEventListener("click", function (event) {
     var target = event.target;
     if (!target || !target.closest) return;
+
+    // Collapse/expand the desktop rail.
+    if (target.closest("[data-sidebar-toggle]")) {
+      var collapsed = root.dataset.sidebar === "collapsed";
+      if (collapsed) delete root.dataset.sidebar;
+      else root.dataset.sidebar = "collapsed";
+      setExpanded("[data-sidebar-toggle]", collapsed);
+      try {
+        localStorage.setItem(SIDEBAR_KEY, collapsed ? "expanded" : "collapsed");
+      } catch {
+        // Not remembered, but applied for this page view.
+      }
+      return;
+    }
+
+    // Open the mobile drawer.
+    if (target.closest("[data-drawer-toggle]")) {
+      var open = root.dataset.drawer === "open";
+      if (open) closeDrawer();
+      else {
+        root.dataset.drawer = "open";
+        setExpanded("[data-drawer-toggle]", true);
+      }
+      return;
+    }
+
+    // The scrim, the close button, and any link inside the drawer all
+    // dismiss it -- a link especially, since navigating with the drawer
+    // still covering the page is the classic version of this bug.
+    if (target.closest("[data-drawer-close]") || target.closest(".app-sidebar a")) {
+      closeDrawer();
+      return;
+    }
+
     if (!target.closest("[data-theme-toggle]")) return;
 
     // No attribute yet means nobody has chosen, which renders as light -- so
@@ -62,5 +120,9 @@
     } catch {
       // The theme still applies for this page view, it just isn't remembered.
     }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && root.dataset.drawer === "open") closeDrawer();
   });
 })();

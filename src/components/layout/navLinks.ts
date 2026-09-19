@@ -1,8 +1,30 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  BookOpen,
+  CalendarDays,
+  CheckCheck,
+  ClipboardCheck,
+  ClipboardList,
+  ClipboardPen,
+  Download,
+  FilePen,
+  GraduationCap,
+  History,
+  Network,
+  Scale,
+  ScrollText,
+  ShieldCheck,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import type { Role } from "@/lib/permissions/kernel";
 
 export interface NavLink {
   href: string;
   label: string;
+  /** Sidebar glyph. Additive: the label is still the accessible name, and
+   * the icon is decorative, so nothing depends on it being right. */
+  icon: LucideIcon;
 }
 
 /**
@@ -26,9 +48,9 @@ export const STUDENT_GROUPS: NavGroup[] = [
   {
     label: "",
     links: [
-      { href: "/admin/offerings", label: "Course offerings" },
-      { href: "/planning", label: "Course planning" },
-      { href: "/grading-policy", label: "Grading policy" },
+      { href: "/admin/offerings", label: "Course offerings", icon: BookOpen },
+      { href: "/planning", label: "Course planning", icon: ClipboardList },
+      { href: "/grading-policy", label: "Grading policy", icon: Scale },
     ],
   },
 ];
@@ -37,36 +59,36 @@ export const ADMIN_GROUPS: NavGroup[] = [
   {
     label: "Students",
     links: [
-      { href: "/admin/students", label: "Student Listing" },
-      { href: "/admin/historical/progress", label: "Historical import progress" },
+      { href: "/admin/students", label: "Student Listing", icon: Users },
+      { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
     ],
   },
   {
     label: "Academic",
     links: [
-      { href: "/admin/structure", label: "Academic structure" },
-      { href: "/admin/calendar", label: "Academic calendar" },
+      { href: "/admin/structure", label: "Academic structure", icon: Network },
+      { href: "/admin/calendar", label: "Academic calendar", icon: CalendarDays },
     ],
   },
   {
     label: "Planning",
     links: [
-      { href: "/admin/offerings", label: "Course offerings" },
+      { href: "/admin/offerings", label: "Course offerings", icon: BookOpen },
       // Ordered as the work actually flows: publish the offerings, enter a
       // plan for a student who can't (DEV-20), review what comes in,
       // register directly only as the exception path.
-      { href: "/admin/student-plan", label: "Course plan entry" },
-      { href: "/admin/planning", label: "Course plan review" },
-      { href: "/admin/registrations", label: "Registrations" },
+      { href: "/admin/student-plan", label: "Course plan entry", icon: ClipboardPen },
+      { href: "/admin/planning", label: "Course plan review", icon: ClipboardCheck },
+      { href: "/admin/registrations", label: "Registrations", icon: UserCheck },
     ],
   },
   {
     label: "Grades",
     links: [
-      { href: "/admin/grades", label: "Class grade entry" },
-      { href: "/admin/grade-corrections", label: "Grade corrections" },
-      { href: "/admin/export", label: "Semester export" },
-      { href: "/grading-policy", label: "Grading policy" },
+      { href: "/admin/grades", label: "Class grade entry", icon: GraduationCap },
+      { href: "/admin/grade-corrections", label: "Grade corrections", icon: FilePen },
+      { href: "/admin/export", label: "Semester export", icon: Download },
+      { href: "/grading-policy", label: "Grading policy", icon: Scale },
     ],
   },
 ];
@@ -75,31 +97,31 @@ export const SUPER_ADMIN_GROUPS: NavGroup[] = [
   {
     label: "Accounts",
     links: [
-      { href: "/admin/accounts", label: "Admin accounts" },
-      { href: "/admin/audit", label: "Audit log" },
+      { href: "/admin/accounts", label: "Admin accounts", icon: ShieldCheck },
+      { href: "/admin/audit", label: "Audit log", icon: ScrollText },
     ],
   },
   {
     label: "Students",
     links: [
-      { href: "/admin/students", label: "Student Listing" },
-      { href: "/admin/historical/progress", label: "Historical import progress" },
+      { href: "/admin/students", label: "Student Listing", icon: Users },
+      { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
     ],
   },
   {
     label: "Academic",
     links: [
-      { href: "/admin/calendar", label: "Academic calendar" },
-      { href: "/admin/offerings", label: "Course offerings" },
+      { href: "/admin/calendar", label: "Academic calendar", icon: CalendarDays },
+      { href: "/admin/offerings", label: "Course offerings", icon: BookOpen },
     ],
   },
   {
     label: "Grades",
     links: [
-      { href: "/admin/grade-review", label: "Grade submission review" },
-      { href: "/admin/grade-corrections", label: "Grade corrections" },
-      { href: "/admin/export", label: "Semester export" },
-      { href: "/grading-policy", label: "Grading policy" },
+      { href: "/admin/grade-review", label: "Grade submission review", icon: CheckCheck },
+      { href: "/admin/grade-corrections", label: "Grade corrections", icon: FilePen },
+      { href: "/admin/export", label: "Semester export", icon: Download },
+      { href: "/grading-policy", label: "Grading policy", icon: Scale },
     ],
   },
 ];

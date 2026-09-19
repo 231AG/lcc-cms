@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Playfair_Display, Source_Sans_3 } from "next/font/google";
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-// Brand typography: Playfair Display for headings, Source Sans 3 for body
-// (applied globally in globals.css, not per-component). Geist Mono stays
-// for the monospace code/ID display used throughout the admin tables.
-const headingFont = Playfair_Display({
-  variable: "--font-heading",
-  weight: "variable",
-  subsets: ["latin"],
-});
-
-const bodyFont = Source_Sans_3({
+// Brand typography: Plus Jakarta Sans for both headings and body, applied
+// globally in globals.css rather than per-component. One family, two
+// variables -- headings differ by weight and tracking, not by typeface,
+// which is what the design reference does. Geist Mono stays for the
+// monospace code/ID display used throughout the admin tables.
+//
+// One font request rather than two: the same loaded family is bound to
+// both custom properties, so the heading/body split in the stylesheet
+// keeps working without a second download.
+const brandFont = Plus_Jakarta_Sans({
   variable: "--font-body",
   weight: "variable",
   subsets: ["latin"],
@@ -34,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${headingFont.variable} ${bodyFont.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${brandFont.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-fg">
         {/* Applies a stored light/dark preference to <html> before any styled

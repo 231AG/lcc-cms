@@ -51,30 +51,41 @@
    1. PRIMITIVES -- fixed ramps, identical under both themes.
    =========================================================================== */
 :root {
-  /* Orchid ramp, anchored on Deep Orchid (600) and Lavender Haze (400). */
-  --orchid-50: #f8f0fe;
-  --orchid-100: #f2e2fc;
-  --orchid-200: #e1c3f8;
-  --orchid-300: #ce9ef3;
-  --orchid-400: #b76df7; /* Lavender Haze */
-  --orchid-500: #a544de;
-  --orchid-600: #932ccc; /* Deep Orchid */
-  --orchid-700: #7b22ac;
-  --orchid-800: #601a85;
-  --orchid-900: #3f1159;
+  /* Brand ramp, anchored on the three colours the design reference names:
+     Primary #5f2ac4 (600), Accent #8b5cf6 (400) and Deep #3b1a7e (800).
+     The remaining steps are interpolated to keep an even perceptual
+     spacing, so every existing token that reaches for a step by number
+     lands somewhere sensible without being re-pointed.
+
+     Measured against white: 600 gives 8.0:1 and 800 gives 12.8:1, so white
+     text is safe on both -- which is what makes the full-height sidebar in
+     the reference work. 400 is 4.2:1, UNDER the 4.5 needed for normal text,
+     so it is used for borders, rings and large marks only, never as a
+     background for body copy; 500 (5.9:1) is the lightest step that carries
+     white text, and is what the active nav pill uses. */
+  --orchid-50: #f5f2ff;
+  --orchid-100: #ebe5ff;
+  --orchid-200: #d9cdff;
+  --orchid-300: #bda6fb;
+  --orchid-400: #8b5cf6; /* Accent */
+  --orchid-500: #7440e0;
+  --orchid-600: #5f2ac4; /* Primary */
+  --orchid-700: #4e2199;
+  --orchid-800: #3b1a7e; /* Deep */
+  --orchid-900: #2a1259;
 
   /* Orchid mixed into the dark neutrals -- the dark theme's "lavender tint".
      Deep Orchid itself is never used as a large dark-theme background. */
-  --orchid-ink-subtle: #241a33;
-  --orchid-ink-strong: #2f2142;
-  --orchid-ink-line: #4a3168;
+  --orchid-ink-subtle: #1e1a33;
+  --orchid-ink-strong: #272142;
+  --orchid-ink-line: #3f3168;
 
   /* Gold Yellow / Honey Gold accents, plus their dark-theme counterparts.
      The literal Honey Gold hex is a light-theme surface only; on dark it
      becomes a tint + a desaturated text/border pair. */
-  --gold-400: #ffd700; /* Gold Yellow */
-  --gold-700: #8a6d00;
-  --gold-950: #3a2e00;
+  --gold-400: #f2c661; /* Gold */
+  --gold-700: #7d6110;
+  --gold-950: #33280a;
   --honey-200: #f0e68c; /* Honey Gold */
   --honey-500: #b9ab4a;
   --honey-900: #4a3f00;
@@ -161,6 +172,12 @@
   /* Light unless the user opts into dark; see the note at the top of the file
      for why this does not follow `prefers-color-scheme`. */
   color-scheme: light;
+
+  /* Headings and body are the same family now, so this aliases rather than
+     loading a second font. Keeping the name means the heading rule below,
+     and the `font-heading` Tailwind utility, both keep working -- and going
+     back to a separate display face later is one declaration. */
+  --font-heading: var(--font-body);
 
   /* --- Global: backgrounds & surfaces ----------------------------------- */
   --background: light-dark(var(--gray-25), var(--ink-950));
@@ -261,6 +278,24 @@
   --info-line: light-dark(var(--info-line-light), var(--info-line-dark));
   --info-fg: light-dark(var(--info-fg-light), var(--info-fg-dark));
   --info-solid: light-dark(var(--info-solid-light), var(--info-solid-dark));
+
+  /* --- Sidebar ----------------------------------------------------------- */
+  /* The one large saturated brand surface in the app, and the reason the
+     ramp was re-anchored: white on 800 measures 12.8:1 and on 500 (the
+     active pill) 5.9:1, so every piece of text on it clears AA. 400 is only
+     4.2:1, which is why it appears here as the focus ring and nowhere as a
+     background for text.
+
+     It stays dark under BOTH themes. A sidebar that inverts with the theme
+     stops being the fixed landmark the eye navigates by, and the dark theme
+     is already a dark page -- a light sidebar would be the bright slab the
+     rest of the palette works to avoid. */
+  --sidebar: linear-gradient(175deg, var(--orchid-800) 0%, var(--orchid-700) 55%, var(--orchid-600) 100%);
+  --sidebar-fg: #ffffff;
+  --sidebar-fg-muted: light-dark(rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.66));
+  --sidebar-hover: rgb(255 255 255 / 0.1);
+  --sidebar-active: var(--orchid-500);
+  --sidebar-fg-active: #ffffff;
 
   /* --- Chrome ------------------------------------------------------------ */
   /* The institutional seal is artwork with a light ground, so it keeps a
@@ -394,6 +429,12 @@
 
   /* Chrome */
   --color-seal-backdrop: var(--seal-backdrop);
+
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-fg-muted: var(--sidebar-fg-muted);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-fg-active: var(--sidebar-fg-active);
 }
 
 /* ===========================================================================
@@ -402,23 +443,144 @@
 body {
   background: var(--background);
   color: var(--fg);
-  font-family: var(--font-body), "Source Sans 3", Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Headings use the brand serif everywhere, regardless of whether they go
-   through a shared component (PageHeader/CardTitle) or a page's own
-   <h2>/<h3> -- one rule at the source instead of touching every page. */
+/* One family across headings and body, as the design reference does. The
+   rule stays here rather than on every component so a page's own <h2>/<h3>
+   is covered without being touched. Headings carry their weight and
+   tracking from here too: at display sizes Plus Jakarta Sans needs the
+   tracking pulled in, which is the difference between "big text" and a
+   heading that reads as designed. */
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-heading), "Playfair Display", Georgia, serif;
+  font-family: var(--font-heading), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  letter-spacing: -0.03em;
+}
+
+/* ===========================================================================
+   APP SHELL -- the signed-in sidebar layout.
+   ===========================================================================
+
+   The width lives in CSS, driven by a `data-sidebar` attribute on <html>
+   that public/theme.js writes before first paint, exactly as the colour
+   theme already works. React never renders different markup for the two
+   states, so there is no hydration mismatch to get wrong and no flash of a
+   wrongly-sized sidebar on a reload.
+
+   `min-width: 0` on the content column is load-bearing: without it a wide
+   table (course offerings has twelve columns) forces the grid track wider
+   than the viewport and the whole page scrolls sideways instead of the
+   table scrolling inside its own card.
+   =========================================================================== */
+:root {
+  --sidebar-w: 16rem;
+  --sidebar-w-collapsed: 4.75rem;
+  --topbar-h: 4rem;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+html[data-sidebar="collapsed"] .app-shell {
+  grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
+}
+
+.app-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+/* The label text and anything else that only makes sense at full width.
+   Collapsed, the rail keeps the icons and the accessible names (which live
+   in an sr-only span), so the nav is still fully usable by keyboard and by
+   a screen reader at either width. */
+html[data-sidebar="collapsed"] .sidebar-full-only {
+  display: none;
+}
+
+html[data-sidebar="collapsed"] .sidebar-rail-center {
+  justify-content: center;
+}
+
+/* Below lg the sidebar stops being a column and becomes an overlay drawer,
+   off-canvas until `data-drawer="open"`. */
+@media (max-width: 1023px) {
+  .app-shell,
+  html[data-sidebar="collapsed"] .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 50;
+    width: var(--sidebar-w);
+    transform: translateX(-100%);
+    transition: transform 200ms ease;
+  }
+
+  html[data-drawer="open"] .app-sidebar {
+    transform: translateX(0);
+  }
+
+  /* Collapsed is a desktop-only idea; in the drawer it is always full. */
+  html[data-sidebar="collapsed"] .sidebar-full-only {
+    display: revert;
+  }
+
+  .app-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgb(0 0 0 / 0.45);
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-scrim {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar {
+    transition: none;
+  }
+}
+
+/* Nothing in the shell belongs on paper. */
+@media print {
+  .app-shell {
+    display: block;
+  }
+
+  .app-sidebar,
+  .app-topbar,
+  .app-scrim {
+    display: none !important;
+  }
 }
 
 /* Deep Orchid -> Lavender Haze, for hero/major brand moments only. Not a
    Tailwind colour utility because it is a gradient, not a colour. */
+.bg-sidebar {
+  background-image: var(--sidebar);
+}
+
 .bg-gradient-brand {
   background-image: var(--gradient-brand);
 }
