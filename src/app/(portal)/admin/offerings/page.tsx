@@ -4,6 +4,7 @@ import { Download, Pencil, Printer, Trash2 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
+import { formatCourseCode } from "@/lib/courses/courseCode";
 import {
   DAY_LETTER,
   DAY_NAMES,
@@ -30,6 +31,8 @@ import {
   cancelOfferingAction,
   createOfferingAction,
   publishOfferingAction,
+  reinstateOfferingAction,
+  rescheduleMeetingsAction,
   removeMeetingAction,
   updateOfferingAction,
 } from "./actions";
@@ -49,6 +52,37 @@ const PAGE_SIZES = [10, 25, 50] as const;
 const DEFAULT_PAGE_SIZE = 10;
 
 /** Icon controls carry a tooltip and a matching accessible name. */
+/**
+ * How full a class is: seats taken, out of seats that exist, with the
+ * students still waiting on a decision underneath.
+ *
+ * Pending is shown separately rather than folded into the total because the
+ * two are different facts -- one is a student who has a place, the other is a
+ * student who has asked for one. Adding them would tell an Admin a course is
+ * full when it is not yet, and hide from them that it is about to be.
+ *
+ * The tone changes only at the point a decision is needed: amber once the
+ * pending ones would fill it, red once the seats themselves are gone.
+ */
+function EnrolledCell({ enrolled, pending, capacity }: { enrolled: string; pending: string; capacity: string }) {
+  const taken = Number(enrolled) || 0;
+  const waiting = Number(pending) || 0;
+  const seats = capacity === "" ? null : Number(capacity);
+
+  const full = seats !== null && taken >= seats;
+  const wouldFill = !full && seats !== null && taken + waiting >= seats;
+
+  return (
+    <span className="inline-flex flex-col items-center leading-tight">
+      <span className={full ? "font-semibold text-danger-fg" : wouldFill ? "font-semibold text-warning-fg" : undefined}>
+        {taken}
+        <span className="text-fg-muted"> / {seats === null ? "—" : seats}</span>
+      </span>
+      {waiting > 0 && <span className="text-xs whitespace-nowrap text-fg-muted">+{waiting} pending</span>}
+    </span>
+  );
+}
+
 const iconAction =
   "rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
@@ -354,9 +388,14 @@ export default async function OfferingsPage({
                         autoComplete="off"
                         placeholder="Type a code or title, e.g. ACCT 301"
                       />
+                      {/* Offered spaced, matching the table and the grade
+                          sheet. The code typed here is resolved with its
+                          spaces removed, so either spelling is accepted --
+                          which is the point: a code a reader can see is a
+                          code they can type. */}
                       <datalist id="offering-course-options">
                         {courses.map((c) => (
-                          <option key={c.id} value={c.code}>
+                          <option key={c.id} value={formatCourseCode(c.code)}>
                             {c.title}
                           </option>
                         ))}
@@ -499,6 +538,17 @@ export default async function OfferingsPage({
                     <SortableTh label="Day" column="day" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} />
                     <SortableTh label="Start" column="startTime" activeColumn={sortColumn} direction={sortDirection} hrefFor={hrefForSort} className="whitespace-nowrap" />
                     <Th className="whitespace-nowrap">End</Th>
+                    {/* Stays visible at every width, unlike Room or Cr/Hrs:
+                        knowing whether a class is full is the reason most
+                        people open this table on a phone. */}
+                    <SortableTh
+                      label="Enrolled"
+                      column="enrolled"
+                      activeColumn={sortColumn}
+                      direction={sortDirection}
+                      hrefFor={hrefForSort}
+                      className="whitespace-nowrap text-center"
+                    />
                     {/* Management is Admin-only, so a Super Admin's or a
                         student's view of this table has no Actions column at
                         all rather than an empty one. */}
@@ -554,6 +604,9 @@ export default async function OfferingsPage({
                       </Td>
                       <Td className="whitespace-nowrap">{row.startTime || "—"}</Td>
                       <Td className="whitespace-nowrap">{row.endTime || "—"}</Td>
+                      <Td className="whitespace-nowrap text-center">
+                        <EnrolledCell enrolled={row.enrolled} pending={row.pending} capacity={row.capacity} />
+                      </Td>
                       {isAdmin && (
                         <Td className="px-2 sm:px-3">
                           <span className="flex items-center justify-end gap-1">
@@ -578,6 +631,59 @@ export default async function OfferingsPage({
                                           Save
                                         </Button>
                                       </form>
+
+                                      {/* CHANGE this slot, as against adding
+                                          another. Without it the only way to
+                                          move a class from 11:00 to 12:00 was
+                                          to add a second slot and delete the
+                                          first -- and stopping half way
+                                          leaves the offering on the timetable
+                                          twice, which reads as the system
+                                          having duplicated it. Days are not
+                                          editable here: changing WHEN a class
+                                          meets is this, changing WHICH DAYS
+                                          is the add and remove below. */}
+                                      {row.meetingIds && (
+                                        <form action={rescheduleMeetingsAction} className="flex flex-wrap items-end gap-2">
+                                          <input type="hidden" name="semesterId" value={semesterId} />
+                                          <input type="hidden" name="meetingIds" value={row.meetingIds} />
+                                          <span className="py-1 text-xs text-fg-muted" title={expandDays(row.day)}>
+                                            Move {row.day}
+                                          </span>
+                                          <Input
+                                            name="startTime"
+                                            type="time"
+                                            required
+                                            defaultValue={row.startTime}
+                                            className="w-24 py-1 text-xs"
+                                            aria-label="New start time"
+                                          />
+                                          <Input
+                                            name="endTime"
+                                            type="time"
+                                            required
+                                            defaultValue={row.endTime}
+                                            className="w-24 py-1 text-xs"
+                                            aria-label="New end time"
+                                          />
+                                          <Select
+                                            name="room"
+                                            required
+                                            defaultValue={row.room}
+                                            className="w-24 py-1 text-xs"
+                                            aria-label="New room"
+                                          >
+                                            {ROOMS.map((r) => (
+                                              <option key={r} value={r}>
+                                                {r}
+                                              </option>
+                                            ))}
+                                          </Select>
+                                          <Button type="submit" variant="secondary" size="sm">
+                                            Change time
+                                          </Button>
+                                        </form>
+                                      )}
 
                                       <form action={addMeetingAction} className="flex flex-wrap items-end gap-2">
                                         <input type="hidden" name="semesterId" value={semesterId} />
@@ -606,10 +712,17 @@ export default async function OfferingsPage({
                                           ))}
                                         </Select>
                                         <Button type="submit" variant="secondary" size="sm">
-                                          Add meeting
+                                          Add another day
                                         </Button>
                                       </form>
 
+                                      {/* The lifecycle, and a way back from
+                                          every state. Cancelling used to be
+                                          a one-way door: Publish only ever
+                                          showed for a DRAFT, so a cancelled
+                                          offering could not be brought back
+                                          and the class had to be recreated
+                                          under another section number. */}
                                       <div className="flex flex-wrap items-center gap-3">
                                         {row.status === "DRAFT" && (
                                           <form action={publishOfferingAction}>
@@ -617,6 +730,19 @@ export default async function OfferingsPage({
                                             <input type="hidden" name="offeringId" value={row.offeringId} />
                                             <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
                                               Publish
+                                            </button>
+                                          </form>
+                                        )}
+                                        {row.status === "CANCELLED" && (
+                                          <form action={reinstateOfferingAction}>
+                                            <input type="hidden" name="semesterId" value={semesterId} />
+                                            <input type="hidden" name="offeringId" value={row.offeringId} />
+                                            <button
+                                              type="submit"
+                                              title="Bring this offering back as a draft, then publish it"
+                                              className="text-xs font-medium text-brand-fg hover:underline"
+                                            >
+                                              Reinstate as draft
                                             </button>
                                           </form>
                                         )}

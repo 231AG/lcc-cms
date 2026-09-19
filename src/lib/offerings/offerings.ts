@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { courseCodeKey } from "@/lib/courses/courseCode";
 import { db } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import { course, courseOffering, offeringMeeting, registration, semester } from "@/lib/db/schema";
@@ -85,11 +86,11 @@ export async function createOffering(actor: Actor, input: CreateOfferingInput) {
   // course_code_unique_idx on lower(trim(code))), so this resolves to at
   // most one course -- and matching the same way the index does means a
   // code that looks right to the user is never rejected over its casing.
-  const wantedCode = input.courseCode?.trim().toLowerCase();
+  const wantedCode = input.courseCode ? courseCodeKey(input.courseCode) : undefined;
   const courseRow = input.courseId
     ? await db.query.course.findFirst({ where: eq(course.id, input.courseId) })
     : wantedCode
-      ? (await db.query.course.findMany()).find((c) => c.code.trim().toLowerCase() === wantedCode)
+      ? (await db.query.course.findMany()).find((c) => courseCodeKey(c.code) === wantedCode)
       : undefined;
   if (!courseRow) {
     throw new ValidationError(
@@ -284,6 +285,127 @@ export async function cancelOffering(actor: Actor, offeringId: string) {
       newValue: { status: "CANCELLED" },
     });
     return row;
+  });
+}
+
+/**
+ * CANCELLED -> DRAFT.
+ *
+ * Cancelling was a one-way door: publishOffering refuses anything that is
+ * not DRAFT, so a cancelled offering could never be brought back, and the
+ * only way to teach that class again was a second offering under a
+ * different section number -- leaving the cancelled one on the timetable
+ * forever.
+ *
+ * Reinstating is safe precisely because cancelling is not: cancelOffering
+ * refuses while any student is registered, so a CANCELLED offering has
+ * nobody in it. Its meetings, capacity and instructor were never touched,
+ * only its status, so there is nothing to rebuild.
+ *
+ * It comes back as DRAFT rather than PUBLISHED. Publishing is the act that
+ * puts a class in front of students; after a cancellation the schedule
+ * deserves a second look before that happens, and Publish is one more click
+ * away.
+ */
+export async function reinstateOffering(actor: Actor, offeringId: string) {
+  await assertCan(actor, "offering.manage");
+
+  const existing = await db.query.courseOffering.findFirst({ where: eq(courseOffering.id, offeringId) });
+  if (!existing) throw new ValidationError("Offering not found.");
+  await assertSemesterEditable(existing.semesterId);
+  if (existing.status !== "CANCELLED") {
+    throw new StateError(`Only a cancelled offering can be reinstated (currently ${existing.status}).`);
+  }
+
+  return asUser(actor.userId, async (tx) => {
+    const [row] = await tx
+      .update(courseOffering)
+      .set({ status: "DRAFT" })
+      .where(eq(courseOffering.id, offeringId))
+      .returning();
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "OFFERING_REINSTATED",
+      entityType: "course_offering",
+      entityId: offeringId,
+      oldValue: { status: "CANCELLED" },
+      newValue: { status: "DRAFT" },
+    });
+    return row;
+  });
+}
+
+/**
+ * Move a timetable slot to a different time or room, keeping its days.
+ *
+ * A slot is one room and one time that an offering meets at, and the table
+ * shows it as a single row however many days it covers -- "MWF 11:00-12:00
+ * in PAPE 1" is three meeting rows behind one line. Until now the only
+ * controls were Add and Remove, so changing 11:00 to 12:00 meant adding a
+ * second slot and then deleting the first; do only the first half and the
+ * offering appears twice, which is exactly what it looks like: a duplicate.
+ *
+ * Days are deliberately not editable here. Changing which days a class
+ * meets is adding and removing slots, which the existing controls already
+ * do; changing when it meets is one edit, and that is what this is.
+ */
+export async function rescheduleMeetings(
+  actor: Actor,
+  meetingIds: string[],
+  input: { startTime: string; endTime: string; room?: string },
+) {
+  await assertCan(actor, "offering.manage");
+  if (meetingIds.length === 0) throw new ValidationError("No meeting selected.");
+
+  const meetings = await db.query.offeringMeeting.findMany({ where: inArray(offeringMeeting.id, meetingIds) });
+  if (meetings.length !== meetingIds.length) throw new ValidationError("Meeting not found.");
+
+  const offeringIds = [...new Set(meetings.map((m) => m.offeringId))];
+  if (offeringIds.length !== 1) throw new ValidationError("Those meetings belong to different offerings.");
+
+  const offering = await db.query.courseOffering.findFirst({ where: eq(courseOffering.id, offeringIds[0]) });
+  if (!offering) throw new ValidationError("Offering not found.");
+  await assertSemesterEditable(offering.semesterId);
+
+  if (timeToMinutes(input.endTime) <= timeToMinutes(input.startTime)) {
+    throw new ValidationError("End time must be after start time.");
+  }
+  if (!isRoom(input.room?.trim() ?? "")) throw new ValidationError("Choose a room.");
+
+  // The offering's OTHER slots are what this could now collide with -- the
+  // ones being moved cannot clash with themselves.
+  const others = (
+    await db.query.offeringMeeting.findMany({ where: eq(offeringMeeting.offeringId, offering.id) })
+  ).filter((m) => !meetingIds.includes(m.id));
+  for (const moving of meetings) {
+    const candidate = { dayOfWeek: moving.dayOfWeek, startTime: input.startTime, endTime: input.endTime };
+    const conflict = others.find((m) => meetingsOverlap(candidate, m));
+    if (conflict) {
+      throw new ValidationError(
+        `That time overlaps another meeting for this offering (day ${conflict.dayOfWeek}, ${conflict.startTime}-${conflict.endTime}).`,
+      );
+    }
+  }
+
+  return asUser(actor.userId, async (tx) => {
+    await tx
+      .update(offeringMeeting)
+      .set({ startTime: input.startTime, endTime: input.endTime, room: input.room?.trim() || null })
+      .where(inArray(offeringMeeting.id, meetingIds));
+
+    if (offering.status === "PUBLISHED") {
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "OFFERING_MEETING_CHANGED",
+        entityType: "course_offering",
+        entityId: offering.id,
+        oldValue: meetings.map((m) => ({ dayOfWeek: m.dayOfWeek, startTime: m.startTime, endTime: m.endTime, room: m.room })),
+        newValue: { startTime: input.startTime, endTime: input.endTime, room: input.room?.trim() || null },
+        reason: "Meeting time changed after publication.",
+      });
+    }
   });
 }
 

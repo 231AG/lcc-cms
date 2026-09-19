@@ -19,3 +19,23 @@ export function formatCourseCode(code: string): string {
   const match = /^([A-Za-z]+)\s*(\d.*)$/.exec(trimmed);
   return match ? `${match[1]} ${match[2]}` : trimmed;
 }
+
+/**
+ * The form of a course code used for MATCHING -- lowercase, with every space
+ * removed. Never displayed.
+ *
+ * "CECS 201", "cecs201" and "CECS  201" are the same course to a person, and
+ * a person typing a code into a search box or a prerequisite form has no way
+ * of knowing which spelling the database happens to hold. Comparing the
+ * stored text directly meant the spelling had to be guessed exactly: a
+ * course stored as "CECS201" could not be found by typing "CECS 201", and
+ * the screen reported "No course with the code" -- which reads as "this
+ * course does not exist" rather than "you put a space in".
+ *
+ * Display is the other half of the same problem and is handled by
+ * formatCourseCode: everything is SHOWN spaced and MATCHED unspaced, so what
+ * a reader sees can always be typed back in.
+ */
+export function courseCodeKey(code: string): string {
+  return code.replace(/\s+/g, "").toLowerCase();
+}

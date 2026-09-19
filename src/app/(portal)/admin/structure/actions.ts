@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { courseCodeKey } from "@/lib/courses/courseCode";
 import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
 import {
@@ -168,7 +169,11 @@ async function resolveCourseByCode(code: string) {
   const { db } = await import("@/lib/db/client");
   const { course } = await import("@/lib/db/schema");
   const { sql } = await import("drizzle-orm");
-  return db.query.course.findFirst({ where: sql`lower(trim(${course.code})) = lower(trim(${code}))` });
+  // Space-insensitive, so a prerequisite typed as "CECS 201" finds a course
+  // stored as "CECS201" -- see courseCodeKey.
+  return db.query.course.findFirst({
+    where: sql`replace(lower(${course.code}), ' ', '') = ${courseCodeKey(code)}`,
+  });
 }
 
 export async function addPrerequisiteAction(formData: FormData): Promise<void> {
