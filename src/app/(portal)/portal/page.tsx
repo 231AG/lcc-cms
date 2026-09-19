@@ -15,6 +15,7 @@ import { getGradeSheet, trimCredits } from "@/lib/gradesheet/gradeSheet";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
 import { getStudentStatistics, type StudentStatistics } from "@/lib/dashboard/statistics";
+import { Building2, CalendarDays, UserCheck, Users } from "lucide-react";
 import { BarList, ColumnChart, StatTile, StatusBarList } from "@/components/charts/Charts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
@@ -137,7 +138,7 @@ export default async function PortalPage({
             : null;
 
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 outline-none sm:py-12">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
         <PageHeader
           title={
             <>
@@ -396,7 +397,7 @@ export default async function PortalPage({
     const nothingWaiting = summary.submissionsAwaitingApproval === 0 && summary.correctionsAwaitingDecision === 0;
 
     return (
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 outline-none sm:py-12">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
         <PageHeader title="Super Admin home" description={`Signed in as ${actor.displayName}.`} />
 
         <StatisticsSection stats={stats} semesterCount={summary.semesterStates.length} />
@@ -454,7 +455,7 @@ export default async function PortalPage({
     summary.plansAwaitingApproval === 0 && summary.classesNotYetSubmitted === 0 && summary.rejectedGradesNeedingRework === 0;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 outline-none sm:py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 outline-none sm:py-12">
       <PageHeader title="Admin home" description={`Signed in as ${actor.displayName}.`} />
 
       <StatisticsSection stats={stats} />
@@ -529,17 +530,26 @@ export default async function PortalPage({
 function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics; semesterCount?: number }) {
   return (
     <>
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Total students" value={stats.total} />
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile label="Total students" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
         <StatTile
           label="Active"
           value={stats.byStatus.find((s) => s.label === "ACTIVE")?.count ?? 0}
           hint={stats.total > 0 ? `${Math.round(((stats.byStatus.find((s) => s.label === "ACTIVE")?.count ?? 0) / stats.total) * 100)}% of all students` : undefined}
+          icon={<UserCheck className="h-5 w-5" />}
+          tone="success"
         />
-        <StatTile label="Colleges represented" value={stats.byCollege.length} />
+        <StatTile
+          label="Colleges represented"
+          value={stats.byCollege.length}
+          icon={<Building2 className="h-5 w-5" />}
+          tone="info"
+        />
         <StatTile
           label={semesterCount === undefined ? "Enrolment years" : "Semesters"}
           value={semesterCount ?? stats.byEnrolmentYear.length}
+          icon={<CalendarDays className="h-5 w-5" />}
+          tone="accent"
         />
       </div>
 

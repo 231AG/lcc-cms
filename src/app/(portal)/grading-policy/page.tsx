@@ -25,7 +25,7 @@ export default async function GradingPolicyPage() {
   const policy = await getGradingPolicy(actor);
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <PageHeader title="Grading policy" description={`Active grade scale (policy version ${policy.activeVersion}).`} />
 
       <Card className="mb-8">

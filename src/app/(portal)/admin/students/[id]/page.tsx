@@ -199,7 +199,7 @@ export default async function StudentDetailPage({
   const collegeLabel = collegeRecord?.name ?? "—";
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 outline-none sm:py-10">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 outline-none sm:py-10">
       <Breadcrumb
         items={[
           { label: "Home", href: "/portal" },
