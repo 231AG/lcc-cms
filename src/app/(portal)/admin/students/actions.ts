@@ -11,6 +11,7 @@ import {
   type StudentGender,
   type StudentStatus,
 } from "@/lib/students/students";
+import { removeStudentPhoto, setStudentPhoto } from "@/lib/students/photo";
 
 export interface EnrollStudentState {
   error?: string;
@@ -104,5 +105,54 @@ export async function updateStudentProfileAction(formData: FormData): Promise<vo
     }
     throw err;
   }
+  redirect(`/admin/students/${studentId}`);
+}
+
+/**
+ * Upload or replace a student's photograph.
+ *
+ * The file arrives as a `File` inside the FormData -- Next parses the
+ * multipart body itself, so there is no upload library here. The bytes are
+ * read in full before anything else happens, which is fine at a 2 MB cap
+ * and is what lets the service sniff the real format rather than trusting
+ * the browser's guess at it.
+ */
+export async function uploadStudentPhotoAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const studentId = String(formData.get("studentId") ?? "");
+  const file = formData.get("photo");
+
+  const fail = (message: string) => redirect(`/admin/students/${studentId}?error=${encodeURIComponent(message)}`);
+
+  if (!(file instanceof File) || file.size === 0) fail("Choose an image file first.");
+  const upload = file as File;
+
+  try {
+    const bytes = new Uint8Array(await upload.arrayBuffer());
+    await setStudentPhoto(actor, studentId, bytes, upload.type || undefined);
+  } catch (err) {
+    if (err instanceof AppError) fail(err.message);
+    throw err;
+  }
+  // The <img> points at a route whose response is cached for five minutes,
+  // so re-rendering the page alone would show the old photo. Revalidating
+  // is still right for the rest of the page; the cache-buster on the src is
+  // what actually refreshes the image.
+  revalidatePath(`/admin/students/${studentId}`);
+  redirect(`/admin/students/${studentId}`);
+}
+
+export async function removeStudentPhotoAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const studentId = String(formData.get("studentId") ?? "");
+  try {
+    await removeStudentPhoto(actor, studentId);
+  } catch (err) {
+    if (err instanceof AppError) {
+      redirect(`/admin/students/${studentId}?error=${encodeURIComponent(err.message)}`);
+    }
+    throw err;
+  }
+  revalidatePath(`/admin/students/${studentId}`);
   redirect(`/admin/students/${studentId}`);
 }

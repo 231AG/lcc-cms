@@ -124,6 +124,60 @@ function shortTime(value: string): string {
   return value.slice(0, 5);
 }
 
+export interface MeetingSlot {
+  room: string;
+  start: string;
+  end: string;
+  days: number[];
+  ids: string[];
+}
+
+/**
+ * One offering's meetings, grouped into timetable slots: same room, same
+ * start, same end. A course taught Monday, Wednesday and Friday at 11 in
+ * PAPE 1 is ONE slot with three days, not three rows saying the same thing.
+ *
+ * Insertion order is preserved by Map and the meetings arrive already
+ * sorted by day then start time, so a slot's days come out in week order
+ * without a second sort.
+ *
+ * Extracted from buildOfferingRows below, which is where this logic lived
+ * and still uses it -- the student's own screens need the same grouping to
+ * show "when and where", and two copies would be two things to keep in
+ * step.
+ */
+export function groupMeetingSlots(
+  meetings: readonly { id: string; dayOfWeek: number; startTime: string; endTime: string; room: string | null }[],
+): MeetingSlot[] {
+  const slots = new Map<string, MeetingSlot>();
+  for (const meeting of meetings) {
+    const start = shortTime(meeting.startTime);
+    const end = shortTime(meeting.endTime);
+    const room = meeting.room ?? "";
+    const key = `${room}|${start}|${end}`;
+    const slot = slots.get(key) ?? { room, start, end, days: [], ids: [] };
+    slot.days.push(meeting.dayOfWeek);
+    slot.ids.push(meeting.id);
+    slots.set(key, slot);
+  }
+  return [...slots.values()];
+}
+
+/**
+ * The same slots as one human line each: "MWF 11:00-12:00 - PAPE 1".
+ *
+ * Returns an empty array when nothing is scheduled, so a caller renders
+ * nothing rather than an empty-looking "TBA" it has no basis for.
+ */
+export function formatMeetingSlots(
+  meetings: readonly { id: string; dayOfWeek: number; startTime: string; endTime: string; room: string | null }[],
+): string[] {
+  return groupMeetingSlots(meetings).map((slot) => {
+    const when = `${formatDays(slot.days)} ${slot.start}\u2013${slot.end}`.trim();
+    return slot.room ? `${when} \u00b7 ${slot.room}` : when;
+  });
+}
+
 /**
  * The full day names behind whatever `formatDays` produced, for a tooltip.
  *
@@ -261,23 +315,7 @@ export async function getOfferingRows(actor: Actor, semesterId: string): Promise
       continue;
     }
 
-    // Group the offering's meetings into timetable slots: same room, same
-    // start, same end. Insertion order is preserved by Map, and the meetings
-    // arrive already sorted by day then start time, so a slot's days come out
-    // in week order without a second sort.
-    const slots = new Map<string, { room: string; start: string; end: string; days: number[]; ids: string[] }>();
-    for (const meeting of meetings) {
-      const start = shortTime(meeting.startTime);
-      const end = shortTime(meeting.endTime);
-      const room = meeting.room ?? "";
-      const key = `${room}|${start}|${end}`;
-      const slot = slots.get(key) ?? { room, start, end, days: [], ids: [] };
-      slot.days.push(meeting.dayOfWeek);
-      slot.ids.push(meeting.id);
-      slots.set(key, slot);
-    }
-
-    for (const slot of slots.values()) {
+    for (const slot of groupMeetingSlots(meetings)) {
       rows.push({
         ...base,
         room: slot.room,

@@ -51,17 +51,53 @@
   var preference = stored();
   if (preference) root.dataset.theme = preference;
 
-  // Collapsed is opt-in and desktop-only; below lg the CSS ignores it and
-  // uses the off-canvas drawer instead, so it is safe to apply unconditionally.
+  // Collapsed is desktop-only; below lg the CSS ignores it and uses the
+  // off-canvas drawer instead, so it is safe to apply unconditionally.
+  //
+  // A stored choice always wins. With NO stored choice, the rail starts
+  // collapsed between lg and xl: at 1024-1279px the full 16rem rail takes a
+  // quarter of the window away from the table the person came to read,
+  // which is why the design reference calls that width "compact sidebar".
+  // From 1280px up there is room for both, so it starts expanded. This is
+  // a default, not a rule -- one click changes it and the choice is then
+  // remembered, and it is only ever read at load, so resizing a window
+  // mid-session never overrides what somebody just chose.
+  var sidebarChoice = null;
   try {
-    if (localStorage.getItem(SIDEBAR_KEY) === "collapsed") root.dataset.sidebar = "collapsed";
+    sidebarChoice = localStorage.getItem(SIDEBAR_KEY);
   } catch {
-    // Storage unavailable: the sidebar just starts expanded.
+    // Storage unavailable: fall through to the width-based default.
   }
+  var railCollapsed =
+    sidebarChoice === "collapsed" ||
+    (sidebarChoice !== "expanded" && window.matchMedia("(min-width: 1024px) and (max-width: 1279px)").matches);
+  if (railCollapsed) root.dataset.sidebar = "collapsed";
 
   function setExpanded(selector, expanded) {
     var controls = document.querySelectorAll(selector);
     for (var i = 0; i < controls.length; i++) controls[i].setAttribute("aria-expanded", String(expanded));
+  }
+
+  // The toggle is server-rendered as aria-expanded="true", which was a lie
+  // for anyone whose rail started collapsed -- the button announced
+  // "expanded" beside a narrow rail until the first click corrected it.
+  //
+  // Deferred, unlike the dataset write above: this script is a blocking
+  // <script> placed BEFORE the app markup (it has to be, or the collapsed
+  // width arrives a paint too late), so the button does not exist yet. The
+  // attribute is corrected as soon as the document is parsed.
+  if (railCollapsed) {
+    if (document.readyState === "loading") {
+      document.addEventListener(
+        "DOMContentLoaded",
+        function () {
+          setExpanded("[data-sidebar-toggle]", false);
+        },
+        { once: true },
+      );
+    } else {
+      setExpanded("[data-sidebar-toggle]", false);
+    }
   }
 
   function closeDrawer() {

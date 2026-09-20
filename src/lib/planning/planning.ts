@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, type Tx } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
 import {
@@ -442,7 +442,40 @@ export async function getOrCreateDraftPlan(actor: Actor, semesterId: string, for
  * registered, so they are locked one at a time by assertItemNotRegistered
  * rather than by locking the whole plan.
  */
-const EDITABLE_PLAN_STATUSES = new Set(["DRAFT", "REJECTED", "PARTIALLY_APPROVED"]);
+const EDITABLE_PLAN_STATUSES = new Set(["DRAFT", "SUBMITTED", "REJECTED", "PARTIALLY_APPROVED"]);
+
+/**
+ * Takes a plan that is not a DRAFT back to one, so it can be edited.
+ *
+ * SUBMITTED is in the set above as of this change, which retires the
+ * withdraw-first step: a student no longer has to find a button called
+ * "Withdraw for editing" before they may change a plan nobody has
+ * approved. They edit, and this runs on the first change.
+ *
+ * DEC-35 froze a submitted plan so a student could not alter one an Admin
+ * was mid-review on, and that guarantee is kept rather than dropped: the
+ * plan leaves the review queue in the SAME TRANSACTION as the edit, so
+ * there is no moment where a queued plan is changing. What is gone is only
+ * the manual step, not the invariant.
+ *
+ * Audited, because this is a real state change that removes a plan from
+ * somebody's work queue -- doing it silently as a side effect of adding a
+ * course is how a Registrar ends up unable to explain where a plan went.
+ */
+async function reopenForEditing(tx: Tx, actor: Actor, plan: { id: string; status: string; studentId: string }) {
+  if (plan.status === "DRAFT") return;
+  await tx.update(coursePlan).set({ status: "DRAFT", submittedAt: null }).where(eq(coursePlan.id, plan.id));
+  await auditWrite(tx, {
+    actorUserId: actor.userId,
+    actorRole: actor.role,
+    action: "COURSE_PLAN_REOPENED",
+    entityType: "course_plan",
+    entityId: plan.id,
+    studentId: plan.studentId,
+    oldValue: { status: plan.status },
+    newValue: { status: "DRAFT", reason: "EDITED_BY_OWNER" },
+  });
+}
 
 /** Loads a plan that the actor may edit -- their own, or (Admin, DEV-20) a
  * student's that they are entering on that student's behalf. */
@@ -468,12 +501,11 @@ export async function addPlanItem(actor: Actor, planId: string, offeringId: stri
     if (!offering) throw new ValidationError("Offering not found.");
     if (offering.semesterId !== plan.semesterId) throw new ValidationError("That offering does not belong to this plan's semester.");
 
-    // Adding a course to a decided plan hands it back to the student. The
-    // decisions already made on the courses inside it are untouched --
-    // submitPlan is where a refused course is put up for review again.
-    if (plan.status !== "DRAFT") {
-      await tx.update(coursePlan).set({ status: "DRAFT" }).where(eq(coursePlan.id, planId));
-    }
+    // Adding a course to a submitted or decided plan hands it back to the
+    // student. The decisions already made on the courses inside it are
+    // untouched -- submitPlan is where a refused course is put up for
+    // review again.
+    await reopenForEditing(tx, actor, plan);
 
     try {
       const [row] = await tx
@@ -502,8 +534,11 @@ export async function removePlanItem(actor: Actor, planItemId: string) {
   return db.transaction(async (tx) => {
     const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
     if (!item) throw new ValidationError("Plan item not found.");
-    await loadEditablePlan(tx, actor, item.planId);
+    const { plan } = await loadEditablePlan(tx, actor, item.planId);
     assertItemNotRegistered(item);
+    // Same reason as adding: a plan that is changing must not still be in
+    // the review queue while it changes.
+    await reopenForEditing(tx, actor, plan);
     await tx.delete(coursePlanItem).where(eq(coursePlanItem.id, planItemId));
   });
 }
@@ -512,8 +547,9 @@ export async function setPlanItemRetake(actor: Actor, planItemId: string, isReta
   return db.transaction(async (tx) => {
     const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
     if (!item) throw new ValidationError("Plan item not found.");
-    await loadEditablePlan(tx, actor, item.planId);
+    const { plan } = await loadEditablePlan(tx, actor, item.planId);
     assertItemNotRegistered(item);
+    await reopenForEditing(tx, actor, plan);
     const [row] = await tx.update(coursePlanItem).set({ isRetake }).where(eq(coursePlanItem.id, planItemId)).returning();
     return row;
   });
@@ -541,62 +577,20 @@ export async function deleteDraftPlan(actor: Actor, planId: string) {
   });
 }
 
-/**
- * Takes a SUBMITTED plan back to DRAFT so its owner can change it.
- *
- * DEC-35 froze a submitted plan precisely so a student could not alter one
- * an Admin was mid-review on. The owner asked for submitted plans to be
- * editable again; this is the shape they chose, and it keeps DEC-35's
- * actual guarantee rather than dropping it: the plan leaves the review
- * queue BEFORE it can change, so no Admin is ever looking at a plan that
- * is moving under them. The student re-submits when they are done.
- *
- * Refused once any individual course has been decided. At that point the
- * Admin is not merely holding the plan, they are working through it, and an
- * APPROVED item already has a registration behind it -- withdrawing would
- * either strand that registration or silently revoke a decision somebody
- * made. Neither is something a student's edit should do.
- */
-export async function withdrawPlan(actor: Actor, planId: string) {
-  return db.transaction(async (tx) => {
-    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
-    if (!plan) throw new ValidationError("Plan not found.");
-    await authorizePlanSubject(actor, plan.studentId);
-    if (plan.status !== "SUBMITTED") {
-      throw new StateError(`Only a submitted plan can be withdrawn (currently ${plan.status}).`);
-    }
-    await assertSemesterOpenForRegistration(tx, plan.semesterId);
+/* withdrawPlan() stood here: the explicit "take my plan back out of the
+   queue" step a student had to take before they could edit a SUBMITTED
+   plan. That step is gone -- reopenForEditing() above does the same thing
+   as part of the edit itself -- which left this function with no caller
+   and no test, so it is removed rather than kept as a second, unexercised
+   way into the same state change.
 
-    const decided = await tx.query.coursePlanItem.findMany({
-      where: and(eq(coursePlanItem.planId, planId), ne(coursePlanItem.status, "PENDING")),
-    });
-    if (decided.length > 0) {
-      throw new StateError(
-        "This plan is already being reviewed course by course and can no longer be withdrawn. " +
-          "Wait for the decision, then revise it if it is rejected.",
-      );
-    }
+   DEC-35's actual guarantee is unchanged and is documented on
+   reopenForEditing: a plan leaves the review queue before it changes, in
+   the same transaction, so no Admin ever reads a plan that is moving.
 
-    const [row] = await tx
-      .update(coursePlan)
-      .set({ status: "DRAFT", submittedAt: null })
-      .where(eq(coursePlan.id, planId))
-      .returning();
-
-    await auditWrite(tx, {
-      actorUserId: actor.userId,
-      actorRole: actor.role,
-      action: "COURSE_PLAN_WITHDRAWN",
-      entityType: "course_plan",
-      entityId: planId,
-      studentId: plan.studentId,
-      oldValue: { status: "SUBMITTED" },
-      newValue: { status: "DRAFT" },
-    });
-
-    return row;
-  });
-}
+   The COURSE_PLAN_WITHDRAWN audit action is deliberately NOT removed --
+   rows written by this function still exist in the log and still have to
+   be readable. New departures from the queue are COURSE_PLAN_REOPENED. */
 
 export interface SubmitPlanResult {
   plan: typeof coursePlan.$inferSelect;

@@ -31,7 +31,21 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
        what axe's scrollable-region-focusable catches on a narrow viewport.
        role="group" with a name keeps it from announcing as an unlabelled
        focusable div. */
-    <div className="overflow-x-auto" tabIndex={0} role="group" aria-label="Table, scrollable">
+    /* `contain: paint` alongside overflow-x-auto, not decoration: without
+       it a wide border-collapse table's overflow is still counted by
+       document.scrollWidth even though the scroller clips it visually, so
+       the whole PAGE gains a horizontal scrollbar on a phone -- 644px wide
+       at a 390px viewport on the student detail screen. Measured, not
+       guessed: of overflow-hidden on the card, max-width on the table and
+       overflow-x-hidden on the grid, this is the only one that actually
+       moved the number. Safe here because nothing in any table in this app
+       is position:sticky or escapes its wrapper. */
+    <div
+      className="[contain:paint] overflow-x-auto"
+      tabIndex={0}
+      role="group"
+      aria-label="Table, scrollable"
+    >
       <table className={cn("w-full border-collapse text-sm", className)} {...props} />
     </div>
   );

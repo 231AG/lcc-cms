@@ -326,6 +326,19 @@
   /* Deep Orchid -> Lavender Haze. Reserved for hero/major brand moments; kept
      deliberately more contained (and darker) on dark so no large saturated
      purple area dominates the interface. */
+  /* The soft banner behind a welcome heading -- a wash, not a fill. Kept at
+     the opacity of a tint so dark text sits on it at full contrast and it
+     never competes with the card below it. Orchid at both ends with a Honey
+     centre, so it is this College's two colours rather than a generic pastel.
+     On dark the same three stops at a fraction of the alpha, because a pale
+     band is exactly the bright slab the dark palette avoids. */
+  --gradient-welcome: linear-gradient(
+    105deg,
+    light-dark(rgba(147, 44, 204, 0.12), rgba(147, 44, 204, 0.22)) 0%,
+    light-dark(rgba(245, 190, 60, 0.13), rgba(245, 190, 60, 0.08)) 52%,
+    light-dark(rgba(183, 109, 247, 0.16), rgba(183, 109, 247, 0.16)) 100%
+  );
+
   --gradient-brand: linear-gradient(
     100deg,
     light-dark(var(--orchid-800), var(--orchid-900)) 0%,
@@ -498,6 +511,51 @@ h1 {
   min-height: 100vh;
 }
 
+/* The rail is its own scrollport, pinned to the viewport.
+   Without this the aside simply grows to fit its items, the grid row grows
+   with it, and the PAGE scrolls: on a 950px-tall screen the Admin nav made
+   the document 1155px, so scrolling to the foot of a long table carried
+   the College seal and every nav item off the top of the window. Now the
+   brand and the footer stay put and only the list between them moves. */
+@media (min-width: 1024px) {
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* The rail is exactly one viewport tall and sticky, so scrolling keeps it
+     in front of you and the column behind it is never visible. It IS
+     visible in a full-page screenshot, though, where the capture is taller
+     than the viewport and the rail stops partway down -- which reads as a
+     nav that gives up halfway.
+
+     This paints the grid's first column for the whole document height, in
+     the colour the rail's gradient ENDS on, so what continues below the
+     rail is the shade it was already fading into. A grid item placed in the
+     same cell, before the <aside> in paint order, so the rail draws over
+     it. */
+  .app-shell::before {
+    content: "";
+    grid-area: 1 / 1;
+    background: var(--orchid-600);
+  }
+
+  /* Both real children need explicit placement now. The ::before is the
+     first grid item, so without this the aside auto-places into column 2
+     and the main content is pushed onto a second row -- which turned a
+     1096px document into a 3242px one the first time this was tried. */
+  .app-sidebar {
+    grid-area: 1 / 1;
+  }
+
+  .app-main {
+    grid-area: 1 / 2;
+  }
+}
+
 html[data-sidebar="collapsed"] .app-shell {
   grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
 }
@@ -509,15 +567,58 @@ html[data-sidebar="collapsed"] .app-shell {
 }
 
 /* The label text and anything else that only makes sense at full width.
-   Collapsed, the rail keeps the icons and the accessible names (which live
-   in an sr-only span), so the nav is still fully usable by keyboard and by
-   a screen reader at either width. */
+   `display: none` hides these from assistive tech as well as from view, so
+   the rail's links do NOT get their accessible names from here -- each one
+   carries an explicit aria-label (SidebarLink, AppSidebar) that is the same
+   string at both widths. The nav stays fully usable by keyboard and by a
+   screen reader either way. */
 html[data-sidebar="collapsed"] .sidebar-full-only {
   display: none;
 }
 
 html[data-sidebar="collapsed"] .sidebar-rail-center {
   justify-content: center;
+}
+
+/* The mirror of .sidebar-full-only: something that exists ONLY in the
+   collapsed rail. Used for the rules between groups, which do the job the
+   group headings do at full width -- collapsed, the headings are gone and
+   without them thirteen icons read as one undifferentiated column. */
+.sidebar-rail-only {
+  display: none;
+}
+
+html[data-sidebar="collapsed"] .sidebar-rail-only {
+  display: block;
+}
+
+/* Collapsed, a nav item becomes a square centred in the rail rather than a
+   full-width pill with an icon pushed to one end of it. */
+html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
+  width: 2.75rem;
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
+/* The nav's own scrollbar sits on a deep purple ground, where a default
+   one is a bright grey slab. Thin and tinted, and it costs nothing in
+   browsers that ignore it. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.22);
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Below lg the sidebar stops being a column and becomes an overlay drawer,
@@ -545,6 +646,16 @@ html[data-sidebar="collapsed"] .sidebar-rail-center {
   /* Collapsed is a desktop-only idea; in the drawer it is always full. */
   html[data-sidebar="collapsed"] .sidebar-full-only {
     display: revert;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar-rail-only {
+    display: none;
+  }
+
+  html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
+    width: auto;
+    margin-inline: 0;
+    padding-inline: 0.75rem;
   }
 
   .app-scrim {
@@ -590,6 +701,10 @@ html[data-sidebar="collapsed"] .sidebar-rail-center {
   background-image: var(--gradient-brand);
 }
 
+.bg-gradient-welcome {
+  background-image: var(--gradient-welcome);
+}
+
 /* Soft brand glow behind the chromeless screens. Gradients aren't colours, so
    this is a plain class rather than a Tailwind colour utility. */
 .screen-glow {
@@ -632,6 +747,14 @@ html[data-sidebar="collapsed"] .sidebar-rail-center {
 
 :root[data-enhanced] .enhance-only {
   display: inline-flex;
+}
+
+/* The mirror image: a control that exists only because scripts may be off.
+   The photo upload submits itself the moment a file is chosen, which needs
+   JavaScript -- so an explicit Upload button is rendered for the case where
+   that never runs, and removed when it does. */
+:root[data-enhanced] .no-enhance-only {
+  display: none;
 }
 
 /* Show/hide password: `aria-pressed` is the single source of truth for the

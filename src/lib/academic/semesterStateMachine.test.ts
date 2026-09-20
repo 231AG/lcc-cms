@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   SEMESTER_STATES,
   findTransitionRule,
+  pickCurrentSemester,
+  pickPlanningSemester,
   isDeletable,
   isGradeEntryOpen,
   isOfferingEditable,
@@ -124,5 +126,59 @@ describe("capability-by-state", () => {
   it("seals only a Closed semester, and allows deletion only of a Draft", () => {
     expect(SEMESTER_STATES.filter(isSealed)).toEqual(["CLOSED"]);
     expect(SEMESTER_STATES.filter(isDeletable)).toEqual(["DRAFT"]);
+  });
+});
+
+describe("picking the current semester", () => {
+  // The shape of the real bug: four semesters OPEN at once with identical
+  // start dates. The dashboard sorted and the planning page used an
+  // unordered .find(), so the status line described one plan and the
+  // button beside it opened a different, empty semester.
+  const tied = [
+    { id: "c", state: "OPEN", startDate: "2026-09-01" },
+    { id: "a", state: "OPEN", startDate: "2026-09-01" },
+    { id: "b", state: "OPEN", startDate: "2026-09-01" },
+  ];
+
+  it("returns the same semester whatever order the rows arrive in", () => {
+    // An unordered .find() answers "c" here and "b" on the reversed list,
+    // which is the whole defect; both must answer "c".
+    expect(pickPlanningSemester(tied)?.id).toBe("c");
+    expect(pickPlanningSemester([...tied].reverse())?.id).toBe("c");
+    expect(pickCurrentSemester(tied)?.id).toBe("c");
+    expect(pickCurrentSemester([...tied].reverse())?.id).toBe("c");
+  });
+
+  it("does not mutate the array it was given", () => {
+    const rows = [...tied];
+    pickPlanningSemester(rows);
+    expect(rows.map((s) => s.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("prefers the newest start date over the id tiebreak", () => {
+    const rows = [
+      { id: "zzz", state: "OPEN", startDate: "2025-09-01" },
+      { id: "aaa", state: "OPEN", startDate: "2027-01-15" },
+    ];
+    expect(pickPlanningSemester(rows)?.id).toBe("aaa");
+  });
+
+  it("only planning-open semesters count as planning semesters", () => {
+    const rows = [
+      { id: "draft", state: "DRAFT", startDate: "2028-09-01" },
+      { id: "running", state: "IN_PROGRESS", startDate: "2027-09-01" },
+      { id: "open", state: "OPEN", startDate: "2026-09-01" },
+    ];
+    expect(pickPlanningSemester(rows)?.id).toBe("open");
+    // The current semester is the wider question -- a term that is running
+    // still has a plan worth looking at.
+    expect(pickCurrentSemester(rows)?.id).toBe("running");
+  });
+
+  it("returns undefined when nothing qualifies", () => {
+    const rows = [{ id: "closed", state: "CLOSED", startDate: "2025-09-01" }];
+    expect(pickPlanningSemester(rows)).toBeUndefined();
+    expect(pickCurrentSemester(rows)).toBeUndefined();
+    expect(pickPlanningSemester([])).toBeUndefined();
   });
 });

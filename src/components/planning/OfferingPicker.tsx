@@ -141,7 +141,7 @@ export function OfferingPicker({
                   {o.instructorName ? ` — ${o.instructorName}` : ""}
                 </p>
                 {already ? (
-                  <span className="text-xs text-fg-subtle">Already in this plan</span>
+                  <span className="text-fg-muted text-xs">Already in this plan</span>
                 ) : (
                   <form action={addAction}>
                     {Object.entries(addHiddenFields).map(([name, value]) => (
