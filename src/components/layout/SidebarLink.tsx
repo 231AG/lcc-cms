@@ -53,6 +53,12 @@ export function SidebarLink({
     <Link
       href={href}
       aria-current={isCurrent ? "page" : undefined}
+      // The label span below is display:none in the collapsed rail, which
+      // removes it from the accessible name as well as from view. `title`
+      // was carrying the name on its own there -- a documented fallback,
+      // but the weakest one there is. An explicit label is the same string
+      // at both widths and does not depend on CSS.
+      aria-label={label}
       title={label}
       className={cn(
         "sidebar-rail-center focus-visible:outline-focus-ring group flex items-center gap-3 rounded-lg px-3 py-2.5",
@@ -63,9 +69,10 @@ export function SidebarLink({
       )}
     >
       {children}
-      {/* Hidden by CSS when the rail is collapsed, but never removed: the
-          accessible name has to survive at both widths, and `title` alone
-          is not a reliable one. */}
+      {/* The visible label. `display:none` in the collapsed rail, which
+          takes it out of the accessible name too -- which is exactly why
+          the aria-label above exists rather than this span being trusted
+          to carry the name at both widths. */}
       <span className="sidebar-full-only truncate">{label}</span>
     </Link>
   );

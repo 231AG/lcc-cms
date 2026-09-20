@@ -511,6 +511,22 @@ h1 {
   min-height: 100vh;
 }
 
+/* The rail is its own scrollport, pinned to the viewport.
+   Without this the aside simply grows to fit its items, the grid row grows
+   with it, and the PAGE scrolls: on a 950px-tall screen the Admin nav made
+   the document 1155px, so scrolling to the foot of a long table carried
+   the College seal and every nav item off the top of the window. Now the
+   brand and the footer stay put and only the list between them moves. */
+@media (min-width: 1024px) {
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+  }
+}
+
 html[data-sidebar="collapsed"] .app-shell {
   grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
 }
@@ -522,15 +538,58 @@ html[data-sidebar="collapsed"] .app-shell {
 }
 
 /* The label text and anything else that only makes sense at full width.
-   Collapsed, the rail keeps the icons and the accessible names (which live
-   in an sr-only span), so the nav is still fully usable by keyboard and by
-   a screen reader at either width. */
+   `display: none` hides these from assistive tech as well as from view, so
+   the rail's links do NOT get their accessible names from here -- each one
+   carries an explicit aria-label (SidebarLink, AppSidebar) that is the same
+   string at both widths. The nav stays fully usable by keyboard and by a
+   screen reader either way. */
 html[data-sidebar="collapsed"] .sidebar-full-only {
   display: none;
 }
 
 html[data-sidebar="collapsed"] .sidebar-rail-center {
   justify-content: center;
+}
+
+/* The mirror of .sidebar-full-only: something that exists ONLY in the
+   collapsed rail. Used for the rules between groups, which do the job the
+   group headings do at full width -- collapsed, the headings are gone and
+   without them thirteen icons read as one undifferentiated column. */
+.sidebar-rail-only {
+  display: none;
+}
+
+html[data-sidebar="collapsed"] .sidebar-rail-only {
+  display: block;
+}
+
+/* Collapsed, a nav item becomes a square centred in the rail rather than a
+   full-width pill with an icon pushed to one end of it. */
+html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
+  width: 2.75rem;
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
+/* The nav's own scrollbar sits on a deep purple ground, where a default
+   one is a bright grey slab. Thin and tinted, and it costs nothing in
+   browsers that ignore it. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.22);
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Below lg the sidebar stops being a column and becomes an overlay drawer,
@@ -558,6 +617,16 @@ html[data-sidebar="collapsed"] .sidebar-rail-center {
   /* Collapsed is a desktop-only idea; in the drawer it is always full. */
   html[data-sidebar="collapsed"] .sidebar-full-only {
     display: revert;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar-rail-only {
+    display: none;
+  }
+
+  html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
+    width: auto;
+    margin-inline: 0;
+    padding-inline: 0.75rem;
   }
 
   .app-scrim {
