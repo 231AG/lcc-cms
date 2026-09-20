@@ -21,14 +21,33 @@ import { cn } from "@/components/ui/cn";
  * a function cannot cross the server/client boundary as a prop -- passing
  * the element keeps the icon server-rendered and this component a leaf.
  */
-export function SidebarLink({ href, label, children }: { href: string; label: string; children: ReactNode }) {
+export function SidebarLink({
+  href,
+  label,
+  siblings,
+  children,
+}: {
+  href: string;
+  label: string;
+  /** Every href in this role's navigation, so the longest match can win. */
+  siblings: readonly string[];
+  children: ReactNode;
+}) {
   const pathname = usePathname();
 
   // Current when it IS the page, or when the page sits under it, so
   // /admin/students/<id> keeps "Student Listing" marked. The trailing slash
   // matters: without it "/admin/student-plan" would also light up
   // "/admin/students".
-  const isCurrent = pathname === href || pathname.startsWith(`${href}/`);
+  const matches = (candidate: string) => pathname === candidate || pathname.startsWith(`${candidate}/`);
+
+  // ...but only the MOST specific match, because a nav item can now be the
+  // parent of another one: "/portal" is an ancestor of "/portal/grades", and
+  // a plain prefix test lights up Dashboard and My grades together on the
+  // grades page. Longest wins, which needs no per-item flag and stays right
+  // as pages are added underneath an existing item.
+  const isCurrent =
+    matches(href) && !siblings.some((other) => other !== href && other.length > href.length && matches(other));
 
   return (
     <Link

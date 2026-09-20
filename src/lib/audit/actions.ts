@@ -71,6 +71,12 @@ export const AUDIT_ACTIONS = [
   // so they can change it. Recorded because it removes work an Admin may
   // already have open in front of them.
   "COURSE_PLAN_WITHDRAWN",
+  // The same departure from the queue, but as a side effect of the student
+  // editing rather than an explicit withdrawal. Its own name so the two are
+  // distinguishable in the log: one is "I changed my mind about submitting",
+  // the other is "I changed the plan". An Admin whose queue item vanished
+  // needs to be able to tell which.
+  "COURSE_PLAN_REOPENED",
   "COURSE_PLAN_ITEM_APPROVED",
   "COURSE_PLAN_ITEM_REJECTED",
   "PREREQUISITE_OVERRIDDEN",
@@ -93,6 +99,12 @@ export const AUDIT_ACTIONS = [
   // The Student ID moving, recorded separately from a general profile
   // edit because it also changes how the student signs in.
   "STUDENT_NUMBER_CHANGED",
+  // Photographs. Separate from STUDENT_UPDATED because the payload of a
+  // profile edit is the fields that changed, and an image has no useful
+  // before/after to record there -- these carry the format and size only.
+  "STUDENT_PHOTO_UPLOADED",
+  "STUDENT_PHOTO_REPLACED",
+  "STUDENT_PHOTO_REMOVED",
   "COURSE_CREDIT_HOURS_CHANGED",
   "PREREQUISITE_ADDED",
   "PREREQUISITE_REMOVED",

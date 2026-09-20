@@ -1,4 +1,4 @@
-import { text, integer, timestamp, uuid, index, check } from "drizzle-orm/pg-core";
+import { text, integer, timestamp, uuid, index, check, customType } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { appSchema } from "./app";
 import { appUser } from "./identity";
@@ -61,5 +61,48 @@ export const student = appSchema.table(
       "student_import_status_valid",
       sql`${table.historicalImportStatus} IN ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETE')`,
     ),
+  ],
+);
+
+/**
+ * Postgres `bytea` as a Node Buffer. Drizzle has no first-class bytea type,
+ * and the alternative -- base64 in a text column -- costs a third more
+ * storage and a decode on every read for nothing.
+ */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+/**
+ * One student's photograph, as bytes (migration 0028).
+ *
+ * Its own table rather than columns on `student` above, because Drizzle's
+ * relational queries select every column of the table they read -- a bytea
+ * on `student` would drag image data into the Student Listing, the CSV
+ * export and every enrolment lookup. Nothing reads this table except the
+ * serve route and the two screens that show a photo.
+ *
+ * `byteSize` is redundant with `octet_length(data)` and stored anyway: a
+ * CHECK keeps the two equal, so the serve route can set Content-Length
+ * without pulling the blob to measure it.
+ */
+export const studentPhoto = appSchema.table(
+  "student_photo",
+  {
+    studentId: uuid("student_id")
+      .primaryKey()
+      .references(() => student.id, { onDelete: "restrict" }),
+    contentType: text("content_type").notNull(), // image/jpeg | image/png | image/webp
+    byteSize: integer("byte_size").notNull(),
+    data: bytea("data").notNull(),
+    uploadedBy: uuid("uploaded_by")
+      .notNull()
+      .references(() => appUser.id, { onDelete: "restrict" }),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("student_photo_content_type_valid", sql`${table.contentType} IN ('image/jpeg', 'image/png', 'image/webp')`),
+    check("student_photo_size_valid", sql`${table.byteSize} > 0 AND ${table.byteSize} <= 2097152`),
+    check("student_photo_size_matches_data", sql`${table.byteSize} = octet_length(${table.data})`),
   ],
 );

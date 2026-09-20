@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
   appUser,
+  auditLog,
   academicYear,
   college as collegeTable,
   course,
@@ -117,6 +118,15 @@ async function planPartlyApproved() {
   await rejectPlanItem(admin(), first.id, "Clashes with your other class.");
   await approvePlan(admin(), plan.id);
   return { student, planId: plan.id, rejectedItemId: first.id };
+}
+
+/** One course planned and submitted; nobody has looked at it yet. */
+async function planAwaitingDecision() {
+  const student = await newStudent();
+  const plan = await getOrCreateDraftPlan(student, semesterId);
+  await addPlanItem(student, plan.id, offeringAId);
+  await submitPlan(student, plan.id);
+  return { student, planId: plan.id };
 }
 
 describe("revising a plan the Registrar turned down", () => {
@@ -256,4 +266,90 @@ describe("revising a plan the Registrar turned down", () => {
     // not tell them their own seat is taken.
     await expect(submitPlan(student, plan.id)).resolves.toBeTruthy();
   });
+
+  // ---------------------------------------------------------------------
+  // Editing a plan that is merely waiting, with no withdraw step first
+  // ---------------------------------------------------------------------
+
+  it("lets the student add a course to a submitted plan without withdrawing it first", async () => {
+    const { student, planId } = await planAwaitingDecision();
+    expect((await planOf(planId))!.status).toBe("SUBMITTED");
+
+    // No revisePlan, no withdrawPlan -- straight to the edit.
+    await addPlanItem(student, planId, offeringBId);
+
+    // The edit took it out of the queue in the same transaction, so no
+    // Admin is ever reading a plan that is changing.
+    const plan = (await planOf(planId))!;
+    expect(plan.status).toBe("DRAFT");
+    expect(plan.submittedAt).toBeNull();
+    expect(await itemsOf(planId)).toHaveLength(2);
+  });
+
+  it("lets the student remove a course from a submitted plan, and reopens it", async () => {
+    const { student, planId } = await planAwaitingDecision();
+    await addPlanItem(student, planId, offeringBId);
+    await submitPlan(student, planId);
+    expect((await planOf(planId))!.status).toBe("SUBMITTED");
+
+    const [first] = await itemsOf(planId);
+    await removePlanItem(student, first.id);
+
+    expect((await planOf(planId))!.status).toBe("DRAFT");
+    expect(await itemsOf(planId)).toHaveLength(1);
+  });
+
+  it("records the reopen in the audit log, distinctly from a withdrawal", async () => {
+    const { student, planId } = await planAwaitingDecision();
+    await addPlanItem(student, planId, offeringBId);
+
+    const entries = await db.query.auditLog.findMany({
+      where: and(eq(auditLog.entityType, "course_plan"), eq(auditLog.entityId, planId)),
+    });
+    const reopened = entries.find((e) => e.action === "COURSE_PLAN_REOPENED");
+    // An Admin whose queue item vanished has to be able to find out why.
+    expect(reopened).toBeTruthy();
+    expect(reopened!.actorUserId).toBe(student.userId);
+    expect(reopened!.oldValue).toMatchObject({ status: "SUBMITTED" });
+    expect(reopened!.newValue).toMatchObject({ status: "DRAFT" });
+    expect(entries.some((e) => e.action === "COURSE_PLAN_WITHDRAWN")).toBe(false);
+  });
+
+  it("reopens only once across several edits in a row", async () => {
+    const { student, planId } = await planAwaitingDecision();
+    await addPlanItem(student, planId, offeringBId);
+    const [first] = await itemsOf(planId);
+    await removePlanItem(student, first.id);
+
+    // The second and third edits act on a plan that is already a DRAFT, so
+    // they must not each write another "it left the queue" record.
+    const entries = await db.query.auditLog.findMany({
+      where: and(eq(auditLog.entityType, "course_plan"), eq(auditLog.entityId, planId)),
+    });
+    expect(entries.filter((e) => e.action === "COURSE_PLAN_REOPENED")).toHaveLength(1);
+  });
+
+  it("goes edit -> resubmit -> approve without the student ever withdrawing", async () => {
+    const { student, planId } = await planAwaitingDecision();
+    await addPlanItem(student, planId, offeringBId);
+    await submitPlan(student, planId);
+
+    const plan = (await planOf(planId))!;
+    expect(plan.status).toBe("SUBMITTED");
+    expect(plan.submittedAt).not.toBeNull();
+    expect((await itemsOf(planId)).every((i) => i.status === "PENDING")).toBe(true);
+
+    await approvePlan(admin(), planId);
+    expect((await planOf(planId))!.status).toBe("APPROVED");
+  });
+
+  it("still refuses to edit a plan once it is fully approved", async () => {
+    const { student, planId } = await planAwaitingDecision();
+    await approvePlan(admin(), planId);
+    expect((await planOf(planId))!.status).toBe("APPROVED");
+
+    // Editable means "not yet approved" -- it does not mean "always".
+    await expect(addPlanItem(student, planId, offeringBId)).rejects.toThrow(StateError);
+  });
 });
+

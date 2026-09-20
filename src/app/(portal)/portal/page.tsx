@@ -7,6 +7,7 @@ import { semesterDisplayName, semesterFullLabel } from "@/lib/academic/semesterN
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
 import { fullName } from "@/lib/students/name";
 import { getStudent } from "@/lib/students/students";
+import { getStudentPhotoMeta } from "@/lib/students/photo";
 import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
@@ -33,6 +34,7 @@ import { BarList, ColumnChart, StatTile, StatusBarList } from "@/components/char
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { RecordPanel } from "@/components/ui/RecordPanel";
+import { StudentAvatar } from "@/components/ui/StudentAvatar";
 import { Alert } from "@/components/ui/Alert";
 import { SemesterResultsPicker, SemesterResultsTable } from "@/components/grades/SemesterResults";
 import { buttonClasses } from "@/components/ui/Button";
@@ -149,6 +151,8 @@ export default async function PortalPage({
     // semesters may share a start date, and two independent picks over the
     // same tie is exactly how the status line below came to describe one
     // semester while the button beside it opened another.
+    const photoMeta = await getStudentPhotoMeta(actor, record.id);
+
     const currentSemester = pickCurrentSemester(semesters);
     const currentSemesterLabel = currentSemester ? semesterInfo(currentSemester.id)?.label : null;
 
@@ -267,20 +271,39 @@ export default async function PortalPage({
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
         <Breadcrumb items={[{ label: "Student profile" }]} />
-        <PageHeader
-          title={
-            <span className="inline-flex flex-wrap items-center gap-3">
-              {fullName(record)}
-              <Badge tone={record.status === "ACTIVE" ? "success" : "neutral"}>{record.status}</Badge>
-            </span>
-          }
-          description={`Student ID ${record.studentNumber}`}
-          actions={
-            <p className="text-brand-fg border-accent hidden border-b-2 pb-1 text-sm font-semibold italic sm:block">
-              Building Character &middot; Shaping Tomorrow
-            </p>
-          }
-        />
+        {/* The photograph appears HERE and nowhere else in the app. Not in
+            the Student Listing, not in the plan-review queue, not in any
+            table: a column of faces makes a dense table slower to scan, and
+            those tables are how the office actually works. This is the one
+            screen that is about a person rather than about their records.
+            Uploading is the Admin office's job -- there is no control here,
+            only the result. */}
+        <div className="mb-6 flex items-start gap-5 print:hidden">
+          <StudentAvatar
+            studentId={record.id}
+            name={fullName(record)}
+            hasPhoto={!!photoMeta}
+            version={photoMeta?.uploadedAt.getTime()}
+            size="lg"
+          />
+          <div className="min-w-0 flex-1">
+            <PageHeader
+              className="mb-0"
+              title={
+                <span className="inline-flex flex-wrap items-center gap-3">
+                  {fullName(record)}
+                  <Badge tone={record.status === "ACTIVE" ? "success" : "neutral"}>{record.status}</Badge>
+                </span>
+              }
+              description={`Student ID ${record.studentNumber}`}
+              actions={
+                <p className="text-brand-fg border-accent hidden border-b-2 pb-1 text-sm font-semibold italic sm:block">
+                  Building Character &middot; Shaping Tomorrow
+                </p>
+              }
+            />
+          </div>
+        </div>
 
         {/* The same four facts the definition list carried, one card each
             as the design reference lays them out. Still a <dl> inside each:

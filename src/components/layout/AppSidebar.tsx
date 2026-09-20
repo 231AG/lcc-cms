@@ -27,6 +27,9 @@ import { SidebarLink } from "./SidebarLink";
  */
 export function AppSidebar({ actor }: { actor: Actor }) {
   const groups = navGroupsForRole(actor.role);
+  // Flattened once here rather than per link: SidebarLink needs the whole
+  // set to decide which of several matching items is the specific one.
+  const allHrefs = groups.flatMap((group) => group.links.map((link) => link.href));
 
   return (
     <aside
@@ -69,7 +72,7 @@ export function AppSidebar({ actor }: { actor: Actor }) {
               </p>
             )}
             {group.links.map(({ href, label, icon: Icon }) => (
-              <SidebarLink key={href} href={href} label={label}>
+              <SidebarLink key={href} href={href} label={label} siblings={allHrefs}>
                 <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
               </SidebarLink>
             ))}

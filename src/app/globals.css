@@ -326,6 +326,19 @@
   /* Deep Orchid -> Lavender Haze. Reserved for hero/major brand moments; kept
      deliberately more contained (and darker) on dark so no large saturated
      purple area dominates the interface. */
+  /* The soft banner behind a welcome heading -- a wash, not a fill. Kept at
+     the opacity of a tint so dark text sits on it at full contrast and it
+     never competes with the card below it. Orchid at both ends with a Honey
+     centre, so it is this College's two colours rather than a generic pastel.
+     On dark the same three stops at a fraction of the alpha, because a pale
+     band is exactly the bright slab the dark palette avoids. */
+  --gradient-welcome: linear-gradient(
+    105deg,
+    light-dark(rgba(147, 44, 204, 0.12), rgba(147, 44, 204, 0.22)) 0%,
+    light-dark(rgba(245, 190, 60, 0.13), rgba(245, 190, 60, 0.08)) 52%,
+    light-dark(rgba(183, 109, 247, 0.16), rgba(183, 109, 247, 0.16)) 100%
+  );
+
   --gradient-brand: linear-gradient(
     100deg,
     light-dark(var(--orchid-800), var(--orchid-900)) 0%,
@@ -590,6 +603,10 @@ html[data-sidebar="collapsed"] .sidebar-rail-center {
   background-image: var(--gradient-brand);
 }
 
+.bg-gradient-welcome {
+  background-image: var(--gradient-welcome);
+}
+
 /* Soft brand glow behind the chromeless screens. Gradients aren't colours, so
    this is a plain class rather than a Tailwind colour utility. */
 .screen-glow {
@@ -632,6 +649,14 @@ html[data-sidebar="collapsed"] .sidebar-rail-center {
 
 :root[data-enhanced] .enhance-only {
   display: inline-flex;
+}
+
+/* The mirror image: a control that exists only because scripts may be off.
+   The photo upload submits itself the moment a file is chosen, which needs
+   JavaScript -- so an explicit Upload button is rendered for the case where
+   that never runs, and removed when it does. */
+:root[data-enhanced] .no-enhance-only {
+  display: none;
 }
 
 /* Show/hide password: `aria-pressed` is the single source of truth for the

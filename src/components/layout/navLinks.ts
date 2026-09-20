@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  LayoutDashboard,
   CalendarDays,
   CheckCheck,
   ClipboardCheck,
@@ -38,6 +39,17 @@ export interface NavGroup {
 }
 
 /**
+ * Every role's first item. The dashboard was reachable only by clicking
+ * the College seal, which is a convention people know from other apps but
+ * nothing on the screen actually says. One named item, same place in every
+ * role's sidebar.
+ */
+const DASHBOARD: NavGroup = {
+  label: "",
+  links: [{ href: "/portal", label: "Dashboard", icon: LayoutDashboard }],
+};
+
+/**
  * Single source of truth for role-based navigation, used by the
  * persistent header (src/components/layout/Header.tsx). Same routes,
  * same items, same permissions per role as before this grouping pass
@@ -45,6 +57,7 @@ export interface NavGroup {
  * confirmed with the project owner before building it this way.
  */
 export const STUDENT_GROUPS: NavGroup[] = [
+  DASHBOARD,
   {
     label: "",
     links: [
@@ -60,6 +73,7 @@ export const STUDENT_GROUPS: NavGroup[] = [
 ];
 
 export const ADMIN_GROUPS: NavGroup[] = [
+  DASHBOARD,
   {
     label: "Students",
     links: [
@@ -98,6 +112,7 @@ export const ADMIN_GROUPS: NavGroup[] = [
 ];
 
 export const SUPER_ADMIN_GROUPS: NavGroup[] = [
+  DASHBOARD,
   {
     label: "Accounts",
     links: [

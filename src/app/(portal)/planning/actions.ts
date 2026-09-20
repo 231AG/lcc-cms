@@ -8,9 +8,7 @@ import {
   deleteDraftPlan,
   getOrCreateDraftPlan,
   removePlanItem,
-  revisePlan,
   submitPlan,
-  withdrawPlan,
 } from "@/lib/planning/planning";
 
 /**
@@ -82,32 +80,16 @@ export async function submitPlanAction(formData: FormData): Promise<void> {
   redirect(listUrl(formData));
 }
 
-/** Pulls a submitted plan back out of the review queue so it can be edited
- *  again. See withdrawPlan for why this is a deliberate step rather than
- *  something an edit does silently. */
-export async function withdrawPlanAction(formData: FormData): Promise<void> {
-  const actor = await requireActor();
-  const planId = String(formData.get("planId") ?? "");
-  try {
-    await withdrawPlan(actor, planId);
-  } catch (err) {
-    if (err instanceof AppError) errorRedirect(formData, err.message);
-    throw err;
-  }
-  redirect(listUrl(formData));
-}
+/* withdrawPlanAction and revisePlanAction lived here until editing a
+   submitted plan stopped requiring a separate "take it back first" step.
+   Both are gone rather than left unreferenced: a server action is a real
+   HTTP endpoint whether or not a form points at it, and an endpoint nobody
+   calls is one nobody is watching either.
 
-export async function revisePlanAction(formData: FormData): Promise<void> {
-  const actor = await requireActor();
-  const planId = String(formData.get("planId") ?? "");
-  try {
-    await revisePlan(actor, planId);
-  } catch (err) {
-    if (err instanceof AppError) errorRedirect(formData, err.message);
-    throw err;
-  }
-  redirect(listUrl(formData));
-}
+   revisePlan() is kept in the service layer: it is the tested description
+   of reopening a DECIDED plan and it has a dozen cases behind it.
+   withdrawPlan() is not -- it had no caller and no test once this changed,
+   so it is gone. reopenForEditing() does that job from inside an edit. */
 
 export async function deleteDraftPlanAction(formData: FormData): Promise<void> {
   const actor = await requireActor();

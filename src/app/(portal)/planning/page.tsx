@@ -13,14 +13,14 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Label, Select } from "@/components/ui/Form";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
+import { ClipboardList, Lock, Send, Trash2 } from "lucide-react";
 import { OfferingPicker } from "@/components/planning/OfferingPicker";
+import { PlanCourseRow, PlanEmpty, PlanStatusBanner, type PlanState } from "@/components/planning/PlanPieces";
 import {
   startPlanAction,
   addPlanItemAction,
   removePlanItemAction,
   submitPlanAction,
-  withdrawPlanAction,
-  revisePlanAction,
   deleteDraftPlanAction,
 } from "./actions";
 
@@ -113,8 +113,11 @@ export default async function PlanningPage({
   const items = plan ? await getPlanItems(actor, plan.id) : [];
   // A partly-approved plan is still the student's to work on: the courses
   // that were refused are the reason they came back.
-  const isEditable =
-    planningOpenHere && (!plan || plan.status === "DRAFT" || plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED");
+  // SUBMITTED is editable as of this change: a plan nobody has approved is
+  // still the student's, and the first edit takes it out of the review
+  // queue by itself (see reopenForEditing in planning.ts). APPROVED is the
+  // only state that locks, because its courses are registered.
+  const isEditable = planningOpenHere && (!plan || plan.status !== "APPROVED");
   const hasRegisteredItems = items.some((i) => i.status === "APPROVED");
 
   const registrations =
@@ -137,6 +140,30 @@ export default async function PlanningPage({
   const offeringById = new Map([...availableOfferings, ...referencedOfferings].map((o) => [o.id, o]));
 
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
+  const registeredRegistrations = registrations.filter((r) => r.status === "REGISTERED");
+  const approvedCount = items.filter((i) => i.status === "APPROVED").length;
+  const rejectedCount = items.filter((i) => i.status === "REJECTED").length;
+  const pendingCount = items.filter((i) => i.status === "PENDING").length;
+  /** One course's row props, so the editor and the read-only views cannot
+   *  describe the same course differently. */
+  const rowFor = (i: (typeof items)[number]) => {
+    const c = courseFor(i.courseId);
+    const o = offeringById.get(i.offeringId);
+    return {
+      code: c?.code ?? "—",
+      title: c?.title ?? i.courseId,
+      meta: [o?.section ? `Section ${o.section}` : null, o ? `${o.frozenCreditHours} credit hours` : null, i.isRetake ? "Retake" : null].filter(
+        (x): x is string => !!x,
+      ),
+      state: i.status as "PENDING" | "APPROVED" | "REJECTED",
+      note:
+        i.status === "REJECTED" && i.rejectionReason
+          ? i.rejectionReason
+          : i.status === "APPROVED"
+            ? "Registered — ask the Registrar to drop it."
+            : undefined,
+    };
+  };
   const plannedOfferingIds = new Set(items.map((i) => i.offeringId));
   const totalCredits = items.reduce((sum, i) => sum + (offeringById.get(i.offeringId)?.frozenCreditHours ?? 0), 0);
 
@@ -211,95 +238,115 @@ export default async function PlanningPage({
         </form>
       )}
 
-      {plan && (plan.status === "DRAFT" || ((plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED") && planningOpenHere)) && (
+      {plan && isEditable && (
         <>
-          {(plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED") && (
-            <Card
-              className={
-                plan.status === "REJECTED" ? "mb-6 border-danger-line bg-danger-surface" : "mb-6 border-warning-line bg-warning-surface"
-              }
-            >
-              <CardBody>
-                {plan.status === "REJECTED" ? (
-                  <>
-                    <h2 className="mb-1 text-sm font-semibold text-danger-fg">Rejected</h2>
-                    <p className="mb-3 text-sm text-danger-fg">
-                      {plan.rejectionReason ?? "Every course in this plan was turned down."} Change the courses below and submit again.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h2 className="mb-1 text-sm font-semibold text-warning-fg">Partly approved</h2>
-                    <p className="mb-3 text-sm text-warning-fg">
-                      The approved courses are registered and cannot be changed here. Replace the ones that were turned down and submit
-                      again.
-                    </p>
-                  </>
-                )}
-                <form action={revisePlanAction}>
-                  {Object.entries(contextFields).map(([name, value]) => (
-                    <input key={name} type="hidden" name={name} value={value} />
-                  ))}
-                  <input type="hidden" name="planId" value={plan.id} />
-                  <Button type="submit" variant="secondary">
-                    Revise
-                  </Button>
-                </form>
-              </CardBody>
-            </Card>
-          )}
+          <PlanStatusBanner
+            state={plan.status as PlanState}
+            headline={
+              plan.status === "SUBMITTED"
+                ? "Your plan is with the Registrar"
+                : plan.status === "REJECTED"
+                  ? "Your plan was returned"
+                  : plan.status === "PARTIALLY_APPROVED"
+                    ? "Some courses were approved"
+                    : items.length === 0
+                      ? "Start building your plan"
+                      : "Your plan is a draft"
+            }
+            facts={[
+              { label: "Courses", value: String(items.length) },
+              { label: "Credit hours", value: String(totalCredits) },
+              ...(approvedCount > 0 ? [{ label: "Registered", value: String(approvedCount) }] : []),
+              ...(rejectedCount > 0 ? [{ label: "Turned down", value: String(rejectedCount) }] : []),
+              ...(plan.status === "SUBMITTED" && plan.submittedAt
+                ? [{ label: "Submitted", value: plan.submittedAt.toISOString().slice(0, 10) }]
+                : []),
+            ]}
+          >
+            {plan.status === "SUBMITTED" ? (
+              // The change this screen exists to communicate: waiting is no
+              // longer the same as frozen.
+              <>
+                {pendingCount === items.length
+                  ? "Nobody has decided on it yet."
+                  : "Some of it has been decided already."}{" "}
+                You can still change it — editing takes it out of the queue, and you submit again when you are ready.
+              </>
+            ) : plan.status === "REJECTED" ? (
+              <>
+                {plan.rejectionReason ?? "Every course in this plan was turned down."} Change the courses below and submit again.
+              </>
+            ) : plan.status === "PARTIALLY_APPROVED" ? (
+              <>The approved courses are registered and cannot be changed here. Replace the ones that were turned down and submit again.</>
+            ) : items.length === 0 ? (
+              <>Add courses from the catalogue below, then submit the plan for the Registrar to approve.</>
+            ) : (
+              <>Not submitted yet — add or remove courses, then submit when it is ready.</>
+            )}
+          </PlanStatusBanner>
 
           <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Your plan — {totalCredits} credit hours</CardTitle>
+            <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle icon={<ClipboardList className="h-4 w-4" aria-hidden="true" />}>Your plan</CardTitle>
+              <span className="text-fg-muted text-sm">
+                {items.length} {items.length === 1 ? "course" : "courses"} · {totalCredits} credit hours
+              </span>
             </CardHeader>
             <CardBody>
-              {items.length === 0 && <p className="mb-3 text-sm text-fg-muted">No courses added yet.</p>}
-              <ul className="mb-4 flex flex-col gap-2">
-                {items.map((i) => {
-                  const c = courseFor(i.courseId);
-                  const o = offeringById.get(i.offeringId);
-                  return (
-                    <li key={i.id} className="flex items-start justify-between gap-3 rounded-md border border-line px-3 py-2 text-sm">
-                      <span>
-                        {c ? `${c.code} — ${c.title}` : i.courseId} (Section {o?.section}){i.isRetake && " — retake"}
-                        {i.status === "REJECTED" && (
-                          <span className="mt-0.5 block text-xs text-danger-fg">
-                            Turned down{i.rejectionReason ? `: ${i.rejectionReason}` : ""}
+              {items.length === 0 ? (
+                <PlanEmpty>No courses yet. Pick them from the catalogue below.</PlanEmpty>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {items.map((i) => (
+                    <PlanCourseRow
+                      key={i.id}
+                      {...rowFor(i)}
+                      action={
+                        i.status === "APPROVED" ? (
+                          <span className="text-fg-muted inline-flex items-center gap-1 text-xs font-medium">
+                            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                            Locked
                           </span>
-                        )}
-                        {i.status === "APPROVED" && <span className="mt-0.5 block text-xs text-success-fg">Approved — registered</span>}
-                      </span>
-                      {i.status === "APPROVED" ? (
-                        <span className="shrink-0 text-xs text-fg-muted">Locked</span>
-                      ) : (
-                        <form action={removePlanItemAction}>
-                          {Object.entries(contextFields).map(([name, value]) => (
-                            <input key={name} type="hidden" name={name} value={value} />
-                          ))}
-                          <input type="hidden" name="planItemId" value={i.id} />
-                          <SubmitTextButton pendingLabel="Removing…" className="text-xs font-medium text-danger-fg hover:underline">
-                            Remove
-                          </SubmitTextButton>
-                        </form>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="flex items-center gap-3">
+                        ) : (
+                          <form action={removePlanItemAction}>
+                            {Object.entries(contextFields).map(([name, value]) => (
+                              <input key={name} type="hidden" name={name} value={value} />
+                            ))}
+                            <input type="hidden" name="planItemId" value={i.id} />
+                            <SubmitTextButton
+                              pendingLabel="Removing…"
+                              className="text-danger-fg inline-flex items-center gap-1 text-xs font-medium hover:underline"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Remove
+                            </SubmitTextButton>
+                          </form>
+                        )
+                      }
+                    />
+                  ))}
+                </ul>
+              )}
+
+              <div className="border-line-subtle mt-5 flex flex-wrap items-center gap-3 border-t pt-5">
                 <form action={submitPlanAction}>
                   {Object.entries(contextFields).map(([name, value]) => (
                     <input key={name} type="hidden" name={name} value={value} />
                   ))}
                   <input type="hidden" name="planId" value={plan.id} />
-                  <SubmitButton pendingLabel="Submitting…">Submit</SubmitButton>
+                  <SubmitButton pendingLabel="Submitting…">
+                    <Send className="h-4 w-4" aria-hidden="true" />
+                    {plan.status === "SUBMITTED" ? "Resubmit plan" : "Submit plan"}
+                  </SubmitButton>
                 </form>
-                {plan.status === "DRAFT" && !hasRegisteredItems && (
-                  <form action={deleteDraftPlanAction}>
+                {plan.status === "SUBMITTED" && (
+                  <p className="text-fg-muted text-xs">Already submitted — resubmit only if you change something.</p>
+                )}
+                {plan.status === "DRAFT" && !hasRegisteredItems && items.length > 0 && (
+                  <form action={deleteDraftPlanAction} className="ml-auto">
                     <input type="hidden" name="semesterId" value={semesterId} />
                     <input type="hidden" name="planId" value={plan.id} />
-                    <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
+                    <button type="submit" className="text-danger-fg text-xs font-medium hover:underline">
                       Delete plan
                     </button>
                   </form>
@@ -327,112 +374,91 @@ export default async function PlanningPage({
         </>
       )}
 
-      {plan && plan.status === "SUBMITTED" && (
-        <Card>
-          <CardBody>
-            <CardTitle className="mb-2">Submitted — awaiting a decision</CardTitle>
-            {/* The date only when there is one. It rendered as a stray
-                " ." on a row with no submitted_at, which is a sentence
-                claiming a submission date the record does not have. */}
-            <p className="mb-3 text-sm text-fg-muted">
-              {totalCredits} credit hours
-              {plan.submittedAt ? `, submitted ${plan.submittedAt.toISOString().slice(0, 10)}` : ""}.
-            </p>
-            {/* An empty list here used to render as a blank card, which
-                read as "nothing was ever planned" whatever the status
-                above said. If the rows are gone, say that. */}
-            {items.length === 0 ? (
-              <Alert tone="warning">
-                This plan has no courses in it. Please contact the Admin office — it cannot be approved as it stands.
-              </Alert>
-            ) : (
-              <ul className="flex flex-col gap-1 text-sm">
-                {items.map((i) => {
-                  const c = courseFor(i.courseId);
-                  return (
-                    <li key={i.id} className="flex items-center justify-between">
-                      <span>{c ? `${c.code} — ${c.title}` : i.courseId}</span>
-                      <span className="text-xs text-fg-muted">
-                        {i.status === "PENDING" ? "Awaiting decision" : i.status === "APPROVED" ? "Approved" : "Rejected"}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {/* Editing a submitted plan means taking it out of the queue
-                first, so nobody is reviewing a plan that is moving. Offered
-                only while every course is still undecided -- once an Admin
-                has started deciding, withdrawing would revoke a decision
-                that may already have created a registration. */}
-            {items.every((i) => i.status === "PENDING") && (
-              <form action={withdrawPlanAction} className="mt-4 border-t border-line pt-3">
-                <input type="hidden" name="planId" value={plan.id} />
-                <input type="hidden" name="semesterId" value={semesterId} />
-                <SubmitButton variant="ghost" pendingLabel="Withdrawing…">
-                  Withdraw for editing
-                </SubmitButton>
-                <p className="mt-2 text-xs text-fg-muted">
-                  Takes this plan back to draft so you can change it. You will need to submit it again.
-                </p>
-              </form>
-            )}
-          </CardBody>
-        </Card>
-      )}
-
       {plan && plan.status === "APPROVED" && (
-        <Card className="border-success-line bg-success-surface">
-          <CardBody>
-            <CardTitle className="mb-2 text-success-fg">Approved</CardTitle>
-            <p className="mb-3 text-sm text-success-fg">{totalCredits} credit hours registered.</p>
-            {registrations.filter((r) => r.status === "REGISTERED").length === 0 && (
-              <p className="text-sm text-success-fg">No registrations are recorded against this plan.</p>
-            )}
-            <ul className="flex flex-col gap-1 text-sm text-success-fg">
-              {registrations.filter((r) => r.status === "REGISTERED").map((r) => {
-                const o = offeringById.get(r.offeringId);
-                const c = o ? courseFor(o.courseId) : undefined;
-                return (
-                  <li key={r.id}>
-                    {c ? `${c.code} — ${c.title}` : r.offeringId}
-                    {r.isRetake && " — retake"}
-                  </li>
-                );
-              })}
-            </ul>
-          </CardBody>
-        </Card>
+        <>
+          <PlanStatusBanner
+            state="APPROVED"
+            headline="You are registered"
+            facts={[
+              { label: "Courses", value: String(registeredRegistrations.length) },
+              { label: "Credit hours", value: String(totalCredits) },
+            ]}
+          >
+            Every course in this plan was approved. Changes now go through the Registrar.
+          </PlanStatusBanner>
+
+          <Card>
+            <CardHeader>
+              <CardTitle icon={<ClipboardList className="h-4 w-4" aria-hidden="true" />}>Registered courses</CardTitle>
+            </CardHeader>
+            <CardBody>
+              {registeredRegistrations.length === 0 ? (
+                <PlanEmpty>No registrations are recorded against this plan.</PlanEmpty>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {registeredRegistrations.map((r) => {
+                    const o = offeringById.get(r.offeringId);
+                    const c = o ? courseFor(o.courseId) : undefined;
+                    return (
+                      <PlanCourseRow
+                        key={r.id}
+                        code={c?.code ?? "\u2014"}
+                        title={c?.title ?? r.offeringId}
+                        meta={[
+                          o?.section ? `Section ${o.section}` : null,
+                          o ? `${o.frozenCreditHours} credit hours` : null,
+                          r.isRetake ? "Retake" : null,
+                        ].filter((x): x is string => !!x)}
+                        state="APPROVED"
+                      />
+                    );
+                  })}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        </>
       )}
 
-      {plan && (plan.status === "PARTIALLY_APPROVED" || plan.status === "REJECTED") && !planningOpenHere && (
-        <Card className="border-warning-line bg-warning-surface">
-          <CardBody>
-            <h2 className="mb-2 text-sm font-semibold text-warning-fg">
-              {plan.status === "PARTIALLY_APPROVED" ? "Partially approved" : "Rejected"}
-            </h2>
-            <p className="mb-3 text-sm text-warning-fg">
-              Planning has closed for this semester, so this plan can no longer be changed. See the Registrar if you need to.
-            </p>
-            <ul className="flex flex-col gap-1 text-sm">
-              {items.map((i) => {
-                const c = courseFor(i.courseId);
-                return (
-                  <li key={i.id} className="flex items-center justify-between">
-                    <span className="text-warning-fg">{c ? `${c.code} — ${c.title}` : i.courseId}</span>
-                    {i.status === "APPROVED" ? (
-                      <span className="text-xs font-medium text-success-fg">Approved</span>
-                    ) : (
-                      <span className="text-xs font-medium text-danger-fg">Rejected{i.rejectionReason ? `: ${i.rejectionReason}` : ""}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </CardBody>
-        </Card>
+      {/* Planning has closed and the plan never reached APPROVED. Covers
+          SUBMITTED as well as the two decided states: once the semester
+          moves on, a plan still sitting in the queue is exactly as
+          unchangeable as one that was turned down, and it used to render
+          as a blank page because only the decided states had a branch. */}
+      {plan && !planningOpenHere && plan.status !== "APPROVED" && (
+        <>
+          <PlanStatusBanner
+            state={plan.status as PlanState}
+            headline="Planning has closed for this semester"
+            facts={[
+              { label: "Courses", value: String(items.length) },
+              { label: "Credit hours", value: String(totalCredits) },
+              ...(approvedCount > 0 ? [{ label: "Registered", value: String(approvedCount) }] : []),
+              ...(rejectedCount > 0 ? [{ label: "Turned down", value: String(rejectedCount) }] : []),
+            ]}
+          >
+            This plan can no longer be changed here. See the Registrar if you need to.
+          </PlanStatusBanner>
+
+          <Card>
+            <CardHeader>
+              <CardTitle icon={<ClipboardList className="h-4 w-4" aria-hidden="true" />}>Courses in this plan</CardTitle>
+            </CardHeader>
+            <CardBody>
+              {items.length === 0 ? (
+                <PlanEmpty>This plan has no courses in it. Please contact the Admin office.</PlanEmpty>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {items.map((i) => (
+                    <PlanCourseRow key={i.id} {...rowFor(i)} />
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        </>
       )}
+
     </main>
   );
 }

@@ -5,6 +5,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  Camera,
   ClipboardList,
   FileText,
   GraduationCap,
@@ -20,13 +21,15 @@ import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
-import { fullName, initials, listName } from "@/lib/students/name";
+import { getStudentPhotoMeta } from "@/lib/students/photo";
+import { fullName, listName } from "@/lib/students/name";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getPlansForStudent } from "@/lib/planning/planning";
 import { can } from "@/lib/permissions/kernel";
 import { NotFoundError } from "@/lib/errors";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { StudentAvatar } from "@/components/ui/StudentAvatar";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
@@ -34,7 +37,7 @@ import { Button, buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { GENDER_LABEL } from "@/lib/students/gender";
-import { updateStudentProfileAction } from "../actions";
+import { removeStudentPhotoAction, updateStudentProfileAction, uploadStudentPhotoAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
 
 const STANDING_LABEL: Record<string, string> = {
@@ -89,16 +92,27 @@ function Stat({
 }
 
 /** One label/value pair in the read-only profile view. */
+/**
+ * One labelled fact in the Profile card.
+ *
+ * The markup is a single `<div>` holding `<dt>` then `<dd>`, which is the
+ * one wrapper HTML permits inside a `<dl>`. It used to be a div containing
+ * an icon span AND a second div around the pair, so the `dt`/`dd` were two
+ * levels down with a non-div sibling -- invalid, and axe reported it as two
+ * serious violations (definition-list, dlitem) on every render of this page.
+ * The icon moved inside the `<dt>` beside the label it belongs to, which is
+ * also where it reads better: it labels the term, not the group.
+ */
 function Detail({ icon: Icon, label, children }: { icon: typeof Award; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-brand-fg">
-        <Icon className="h-4 w-4" aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <dt className="text-xs tracking-wide text-fg-muted uppercase">{label}</dt>
-        <dd className="text-sm font-medium break-words text-fg">{children}</dd>
-      </div>
+    <div className="min-w-0">
+      <dt className="text-fg-muted flex items-center gap-2 text-xs tracking-wide uppercase">
+        <span className="bg-brand-subtle text-brand-fg flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+        {label}
+      </dt>
+      <dd className="text-fg mt-1 pl-9 text-sm font-medium break-words">{children}</dd>
     </div>
   );
 }
@@ -181,6 +195,8 @@ export default async function StudentDetailPage({
     return c ? `${c.code} — ${c.title}` : courseId;
   };
 
+  const photoMeta = await getStudentPhotoMeta(actor, record.id);
+
   const isAdmin = actor.role === "ADMIN";
   // View is read-only regardless of role; Edit is the pre-existing
   // editable form, still Admin-only. Super Admin reaching this page
@@ -212,13 +228,57 @@ export default async function StudentDetailPage({
           apply to them. */}
       <Card className="mb-6">
         <CardBody className="flex flex-wrap items-start justify-between gap-4 py-5">
-          <div className="flex items-center gap-4">
-            <span
-              aria-hidden="true"
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-subtle-strong text-lg font-semibold text-brand-fg"
-            >
-              {initials(record)}
-            </span>
+          <div className="flex items-start gap-4">
+            <div className="flex flex-col items-center gap-2">
+              <StudentAvatar
+                studentId={record.id}
+                name={fullName(record)}
+                hasPhoto={!!photoMeta}
+                version={photoMeta?.uploadedAt.getTime()}
+                size="md"
+              />
+              {/* The upload lives here, on the office's own screen, because
+                  a student's photograph is a record field like their name
+                  -- they do not edit those either. It is the only place in
+                  the app that writes one. */}
+              {isAdmin && (
+                <div className="flex flex-col items-center gap-1">
+                  <form action={uploadStudentPhotoAction} className="contents">
+                    <input type="hidden" name="studentId" value={record.id} />
+                    {/* The file input submits the form on change, so there
+                        is no second "now upload it" button to forget. */}
+                    <label className="text-brand-fg cursor-pointer text-xs font-semibold hover:underline">
+                      <Camera className="mr-1 inline h-3 w-3" aria-hidden="true" />
+                      {photoMeta ? "Replace photo" : "Add photo"}
+                      <input
+                        type="file"
+                        name="photo"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        data-auto-submit=""
+                      />
+                    </label>
+                    {/* Only rendered when enhance.js never ran -- then the
+                        change handler above does not exist and the file
+                        would sit there chosen but unsent. */}
+                    <button
+                      type="submit"
+                      className="no-enhance-only text-brand-fg block text-xs font-semibold hover:underline"
+                    >
+                      Upload
+                    </button>
+                  </form>
+                  {photoMeta && (
+                    <form action={removeStudentPhotoAction}>
+                      <input type="hidden" name="studentId" value={record.id} />
+                      <button type="submit" className="text-danger-fg text-xs font-medium hover:underline">
+                        Remove
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+            </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">
                 {fullName(record)}
@@ -304,9 +364,13 @@ export default async function StudentDetailPage({
         </Card>
       )}
 
+      {/* min-w-0 on both columns: a grid item defaults to min-width:auto, so
+          the Academic history table's own overflow-x-auto cannot contain it
+          and the whole page scrolls sideways instead -- 708px wide at a
+          390px viewport. Same fix as the student dashboard. */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left column: the profile record itself. */}
-        <div className="flex flex-col gap-6 lg:col-span-1">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-1">
           <Card>
             <CardHeader className="flex items-center justify-between gap-2">
               <CardTitle>Profile</CardTitle>
@@ -469,7 +533,7 @@ export default async function StudentDetailPage({
         </div>
 
         {/* Right column: the academic record. */}
-        <div className="flex flex-col gap-6 lg:col-span-2">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           {canReviewPlans && (
             <Card>
               <CardHeader className="flex items-center gap-2">

@@ -11,11 +11,13 @@ import {
   department as departmentTable,
   semester,
   student as studentTable,
+  studentPhoto,
 } from "@/lib/db/schema";
 import { getGradeSheet } from "@/lib/gradesheet/gradeSheet";
 import { getStudent } from "@/lib/students/students";
 import { getCumulativeSummary, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getStudentHistory } from "@/lib/historical/historical";
+import { getStudentPhoto, getStudentPhotoMeta } from "@/lib/students/photo";
 import type { Actor } from "@/lib/permissions/kernel";
 
 /**
@@ -81,6 +83,15 @@ describe("one student cannot read another student's records", () => {
     await db.insert(course).values({ id: COURSE, departmentId: DEPT, code: `SEC${COURSE.slice(0, 3)}`, title: "Isolation", creditHours: 3, isActive: true });
     await makeStudent(A, "Ama");
     await makeStudent(B, "Bea");
+
+    // A photograph each. Inserted through the raw connection rather than
+    // setStudentPhoto() on purpose: this suite is about what Postgres
+    // refuses to hand back, not about the upload path.
+    const pixel = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x01]);
+    await db.insert(studentPhoto).values([
+      { studentId: A, contentType: "image/jpeg", byteSize: pixel.length, data: pixel, uploadedBy: SUPER },
+      { studentId: B, contentType: "image/jpeg", byteSize: pixel.length, data: pixel, uploadedBy: SUPER },
+    ]);
   });
 
   it("the fixture is real: each student can read their OWN grade sheet", async () => {
@@ -111,10 +122,31 @@ describe("one student cannot read another student's records", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("a student can fetch their OWN photograph", async () => {
+    const own = await getStudentPhoto(actorOf(A), A);
+    expect(own).not.toBeNull();
+    expect(own!.contentType).toBe("image/jpeg");
+    expect(await getStudentPhotoMeta(actorOf(A), A)).not.toBeNull();
+  });
+
+  it("a student cannot fetch another student's photograph", async () => {
+    // The serve route has NO ownership check of its own -- it hands the
+    // id straight to this reader and 404s on null. So this assertion is
+    // the whole of what stops one student pulling another's face out of
+    // /api/students/<id>/photo by editing the URL.
+    expect(await getStudentPhoto(actorOf(A), B)).toBeNull();
+    expect(await getStudentPhotoMeta(actorOf(A), B)).toBeNull();
+  });
+
   it("RLS is the thing doing it: the raw connection sees both, asUser sees one", async () => {
     // Proves the test is not passing for some incidental reason -- the data
     // IS there, and only the downgraded connection is being stopped.
     const all = await db.query.academicRecord.findMany({ where: eq(academicRecord.semesterId, SEM) });
     expect(all.length).toBeGreaterThanOrEqual(2);
+
+    // Same for the photographs: both rows exist, and only the downgraded
+    // connection is being stopped from seeing the second one.
+    const photos = await db.query.studentPhoto.findMany();
+    expect(photos.filter((p) => p.studentId === A || p.studentId === B)).toHaveLength(2);
   });
 });
