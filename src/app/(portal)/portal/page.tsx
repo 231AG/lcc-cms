@@ -12,6 +12,8 @@ import { asUser } from "@/lib/db/asUser";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getMyPlan, getPlanItems } from "@/lib/planning/planning";
+import { getOfferingMeetingsForOfferings, getOfferingsByIds } from "@/lib/offerings/offerings";
+import { formatMeetingSlots } from "@/lib/offerings/offeringRows";
 import { getGradeSheet } from "@/lib/gradesheet/gradeSheet";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
 import { getStudentStatistics, type StudentStatistics } from "@/lib/dashboard/statistics";
@@ -161,6 +163,22 @@ export default async function PortalPage({
     const currentPlan = currentSemester ? await getMyPlan(actor, currentSemester.id) : null;
     // Only when a plan exists, so a student with none pays for nothing.
     const currentPlanItems = currentPlan ? await getPlanItems(actor, currentPlan.id) : [];
+
+    // This semester's timetable, for the card under the academic record.
+    // Only the courses that are actually approved and registered -- a
+    // pending one is not yet a class the student turns up to. Fetched only
+    // when there is at least one, so a student with no plan pays nothing.
+    const registeredItems = currentPlanItems.filter((i) => i.status === "APPROVED");
+    const registeredOfferingIds = registeredItems.map((i) => i.offeringId);
+    const [registeredOfferings, registeredMeetings, planCourses_] = registeredOfferingIds.length
+      ? await Promise.all([
+          getOfferingsByIds(actor, registeredOfferingIds),
+          getOfferingMeetingsForOfferings(actor, registeredOfferingIds),
+          asUser(actor.userId, (tx) => tx.query.course.findMany()),
+        ])
+      : [[], new Map(), []];
+    const offeringById = new Map(registeredOfferings.map((o) => [o.id, o]));
+    const courseById = new Map(planCourses_.map((c) => [c.id, c]));
 
     // S-04: one semester's results at a time, newest first, chosen with a
     // year and a semester. Both lists hold only what this student actually
@@ -349,7 +367,8 @@ export default async function PortalPage({
             made the document 572px wide and left the top bar ending
             mid-screen. */}
         <div className="mb-6 grid items-start gap-4 xl:grid-cols-5">
-        <Card className="min-w-0 xl:col-span-2">
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle icon={<Award className="h-4 w-4" aria-hidden="true" />}>Academic record</CardTitle>
           </CardHeader>
@@ -376,6 +395,54 @@ export default async function PortalPage({
             </dl>
           </CardBody>
         </Card>
+
+        {/* What the student is actually registered for this semester.
+            The left column ran out of content well before the results
+            table beside it did, leaving a column of empty page under the
+            record card. This is the obvious thing to put there: it is
+            about the semester the status line above is about, it is real
+            data already half-fetched for that line, and it answers "what
+            am I taking" without a trip to the planning screen. */}
+        {registeredItems.length > 0 && (
+          <Card className="min-w-0">
+            <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle icon={<ClipboardList className="h-4 w-4" aria-hidden="true" />}>This semester</CardTitle>
+              <span className="text-fg-muted text-sm">
+                {registeredItems.length} {registeredItems.length === 1 ? "course" : "courses"}
+              </span>
+            </CardHeader>
+            <CardBody>
+              <ul className="flex flex-col gap-2">
+                {registeredItems.map((i) => {
+                  const offering = offeringById.get(i.offeringId);
+                  const course = courseById.get(i.courseId);
+                  const when = formatMeetingSlots(registeredMeetings.get(i.offeringId) ?? []);
+                  const detail = [...when, offering ? `${offering.frozenCreditHours} credit hours` : null].filter(
+                    (x): x is string => !!x,
+                  );
+                  return (
+                    <li key={i.id} className="border-line-subtle bg-surface-subtle rounded-xl border px-3 py-2.5">
+                      <span className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="bg-brand-subtle text-brand-fg rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold">
+                          {course?.code ?? "—"}
+                        </span>
+                        <span className="text-fg min-w-0 text-sm font-semibold">{course?.title ?? i.courseId}</span>
+                      </span>
+                      {/* Only when there is something to say. A student
+                          reads offerings through RLS, which shows them only
+                          PUBLISHED ones -- so a course whose offering was
+                          later cancelled has no meeting times to show them,
+                          and an empty line under the title looks like a
+                          rendering fault rather than an absence. */}
+                      {detail.length > 0 && <span className="text-fg-muted mt-1 block text-xs">{detail.join(" \u00b7 ")}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardBody>
+          </Card>
+        )}
+        </div>
 
         {obligations.length > 0 && (
           <Card className="mb-6 min-w-0 border-warning-line bg-warning-surface xl:col-span-5">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  ArrowLeft,
   Award,
   BookMarked,
   BookOpen,
@@ -7,35 +8,38 @@ import {
   CalendarDays,
   Camera,
   ClipboardList,
-  FileText,
   GraduationCap,
   History,
   KeyRound,
   Pencil,
   Phone,
+  Printer,
   School,
   TrendingUp,
   UserRound,
 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
-import { semesterFullLabel } from "@/lib/academic/semesterName";
+import { semesterDisplayName, semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
 import { getStudentPhotoMeta } from "@/lib/students/photo";
+import { getGradeSheet } from "@/lib/gradesheet/gradeSheet";
 import { fullName, listName } from "@/lib/students/name";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { getPlansForStudent } from "@/lib/planning/planning";
+import { getOfferingMeetingsForOfferings, getOfferingsByIds } from "@/lib/offerings/offerings";
+import { formatMeetingSlots } from "@/lib/offerings/offeringRows";
 import { can } from "@/lib/permissions/kernel";
 import { NotFoundError } from "@/lib/errors";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { StudentAvatar } from "@/components/ui/StudentAvatar";
+import { SemesterResultsPicker, SemesterResultsTable } from "@/components/grades/SemesterResults";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
-import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { GENDER_LABEL } from "@/lib/students/gender";
 import { removeStudentPhotoAction, updateStudentProfileAction, uploadStudentPhotoAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
@@ -65,6 +69,21 @@ const PLAN_STATUS_TONE: Record<string, Tone> = {
   APPROVED: "success",
   REJECTED: "danger",
   PARTIALLY_APPROVED: "warning",
+};
+
+/** The decision on ONE course inside a plan, when it differs from the
+ *  plan's own. PENDING is the interesting case: the plan has been
+ *  submitted, this course has simply not been looked at yet. */
+const PLAN_ITEM_TONE: Record<string, Tone> = {
+  APPROVED: "success",
+  REJECTED: "danger",
+  PENDING: "info",
+};
+
+const ITEM_STATUS_LABEL: Record<string, string> = {
+  APPROVED: "Approved",
+  REJECTED: "Turned down",
+  PENDING: "Awaiting decision",
 };
 
 /** One figure with its label -- the four-up row under the profile header. */
@@ -136,11 +155,11 @@ export default async function StudentDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; mode?: string }>;
+  searchParams: Promise<{ error?: string; mode?: string; year?: string; semesterId?: string }>;
 }) {
   const actor = await getCurrentActor();
   const { id } = await params;
-  const { error, mode } = await searchParams;
+  const { error, mode, year: requestedYearId, semesterId: requestedSemesterId } = await searchParams;
 
   if (!actor)
     return (
@@ -194,8 +213,44 @@ export default async function StudentDetailPage({
     const c = courses.find((c) => c.id === courseId);
     return c ? `${c.code} — ${c.title}` : courseId;
   };
+  /** Year and sequence, for putting semesters in academic order. */
+  const semesterSortKey = (semesterId: string) => {
+    const sem = semesters.find((s) => s.id === semesterId);
+    const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
+    return sem && year
+      ? { yearStart: new Date(year.startDate).getFullYear(), sequence: sem.sequence as 1 | 2 }
+      : null;
+  };
+  const shortSemesterLabel = (semesterId: string) => {
+    const sem = semesters.find((s) => s.id === semesterId);
+    return sem ? semesterDisplayName(sem) : semesterId;
+  };
 
   const photoMeta = await getStudentPhotoMeta(actor, record.id);
+
+  // ONE semester of history at a time, chosen with a year and a semester --
+  // the same shape the student's own screens use. Every semester at once
+  // was a table that ran for two screens and pushed everything beside it
+  // into whitespace, and an Admin looking a student up is almost always
+  // after one term rather than the lot.
+  const historySemesterIds = [...new Set(history.map((r) => r.semesterId))].sort((a, b) => {
+    const ka = semesterSortKey(a);
+    const kb = semesterSortKey(b);
+    if (!ka || !kb) return 0;
+    return kb.yearStart - ka.yearStart || kb.sequence - ka.sequence;
+  });
+  const yearIdOf = (semesterId: string) => semesters.find((s) => s.id === semesterId)?.academicYearId;
+  const historyYearIds = [...new Set(historySemesterIds.map(yearIdOf).filter((id): id is string => !!id))];
+  const selectedYearId =
+    requestedYearId && historyYearIds.includes(requestedYearId) ? requestedYearId : historyYearIds[0];
+  const yearSemesterIds = historySemesterIds.filter((id) => yearIdOf(id) === selectedYearId);
+  const selectedSemesterId =
+    requestedSemesterId && yearSemesterIds.includes(requestedSemesterId) ? requestedSemesterId : yearSemesterIds[0];
+  // The same assembled figures the printed sheet uses, so this screen and
+  // the paper cannot disagree about a grade point or a total.
+  const sheet = selectedSemesterId ? await getGradeSheet(actor, record.id, selectedSemesterId) : null;
+  const selectedSummary = selectedSemesterId ? semesterSummaryFor(selectedSemesterId) : undefined;
+
 
   const isAdmin = actor.role === "ADMIN";
   // View is read-only regardless of role; Edit is the pre-existing
@@ -205,6 +260,14 @@ export default async function StudentDetailPage({
   const canEdit = isAdmin && mode !== "view";
   const canReviewPlans = isAdmin && (await can(actor, "planning.reviewPlan"));
   const plans = canReviewPlans ? await getPlansForStudent(actor, record.id) : [];
+
+  // When and where each planned course actually meets. One batched query
+  // for the offerings and one for their meetings, not a round trip per
+  // course -- the same pair the planning screens use.
+  const plannedOfferingIds = [...new Set(plans.flatMap((p) => p.items.map((i) => i.offeringId)))];
+  const plannedOfferings = await getOfferingsByIds(actor, plannedOfferingIds);
+  const plannedMeetings = await getOfferingMeetingsForOfferings(actor, plannedOfferingIds);
+  const offeringById = new Map(plannedOfferings.map((o) => [o.id, o]));
 
   // Department is the student's own field; the college is what the
   // Students listing now filters by, so both are shown here -- this page
@@ -308,7 +371,15 @@ export default async function StudentDetailPage({
                   Edit student
                 </Link>
               ))}
-            <Link href="/admin/students" className={buttonClasses("ghost", "md")}>
+            {/* Secondary rather than ghost, with the arrow the action is
+                actually named after. A ghost link beside a filled primary
+                read as disabled text, which is the opposite of what a way
+                back should look like. */}
+            <Link href="/admin/students" className={buttonClasses("secondary", "md", "group")}>
+              <ArrowLeft
+                className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
+                aria-hidden="true"
+              />
               Back to listing
             </Link>
           </div>
@@ -530,6 +601,7 @@ export default async function StudentDetailPage({
               </CardBody>
             </Card>
           )}
+
         </div>
 
         {/* Right column: the academic record. */}
@@ -550,15 +622,42 @@ export default async function StudentDetailPage({
                           <span className="text-sm font-medium text-fg">{yearLabel(p.semesterId)}</span>
                           <Badge tone={PLAN_STATUS_TONE[p.status] ?? "brand"}>{p.status}</Badge>
                         </div>
-                        <ul className="list-disc pl-5 text-sm text-fg-secondary">
-                          {p.items.map((i) => (
-                            <li key={i.id}>
-                              {courseLabel(i.courseId)}
-                              {i.isRetake && " — retake"}
-                              {p.status !== "DRAFT" && ` — ${i.status.toLowerCase()}`}
-                              {i.status === "REJECTED" && i.rejectionReason && ` (${i.rejectionReason})`}
-                            </li>
-                          ))}
+                        {/* The per-course decision is shown only when it
+                            DIFFERS from the plan's own -- every row of an
+                            approved plan saying "approved" is the badge
+                            above repeated N times. A partly-approved plan
+                            still names which course went which way, and a
+                            refusal still carries its reason: that is the
+                            case the redundancy was hiding. The room and
+                            time take the space it gives back. */}
+                        <ul className="flex flex-col gap-1.5">
+                          {p.items.map((i) => {
+                            const offering = offeringById.get(i.offeringId);
+                            const when = formatMeetingSlots(plannedMeetings.get(i.offeringId) ?? []);
+                            const meta = [
+                              offering?.section ? `Section ${offering.section}` : null,
+                              offering ? `${offering.frozenCreditHours} cr` : null,
+                              i.isRetake ? "Retake" : null,
+                            ].filter(Boolean);
+                            return (
+                              <li key={i.id} className="border-line-subtle bg-surface rounded-lg border px-3 py-2">
+                                <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                                  <span className="text-fg min-w-0 text-sm font-medium">{courseLabel(i.courseId)}</span>
+                                  {i.status !== p.status && (
+                                    <Badge tone={PLAN_ITEM_TONE[i.status] ?? "neutral"}>{ITEM_STATUS_LABEL[i.status] ?? i.status}</Badge>
+                                  )}
+                                </span>
+                                {(when.length > 0 || meta.length > 0) && (
+                                  <span className="text-fg-muted mt-0.5 block text-xs">
+                                    {[...when, ...meta].join(" \u00b7 ")}
+                                  </span>
+                                )}
+                                {i.status === "REJECTED" && i.rejectionReason && (
+                                  <span className="text-danger-fg mt-0.5 block text-xs">{i.rejectionReason}</span>
+                                )}
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     ))}
@@ -574,74 +673,53 @@ export default async function StudentDetailPage({
                 <History className="h-4 w-4 text-brand-fg" aria-hidden="true" />
                 <CardTitle>Academic history</CardTitle>
               </span>
-              {canEdit && (
-                <Link href={`/admin/historical?studentId=${record.id}`} className="text-sm font-medium text-brand-fg hover:underline">
-                  Enter historical record
-                </Link>
-              )}
+              <span className="flex items-center gap-3">
+                {/* Opens the College's own grade sheet for the semester on
+                    screen -- the letterhead document the Registrar prints,
+                    not a second rendering of these numbers. */}
+                {sheet && selectedSemesterId && (
+                  <Link
+                    href={`/admin/students/${record.id}/grade-sheet/${selectedSemesterId}?print=1`}
+                    title="Print or save as PDF"
+                    aria-label="Print or save as PDF"
+                    className="text-fg-muted hover:bg-surface-hover hover:text-brand-fg focus-visible:outline-focus-ring inline-flex rounded-md p-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  >
+                    <Printer className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                )}
+                {canEdit && (
+                  <Link href={`/admin/historical?studentId=${record.id}`} className="text-brand-fg text-sm font-medium hover:underline">
+                    Enter historical record
+                  </Link>
+                )}
+              </span>
             </CardHeader>
-            <CardBody className={history.length > 0 ? "px-0 py-0 sm:px-0" : undefined}>
+
+            {historySemesterIds.length > 0 && (
+              <SemesterResultsPicker
+                years={historyYearIds.map((id) => ({ id, label: academicYears.find((y) => y.id === id)?.label ?? id }))}
+                semesters={yearSemesterIds.map((id) => ({ id, label: shortSemesterLabel(id) }))}
+                selectedYearId={selectedYearId}
+                selectedSemesterId={selectedSemesterId}
+                // A GET form replaces the query string, so the read-only
+                // view would flip back to the edit form on every change.
+                hiddenFields={mode ? { mode } : undefined}
+              />
+            )}
+
+            <CardBody>
               {history.length === 0 && (
-                <p className="text-sm text-fg-muted">
+                <p className="text-fg-muted text-sm">
                   Empty -- the import status above explains why nothing appears here yet.
                 </p>
               )}
-              {history.length > 0 && (
-                <Table>
-                  <Thead>
-                    <tr>
-                      <Th>Semester</Th>
-                      <Th>Course</Th>
-                      <Th>Credits</Th>
-                      <Th>Grade</Th>
-                      <Th className="whitespace-nowrap">Semester GPA</Th>
-                      <Th>
-                        <span className="sr-only">Grade sheet</span>
-                      </Th>
-                    </tr>
-                  </Thead>
-                  <tbody>
-                    {history.map((r, i) => {
-                      const showSemesterGpa = i === 0 || history[i - 1].semesterId !== r.semesterId;
-                      const summary = semesterSummaryFor(r.semesterId);
-                      return (
-                        <Tr key={r.id}>
-                          {/* The semester is named once per group, not on
-                              every course row: repeating it six times is
-                              width this narrow column cannot spare, and the
-                              rows are already visually grouped by it. */}
-                          <Td className="whitespace-nowrap">{showSemesterGpa ? yearLabel(r.semesterId) : ""}</Td>
-                          <Td>
-                            {r.courseCodeSnapshot} — {r.courseTitleSnapshot}
-                          </Td>
-                          <Td>{r.creditHours}</Td>
-                          <Td className="font-medium text-fg">
-                            {r.letter}
-                            {r.isRepeatDropped && " (R)"}
-                          </Td>
-                          <Td>{showSemesterGpa ? (summary?.gpa ?? "—") : ""}</Td>
-                          {/* One link per semester, on that semester's first
-                              row -- the grade sheet is a per-semester
-                              document, so a link on every course row would
-                              be the same link a dozen times. Icon-only with
-                              a tooltip, like every other row action. */}
-                          <Td className="whitespace-nowrap">
-                            {showSemesterGpa && (
-                              <Link
-                                href={`/admin/students/${record.id}/grade-sheet/${r.semesterId}`}
-                                title={`Grade sheet for ${yearLabel(r.semesterId)}`}
-                                aria-label={`Grade sheet for ${yearLabel(r.semesterId)}`}
-                                className="inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                              >
-                                <FileText className="h-4 w-4" aria-hidden="true" />
-                              </Link>
-                            )}
-                          </Td>
-                        </Tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
+              {sheet && (
+                <SemesterResultsTable
+                  sheet={sheet}
+                  label={yearLabel(selectedSemesterId!)}
+                  sortKey={semesterSortKey(selectedSemesterId!) ?? undefined}
+                  isProvisional={selectedSummary?.isProvisional}
+                />
               )}
             </CardBody>
           </Card>

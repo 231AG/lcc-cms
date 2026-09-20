@@ -38,14 +38,22 @@ export function SemesterResultsPicker({
   semesters,
   selectedYearId,
   selectedSemesterId,
+  hiddenFields,
 }: {
   years: SemesterOption[];
   semesters: SemesterOption[];
   selectedYearId: string | undefined;
   selectedSemesterId: string | undefined;
+  /** Query parameters the page needs kept across the submit -- a GET form
+   *  replaces the whole query string, so anything not in it is dropped.
+   *  The admin student page uses this to hold on to `?mode=view`. */
+  hiddenFields?: Record<string, string>;
 }) {
   return (
     <form method="GET" className="flex flex-wrap items-end gap-2 border-b border-line-subtle px-4 py-3 print:hidden sm:px-5">
+      {Object.entries(hiddenFields ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <div>
         <Label htmlFor="year" className="text-xs">
           Year

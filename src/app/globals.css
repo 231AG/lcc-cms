@@ -525,6 +525,35 @@ h1 {
     height: 100vh;
     height: 100dvh;
   }
+
+  /* The rail is exactly one viewport tall and sticky, so scrolling keeps it
+     in front of you and the column behind it is never visible. It IS
+     visible in a full-page screenshot, though, where the capture is taller
+     than the viewport and the rail stops partway down -- which reads as a
+     nav that gives up halfway.
+
+     This paints the grid's first column for the whole document height, in
+     the colour the rail's gradient ENDS on, so what continues below the
+     rail is the shade it was already fading into. A grid item placed in the
+     same cell, before the <aside> in paint order, so the rail draws over
+     it. */
+  .app-shell::before {
+    content: "";
+    grid-area: 1 / 1;
+    background: var(--orchid-600);
+  }
+
+  /* Both real children need explicit placement now. The ::before is the
+     first grid item, so without this the aside auto-places into column 2
+     and the main content is pushed onto a second row -- which turned a
+     1096px document into a 3242px one the first time this was tried. */
+  .app-sidebar {
+    grid-area: 1 / 1;
+  }
+
+  .app-main {
+    grid-area: 1 / 2;
+  }
 }
 
 html[data-sidebar="collapsed"] .app-shell {
