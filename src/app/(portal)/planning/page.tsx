@@ -152,7 +152,7 @@ export default async function PlanningPage({
     return {
       code: c?.code ?? "—",
       title: c?.title ?? i.courseId,
-      meta: [o?.section ? `Section ${o.section}` : null, o ? `${o.frozenCreditHours} credit hours` : null, i.isRetake ? "Retake" : null].filter(
+      meta: [o?.section ? `Section ${o.section}` : null, o ? `${o.frozenCreditHours} Cr/Hrs` : null, i.isRetake ? "Retake" : null].filter(
         (x): x is string => !!x,
       ),
       state: i.status as "PENDING" | "APPROVED" | "REJECTED",
@@ -255,7 +255,7 @@ export default async function PlanningPage({
             }
             facts={[
               { label: "Courses", value: String(items.length) },
-              { label: "Credit hours", value: String(totalCredits) },
+              { label: "Cr/Hrs", value: String(totalCredits) },
               ...(approvedCount > 0 ? [{ label: "Registered", value: String(approvedCount) }] : []),
               ...(rejectedCount > 0 ? [{ label: "Turned down", value: String(rejectedCount) }] : []),
               ...(plan.status === "SUBMITTED" && plan.submittedAt
@@ -289,7 +289,7 @@ export default async function PlanningPage({
             <CardHeader className="flex flex-wrap items-center justify-between gap-3">
               <CardTitle icon={<ClipboardList className="h-4 w-4" aria-hidden="true" />}>Your plan</CardTitle>
               <span className="text-fg-muted text-sm">
-                {items.length} {items.length === 1 ? "course" : "courses"} · {totalCredits} credit hours
+                {items.length} {items.length === 1 ? "course" : "courses"} · {totalCredits} Cr/Hrs
               </span>
             </CardHeader>
             <CardBody>
@@ -381,7 +381,7 @@ export default async function PlanningPage({
             headline="You are registered"
             facts={[
               { label: "Courses", value: String(registeredRegistrations.length) },
-              { label: "Credit hours", value: String(totalCredits) },
+              { label: "Cr/Hrs", value: String(totalCredits) },
             ]}
           >
             Every course in this plan was approved. Changes now go through the Registrar.
@@ -406,7 +406,7 @@ export default async function PlanningPage({
                         title={c?.title ?? r.offeringId}
                         meta={[
                           o?.section ? `Section ${o.section}` : null,
-                          o ? `${o.frozenCreditHours} credit hours` : null,
+                          o ? `${o.frozenCreditHours} Cr/Hrs` : null,
                           r.isRetake ? "Retake" : null,
                         ].filter((x): x is string => !!x)}
                         state="APPROVED"
@@ -432,7 +432,7 @@ export default async function PlanningPage({
             headline="Planning has closed for this semester"
             facts={[
               { label: "Courses", value: String(items.length) },
-              { label: "Credit hours", value: String(totalCredits) },
+              { label: "Cr/Hrs", value: String(totalCredits) },
               ...(approvedCount > 0 ? [{ label: "Registered", value: String(approvedCount) }] : []),
               ...(rejectedCount > 0 ? [{ label: "Turned down", value: String(rejectedCount) }] : []),
             ]}

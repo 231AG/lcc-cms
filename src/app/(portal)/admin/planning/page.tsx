@@ -13,9 +13,18 @@ import { Badge } from "@/components/ui/Badge";
 import { ArrowRight, ClipboardCheck } from "lucide-react";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Label, Select, Input } from "@/components/ui/Form";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { TableCard } from "@/components/ui/TableCard";
 import { findPlanAction } from "./actions";
 
 export const metadata: Metadata = { title: "Course plan review" };
+
+/** A screenful at a time. The queue is read whole (it is one semester's
+ *  SUBMITTED plans, tens of rows at most) and sliced here rather than in
+ *  SQL, because the search filters on a student label this page assembles
+ *  in memory -- paginating in the database would need that label in the
+ *  database. */
+const QUEUE_PAGE_SIZE = 12;
 
 /**
  * A-11 (plan Section 20.4, Stage 9): the queue half -- plans awaiting a
@@ -29,10 +38,10 @@ export const metadata: Metadata = { title: "Course plan review" };
 export default async function PlanningQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ semesterId?: string; error?: string; q?: string }>;
+  searchParams: Promise<{ semesterId?: string; error?: string; q?: string; page?: string }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId: rawSemesterId, error, q } = await searchParams;
+  const { semesterId: rawSemesterId, error, q, page } = await searchParams;
 
   if (!actor)
     return (
@@ -74,17 +83,30 @@ export default async function PlanningQueuePage({
     const s = students.find((s) => s.id === studentId);
     return s ? `${s.studentNumber} — ${fullName(s)}` : studentId;
   };
-  /** First and last initial, for the tile on each queue card. Decoration
-   *  beside a name that is always printed next to it, so it is hidden from
-   *  assistive tech by the caller. */
-  const studentInitials = (studentId: string) => {
+  const studentNumber = (studentId: string) => students.find((s) => s.id === studentId)?.studentNumber ?? "—";
+  const studentName = (studentId: string) => {
     const s = students.find((s) => s.id === studentId);
-    if (!s) return "?";
-    return `${s.firstName[0] ?? ""}${s.lastName[0] ?? ""}`.toUpperCase() || "?";
+    return s ? fullName(s) : studentId;
   };
-
   const queue = semesterId ? await getPlanQueue(actor, semesterId) : [];
-  const filteredQueue = q ? queue.filter((p) => studentLabel(p.studentId).toLowerCase().includes(q.toLowerCase())) : queue;
+  const filteredQueue = (q ? queue.filter((p) => studentLabel(p.studentId).toLowerCase().includes(q.toLowerCase())) : queue)
+    // Oldest submission first: a queue is worked in the order things
+    // arrived, and a plan that has been waiting longest should not be on
+    // the last page. Plans with no submitted date sort to the end.
+    .sort((a, b) => (a.submittedAt?.getTime() ?? Infinity) - (b.submittedAt?.getTime() ?? Infinity));
+
+  const pageNum = Math.max(1, Number(page) || 1);
+  const lastPage = Math.max(1, Math.ceil(filteredQueue.length / QUEUE_PAGE_SIZE));
+  const shownPage = Math.min(pageNum, lastPage);
+  const pageRows = filteredQueue.slice((shownPage - 1) * QUEUE_PAGE_SIZE, shownPage * QUEUE_PAGE_SIZE);
+  const firstOnPage = filteredQueue.length === 0 ? 0 : (shownPage - 1) * QUEUE_PAGE_SIZE + 1;
+  const lastOnPage = (shownPage - 1) * QUEUE_PAGE_SIZE + pageRows.length;
+  const queueHref = (p: number) =>
+    `/admin/planning?${new URLSearchParams({
+      ...(semesterId ? { semesterId } : {}),
+      ...(q ? { q } : {}),
+      ...(p > 1 ? { page: String(p) } : {}),
+    }).toString()}`;
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
@@ -115,94 +137,14 @@ export default async function PlanningQueuePage({
         </Button>
       </form>
 
-      {semesterId && (
-        <section className="mb-8">
-          <h2 className="mb-3 font-medium text-fg">Awaiting a decision — {yearLabel(semesterId)}</h2>
-          <form method="GET" className="mb-3 flex flex-wrap items-end gap-2">
-            <input type="hidden" name="semesterId" value={semesterId} />
-            <div>
-              <Label htmlFor="q" className="text-xs">
-                Search
-              </Label>
-              <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Student ID or name" className="w-64" />
-            </div>
-            <Button type="submit" variant="secondary">
-              Search
-            </Button>
-            {q && (
-              <Link href={`/admin/planning?semesterId=${semesterId}`} className="text-sm text-fg-muted hover:underline">
-                Clear
-              </Link>
-            )}
-          </form>
-          {filteredQueue.length === 0 && (
-            <Card className="border-dashed shadow-none">
-              <CardBody className="py-10 text-center">
-                <span className="bg-success-surface text-success-fg mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
-                  <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
-                </span>
-                <p className="text-fg-secondary text-sm">
-                  {q ? "No plan matches that search." : "Nothing is waiting for a decision."}
-                </p>
-              </CardBody>
-            </Card>
-          )}
-
-          {/* One card per plan rather than a row of text with a bare word
-              at the end of it. The reviewer decides which to open from the
-              student and the size of the plan, so those are the two things
-              given room; Review is a real button because it is the one
-              thing to do here. */}
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredQueue.map((p) => (
-              <li key={p.id}>
-                <Card className="flex h-full flex-col gap-3 p-4">
-                  <span className="flex items-start gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="bg-brand-subtle text-brand-fg flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold"
-                    >
-                      {studentInitials(p.studentId)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="text-fg block text-sm font-semibold">{studentLabel(p.studentId)}</span>
-                      <span className="text-fg-muted mt-0.5 block text-xs">
-                        {p.totalCredits} credit hours
-                        {p.submittedAt ? ` \u00b7 submitted ${p.submittedAt.toISOString().slice(0, 10)}` : ""}
-                      </span>
-                    </span>
-                  </span>
-
-                  {/* DEV-20: the office entered this plan for the student
-                      rather than the student submitting it themselves.
-                      Surfaced here so the reviewer sees it before deciding. */}
-                  {p.enteredBy && (
-                    <span>
-                      <Badge tone="brand">Admin-entered</Badge>
-                    </span>
-                  )}
-
-                  <Link
-                    href={`/admin/planning/${p.id}`}
-                    className={buttonClasses("primary", "md", "group mt-auto w-full")}
-                  >
-                    <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
-                    Review plan
-                    <ArrowRight
-                      className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
-                      aria-hidden="true"
-                    />
-                  </Link>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <Card>
+      {/* The lookup sits ABOVE the queue. Someone arriving with a
+          particular student in mind -- an override to apply before they
+          can submit, a question at the counter -- should not have to scroll
+          past however many plans are waiting to reach the box that answers
+          them. */}
+      <Card className="mb-6">
         <CardBody>
-          <h2 className="mb-3 font-medium text-fg">Look up a specific plan</h2>
+          <h2 className="text-fg mb-3 font-medium">Look up a specific plan</h2>
           {/* A typed Student ID rather than a <select> of all 158 students:
               the office knows the ID, and a native dropdown that long is
               the control this pass is removing everywhere. Resolved to a
@@ -212,17 +154,23 @@ export default async function PlanningQueuePage({
               <Label className="text-xs" htmlFor="lookup-student">
                 Student ID
               </Label>
-              <Input id="lookup-student" name="studentNumber" required placeholder="e.g. 202490" className="w-64" />
+              <div className="w-64">
+                <Input id="lookup-student" name="studentNumber" required placeholder="e.g. 202490" />
+              </div>
             </div>
             <div>
-              <Label className="text-xs">Semester</Label>
-              <Select name="semesterId" required className="w-64">
-                {semesters.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {yearLabel(s.id)}
-                  </option>
-                ))}
-              </Select>
+              <Label className="text-xs" htmlFor="lookup-semester">
+                Semester
+              </Label>
+              <div className="w-64">
+                <Select id="lookup-semester" name="semesterId" required>
+                  {semesters.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {yearLabel(s.id)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
             <Button type="submit" variant="secondary">
               Find plan
@@ -230,6 +178,114 @@ export default async function PlanningQueuePage({
           </form>
         </CardBody>
       </Card>
+
+      {semesterId && (
+        <TableCard
+          title={`Awaiting a decision — ${yearLabel(semesterId)}`}
+          count={filteredQueue.length}
+          countLabel="plan"
+          actions={
+            <form method="GET" className="flex flex-wrap items-center gap-2">
+              <input type="hidden" name="semesterId" value={semesterId} />
+              <Label htmlFor="q" className="sr-only">
+                Search the queue
+              </Label>
+              <div className="w-56">
+                <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Student ID or name" />
+              </div>
+              <Button type="submit" variant="secondary">
+                Search
+              </Button>
+              {q && (
+                <Link href={`/admin/planning?semesterId=${semesterId}`} className="text-brand-fg text-xs font-medium hover:underline">
+                  Clear
+                </Link>
+              )}
+            </form>
+          }
+        >
+          {filteredQueue.length === 0 ? (
+            <div className="px-4 py-12 text-center sm:px-5">
+              <span className="bg-success-surface text-success-fg mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
+                <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <p className="text-fg-secondary text-sm">
+                {q ? "No plan matches that search." : "Nothing is waiting for a decision."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <Table>
+                <Thead>
+                  <tr>
+                    <Th className="whitespace-nowrap">Student ID</Th>
+                    <Th>Name</Th>
+                    <Th className="whitespace-nowrap">Cr/Hrs</Th>
+                    <Th className="hidden whitespace-nowrap sm:table-cell">Submitted</Th>
+                    <Th className="hidden whitespace-nowrap md:table-cell">Entered by</Th>
+                    <Th className="text-right">Action</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {pageRows.map((p) => (
+                    <Tr key={p.id}>
+                      <Td className="text-fg-secondary font-mono text-xs whitespace-nowrap">{studentNumber(p.studentId)}</Td>
+                      <Td className="text-fg font-medium">{studentName(p.studentId)}</Td>
+                      <Td className="whitespace-nowrap">{p.totalCredits} Cr/Hrs</Td>
+                      <Td className="text-fg-secondary hidden whitespace-nowrap sm:table-cell">
+                        {p.submittedAt ? p.submittedAt.toISOString().slice(0, 10) : "—"}
+                      </Td>
+                      {/* DEV-20: the office entered this plan for the
+                          student rather than the student submitting it
+                          themselves. Surfaced before the decision, not
+                          after it. */}
+                      <Td className="hidden whitespace-nowrap md:table-cell">
+                        {p.enteredBy ? <Badge tone="brand">Admin</Badge> : <span className="text-fg-muted text-xs">Student</span>}
+                      </Td>
+                      <Td className="text-right">
+                        <Link
+                          href={`/admin/planning/${p.id}`}
+                          className={buttonClasses("primary", "sm", "group gap-1.5")}
+                          aria-label={`Review plan — ${studentLabel(p.studentId)}`}
+                        >
+                          <ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                          Review plan
+                          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                        </Link>
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+
+              <div className="border-line-subtle flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-5">
+                <p className="text-fg-muted text-xs">
+                  Showing {firstOnPage}–{lastOnPage} of {filteredQueue.length}
+                  {q && <> matching &ldquo;{q}&rdquo;</>}
+                </p>
+                {lastPage > 1 && (
+                  <div className="flex items-center gap-2">
+                    {shownPage > 1 && (
+                      <Link href={queueHref(shownPage - 1)} className={buttonClasses("secondary", "sm")}>
+                        Previous
+                      </Link>
+                    )}
+                    <span className="text-fg-muted text-xs">
+                      Page {shownPage} of {lastPage}
+                    </span>
+                    {shownPage < lastPage && (
+                      <Link href={queueHref(shownPage + 1)} className={buttonClasses("secondary", "sm")}>
+                        Next
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </TableCard>
+      )}
+
     </main>
   );
 }

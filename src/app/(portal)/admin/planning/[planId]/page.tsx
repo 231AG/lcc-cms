@@ -145,7 +145,7 @@ export default async function PlanDetailPage({
         description={
           <>
             {semester?.name ?? plan.semesterId} — status <Badge tone={PLAN_STATUS_TONE[plan.status] ?? "neutral"}>{plan.status}</Badge> —{" "}
-            {plan.totalCredits} credit hours
+            {plan.totalCredits} Cr/Hrs
           </>
         }
       />

@@ -14,7 +14,7 @@ import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSumma
 import { getMyPlan, getPlanItems } from "@/lib/planning/planning";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds } from "@/lib/offerings/offerings";
 import { formatMeetingSlots } from "@/lib/offerings/offeringRows";
-import { getGradeSheet } from "@/lib/gradesheet/gradeSheet";
+import { getGradeSheet, trimCredits } from "@/lib/gradesheet/gradeSheet";
 import { getAdminHomeSummary, getSuperAdminHomeSummary } from "@/lib/dashboard/home";
 import { getStudentStatistics, type StudentStatistics } from "@/lib/dashboard/statistics";
 import {
@@ -387,10 +387,14 @@ export default async function PortalPage({
                 {cumulative?.standing ? STANDING_LABEL[cumulative.standing] : "Not yet available"}
               </RecordPanel>
               <RecordPanel icon={<BookOpen className="h-4 w-4" aria-hidden="true" />} term="Credits earned">
-                {cumulative ? `${cumulative.totalCreditsEarned} of 132 — ${cumulative.creditsToGraduation} remaining` : "—"}
+                {cumulative
+                  ? `${trimCredits(cumulative.totalCreditsEarned)} of ${cumulative.graduationCreditHours} Cr/Hrs — ${trimCredits(
+                      cumulative.creditsToGraduation,
+                    )} remaining`
+                  : "—"}
               </RecordPanel>
               <RecordPanel icon={<GraduationCap className="h-4 w-4" aria-hidden="true" />} term="Credits attempted">
-                {cumulative?.totalCreditsAttempted ?? "—"}
+                {cumulative ? `${trimCredits(cumulative.totalCreditsAttempted)} Cr/Hrs` : "—"}
               </RecordPanel>
             </dl>
           </CardBody>
@@ -417,7 +421,7 @@ export default async function PortalPage({
                   const offering = offeringById.get(i.offeringId);
                   const course = courseById.get(i.courseId);
                   const when = formatMeetingSlots(registeredMeetings.get(i.offeringId) ?? []);
-                  const detail = [...when, offering ? `${offering.frozenCreditHours} credit hours` : null].filter(
+                  const detail = [...when, offering ? `${offering.frozenCreditHours} Cr/Hrs` : null].filter(
                     (x): x is string => !!x,
                   );
                   return (

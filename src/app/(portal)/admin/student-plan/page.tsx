@@ -490,7 +490,7 @@ async function StudentPlanEditor({
           <CardBody className="flex flex-wrap items-center gap-3">
             <Badge tone={PLAN_STATUS_TONE[plan.status as keyof typeof PLAN_STATUS_TONE] ?? "neutral"}>{plan.status}</Badge>
             <span className="text-sm text-fg-secondary">
-              {plan.totalCredits} credit hours
+              {plan.totalCredits} Cr/Hrs
               {plan.status === "SUBMITTED" && " — awaiting a decision in Course plan review"}
             </span>
             {plan.status === "REJECTED" && plan.rejectionReason && (
@@ -518,7 +518,7 @@ async function StudentPlanEditor({
         <>
           <Card className="mb-6">
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Planned courses — {totalCredits} credit hours</CardTitle>
+              <CardTitle>Planned courses — {totalCredits} Cr/Hrs</CardTitle>
               {plan.enteredBy && <Badge tone="brand">Admin-entered</Badge>}
             </CardHeader>
             <CardBody>

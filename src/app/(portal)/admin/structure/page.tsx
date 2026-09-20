@@ -324,7 +324,7 @@ export default async function AcademicStructurePage({
                 <Th>Code</Th>
                 <Th>Title</Th>
                 <Th>Department</Th>
-                <Th>Credits</Th>
+                <Th>Cr/Hrs</Th>
                 <Th>Status</Th>
                 <Th>Action</Th>
               </tr>

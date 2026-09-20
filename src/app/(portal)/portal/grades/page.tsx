@@ -164,7 +164,7 @@ export default async function MyGradesPage({
                 {cumulative && (
                   <div className="border-line-subtle mt-3 rounded-xl border p-1">
                     <dl className="grid grid-cols-3 divide-x divide-line-subtle">
-                      <ProgressFigure term="Total credits" value={cumulative.graduationCreditHours} />
+                      <ProgressFigure term="Total" value={cumulative.graduationCreditHours} />
                       <ProgressFigure term="Completed" value={trimCredits(cumulative.totalCreditsEarned)} tone="brand" />
                       <ProgressFigure term="Remaining" value={trimCredits(cumulative.creditsToGraduation)} />
                     </dl>
@@ -173,8 +173,8 @@ export default async function MyGradesPage({
 
                 {cumulative && cumulative.totalCreditsAttempted !== cumulative.totalCreditsEarned && (
                   <p className="text-fg-muted mt-3 text-xs">
-                    {trimCredits(cumulative.totalCreditsAttempted)} credit hours attempted \u2014 the difference is coursework
-                    that did not earn credit.
+                    {trimCredits(cumulative.totalCreditsAttempted)} Cr/Hrs attempted — the difference is coursework that
+                    did not earn credit.
                   </p>
                 )}
               </CardBody>
@@ -194,8 +194,8 @@ export default async function MyGradesPage({
                   <Thead>
                     <tr>
                       <Th>Semester</Th>
-                      <Th className="text-center">Attempted</Th>
-                      <Th className="text-center">Earned</Th>
+                      <Th className="text-center">Attempted Cr/Hrs</Th>
+                      <Th className="text-center">Earned Cr/Hrs</Th>
                       <Th className="text-center">GPA</Th>
                     </tr>
                   </Thead>
@@ -287,12 +287,21 @@ export default async function MyGradesPage({
 /** One of the three degree-progress figures. Deliberately plainer than
  *  RecordPanel: these read as a single sentence across, so each needs a
  *  number and a word, not a bordered tile of its own. */
+/**
+ * One of the three degree-progress numbers.
+ *
+ * The unit is printed next to the figure, not left to the label: "46" on
+ * its own under "Completed" could be credits, courses or per cent, and a
+ * student reading their own record should not have to work out which. It
+ * is set smaller and muted so the number is still what the eye lands on.
+ */
 function ProgressFigure({ term, value, tone }: { term: string; value: string | number; tone?: "brand" }) {
   return (
     <div className="px-3 py-2 text-center">
       <dt className="text-fg-muted text-[11px] font-semibold tracking-wide uppercase">{term}</dt>
       <dd className={tone === "brand" ? "text-brand-fg mt-0.5 text-xl font-extrabold" : "text-fg mt-0.5 text-xl font-bold"}>
         {value}
+        <span className="text-fg-muted ml-1 text-[11px] font-semibold">Cr/Hrs</span>
       </dd>
     </div>
   );

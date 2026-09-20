@@ -350,7 +350,7 @@ async function StudentGrades({
             <div>
               <dt className="text-[11px] font-semibold tracking-wide text-fg-muted uppercase">Credits earned</dt>
               <dd className="text-sm font-bold text-fg">
-                {cumulative ? trimCredits(cumulative.totalCreditsEarned) : "—"}
+                {cumulative ? <>{trimCredits(cumulative.totalCreditsEarned)} Cr/Hrs</> : "—"}
               </dd>
             </div>
             {summary?.gpa && (
