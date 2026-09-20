@@ -19,6 +19,9 @@ import {
 import {
   addPlanItem,
   approvePlan,
+  approvePlanItem,
+  dropRegistration,
+  registerDirect,
   deleteDraftPlan,
   getOrCreateDraftPlan,
   rejectPlanItem,
@@ -26,7 +29,7 @@ import {
   revisePlan,
   submitPlan,
 } from "../planning";
-import { StateError } from "@/lib/errors";
+import { StateError, ValidationError } from "@/lib/errors";
 import type { Actor } from "@/lib/permissions/kernel";
 
 /**
@@ -144,8 +147,8 @@ describe("revising a plan the Registrar turned down", () => {
       { id: courseBId, departmentId, code: `RV${courseBId.slice(0, 3)}102`, title: "Revision Two", creditHours: 3, isActive: true },
     ]);
     await db.insert(courseOffering).values([
-      { id: offeringAId, courseId: courseAId, semesterId, section: "A", capacity: 30, status: "PUBLISHED", frozenCreditHours: 3 },
-      { id: offeringBId, courseId: courseBId, semesterId, section: "A", capacity: 30, status: "PUBLISHED", frozenCreditHours: 3 },
+      { id: offeringAId, courseId: courseAId, semesterId, section: "1", capacity: 30, status: "PUBLISHED", frozenCreditHours: 3 },
+      { id: offeringBId, courseId: courseBId, semesterId, section: "1", capacity: 30, status: "PUBLISHED", frozenCreditHours: 3 },
     ]);
   });
 
@@ -249,7 +252,7 @@ describe("revising a plan the Registrar turned down", () => {
     const soleSeat = id();
     const soleCourse = id();
     await db.insert(course).values({ id: soleCourse, departmentId, code: `RV${soleCourse.slice(0, 3)}103`, title: "One Seat", creditHours: 3, isActive: true });
-    await db.insert(courseOffering).values({ id: soleSeat, courseId: soleCourse, semesterId, section: "A", capacity: 1, status: "PUBLISHED", frozenCreditHours: 3 });
+    await db.insert(courseOffering).values({ id: soleSeat, courseId: soleCourse, semesterId, section: "1", capacity: 1, status: "PUBLISHED", frozenCreditHours: 3 });
 
     const student = await newStudent();
     const plan = await getOrCreateDraftPlan(student, semesterId);
@@ -350,6 +353,65 @@ describe("revising a plan the Registrar turned down", () => {
 
     // Editable means "not yet approved" -- it does not mean "always".
     await expect(addPlanItem(student, planId, offeringBId)).rejects.toThrow(StateError);
+  });
+
+  // ---------------------------------------------------------------------
+  // The seat a student already holds
+  // ---------------------------------------------------------------------
+  // app.registration carries UNIQUE (student_id, offering_id) with no
+  // partial WHERE, so it covers DROPPED rows too. Both cases below used to
+  // reach the INSERT and raise a raw 23505, which is not an AppError -- so
+  // it escaped the server action's catch and the Admin got a 500 instead of
+  // a sentence. That is the "server error on accepting a single course".
+
+  it("refuses, in words, to approve a course the student is already registered for", async () => {
+    const { student, planId } = await planAwaitingDecision();
+    const [item] = await itemsOf(planId);
+
+    // The Registrar got there first, directly.
+    await registerDirect(admin(), student.userId, item.offeringId, "Late add agreed in person.");
+
+    await expect(approvePlanItem(admin(), item.id)).rejects.toThrow(ValidationError);
+    await expect(approvePlanItem(admin(), item.id)).rejects.toThrow(/already registered/i);
+
+    // And the plan is untouched, not half-decided.
+    expect((await itemsOf(planId))[0].status).toBe("PENDING");
+  });
+
+  it("gives a dropped seat back rather than refusing for ever", async () => {
+    const student = await newStudent();
+    const first = await registerDirect(admin(), student.userId, offeringAId, "Late add agreed in person.");
+    await dropRegistration(admin(), first.registration.id, "Student withdrew.");
+
+    // The row is still there, dropped, and the unique index covers it -- so
+    // this used to be an INSERT the database refused for ever, surfacing as
+    // a 500. Registering again must give the same seat back.
+    const again = await registerDirect(admin(), student.userId, offeringAId, "Student returned.");
+
+    const rows = await db.query.registration.findMany({
+      where: and(eq(registration.studentId, student.userId), eq(registration.offeringId, offeringAId)),
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(first.registration.id);
+    expect(again.registration.status).toBe("REGISTERED");
+    expect(again.registration.droppedReason).toBeNull();
+  });
+
+  it("records a reinstatement under its own audit action", async () => {
+    const student = await newStudent();
+    const first = await registerDirect(admin(), student.userId, offeringAId, "Late add.");
+    await dropRegistration(admin(), first.registration.id, "Withdrawn.");
+    await registerDirect(admin(), student.userId, offeringAId, "Returned.");
+
+    const entries = await db.query.auditLog.findMany({
+      where: and(eq(auditLog.entityType, "registration"), eq(auditLog.entityId, first.registration.id)),
+    });
+    const actions = entries.map((e) => e.action);
+    // "came back" and "was created" are different events; an auditor should
+    // not have to tell them apart by timestamp.
+    expect(actions).toContain("REGISTRATION_CREATED");
+    expect(actions).toContain("REGISTRATION_DROPPED");
+    expect(actions).toContain("REGISTRATION_REINSTATED");
   });
 });
 

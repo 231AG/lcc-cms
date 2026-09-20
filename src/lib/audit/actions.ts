@@ -84,6 +84,13 @@ export const AUDIT_ACTIONS = [
   // approved despite the clash.
   "SCHEDULE_CONFLICT_OVERRIDDEN",
   "REGISTRATION_CREATED",
+  // A seat coming BACK after it was dropped. Its own action rather than a
+  // second REGISTRATION_CREATED, because app.registration carries a unique
+  // (student_id, offering_id) that covers dropped rows -- so re-approving
+  // updates the existing row in place, and an auditor reading the log
+  // should not have to infer from a timestamp whether a seat was created
+  // or returned.
+  "REGISTRATION_REINSTATED",
   "REGISTRATION_DROPPED",
 
   // Administration and configuration

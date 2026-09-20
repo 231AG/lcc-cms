@@ -9,9 +9,9 @@ const courses: SearchableCourse[] = [
 ];
 
 const offerings: SearchableOffering[] = [
-  { id: "o1", courseId: "c1", section: "A", instructorName: "J. Kollie" },
-  { id: "o2", courseId: "c2", section: "B", instructorName: null },
-  { id: "o3", courseId: "c3", section: "A", instructorName: "M. Tarpeh" },
+  { id: "o1", courseId: "c1", section: "1", instructorName: "J. Kollie" },
+  { id: "o2", courseId: "c2", section: "2", instructorName: null },
+  { id: "o3", courseId: "c3", section: "1", instructorName: "M. Tarpeh" },
 ];
 
 describe("filterOfferings", () => {
@@ -41,7 +41,7 @@ describe("filterOfferings", () => {
   });
 
   it("does not match an offering whose course is missing from the course list", () => {
-    const orphan: SearchableOffering = { id: "o4", courseId: "missing", section: "C", instructorName: null };
+    const orphan: SearchableOffering = { id: "o4", courseId: "missing", section: "3", instructorName: null };
     expect(filterOfferings([orphan], courses, "acct")).toEqual([]);
   });
 });

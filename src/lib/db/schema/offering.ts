@@ -21,7 +21,9 @@ export const courseOffering = appSchema.table(
     courseId: uuid("course_id")
       .notNull()
       .references(() => course.id, { onDelete: "restrict" }),
-    section: text("section").notNull(), // e.g. "A" -- unique only within (semester, course), Section 12.4
+    // "1", "2", ... -- numeric, enforced by a CHECK from 0029. Unique
+    // only within (semester, course), Section 12.4.
+    section: text("section").notNull(),
     instructorName: text("instructor_name"), // free text, no account (ASM-10/DER-15, OOS-01)
     capacity: integer("capacity"), // nullable -- GAP-26, enforced only when set
     status: text("status").notNull().default("DRAFT"), // DRAFT | PUBLISHED | CANCELLED

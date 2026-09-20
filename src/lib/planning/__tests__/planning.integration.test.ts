@@ -347,7 +347,7 @@ describe("V4 -- duplicate course in the plan", () => {
 
 describe("V5 -- availability and capacity", () => {
   it("blocks submission once a capped offering has no seats remaining", async () => {
-    const cappedOffering = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "CAP", capacity: 1 });
+    const cappedOffering = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "7", capacity: 1 });
     cleanupOfferingIds.push(cappedOffering.id);
     await addMeeting(adminActor, cappedOffering.id, { dayOfWeek: 6, startTime: "09:00", endTime: "10:00" });
     await publishOffering(adminActor, cappedOffering.id);
@@ -462,7 +462,7 @@ describe("approval atomicity and lifecycle", () => {
   });
 
   it("V5 fails at approval when the offering is cancelled after submission (edge case 3)", async () => {
-    const off = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "CANC" });
+    const off = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "8" });
     cleanupOfferingIds.push(off.id);
     await addMeeting(adminActor, off.id, { dayOfWeek: 7, startTime: "09:00", endTime: "10:00" });
     await publishOffering(adminActor, off.id);
@@ -578,7 +578,7 @@ describe("admin-entered course plans (DEV-20)", () => {
 
 describe("concurrent last-seat approval (edge case 6, G9 gate)", () => {
   it("one approval succeeds and the other fails cleanly when two plans compete for the last seat", async () => {
-    const cappedOffering = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "RACE", capacity: 1 });
+    const cappedOffering = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "9", capacity: 1 });
     cleanupOfferingIds.push(cappedOffering.id);
     await addMeeting(adminActor, cappedOffering.id, { dayOfWeek: 2, startTime: "09:00", endTime: "10:00" });
     await publishOffering(adminActor, cappedOffering.id);
@@ -624,7 +624,7 @@ describe("direct registration and drop (DEC-14)", () => {
   });
 
   it("refuses cancelling an offering that still has an active registration (Stage 8's TODO, closed here)", async () => {
-    const off = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "REGD" });
+    const off = await createOffering(adminActor, { semesterId: registrationSemesterId, courseId: courseD.id, section: "10" });
     cleanupOfferingIds.push(off.id);
     await addMeeting(adminActor, off.id, { dayOfWeek: 4, startTime: "09:00", endTime: "10:00" });
     await publishOffering(adminActor, off.id);

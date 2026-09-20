@@ -101,7 +101,7 @@ afterAll(async () => {
 
 describe("createOffering", () => {
   it("creates a DRAFT offering with frozen credit hours, and audits", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "A" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "1" });
     cleanupOfferingIds.push(offering.id);
 
     expect(offering.status).toBe("DRAFT");
@@ -114,11 +114,11 @@ describe("createOffering", () => {
   });
 
   it("refuses a duplicate section for the same course and semester", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "B" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "2" });
     cleanupOfferingIds.push(offering.id);
 
     await expect(
-      createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "b" }), // case-insensitive match
+      createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "2" }), // same section number
     ).rejects.toThrow(ValidationError);
   });
 
@@ -135,7 +135,7 @@ describe("createOffering", () => {
     });
 
     await expect(
-      createOffering(adminActor, { semesterId: closedSem.id, courseId, section: "A" }),
+      createOffering(adminActor, { semesterId: closedSem.id, courseId, section: "1" }),
     ).rejects.toThrow(StateError);
 
     await db.delete(semester).where(eq(semester.id, closedSem.id));
@@ -143,17 +143,17 @@ describe("createOffering", () => {
 
   it("refuses a Student and a Super Admin", async () => {
     await expect(
-      createOffering(studentActor, { semesterId: openSemesterId, courseId, section: "C" }),
+      createOffering(studentActor, { semesterId: openSemesterId, courseId, section: "3" }),
     ).rejects.toThrow(ForbiddenError);
     await expect(
-      createOffering(superAdminActor, { semesterId: openSemesterId, courseId, section: "C" }),
+      createOffering(superAdminActor, { semesterId: openSemesterId, courseId, section: "3" }),
     ).rejects.toThrow(ForbiddenError);
   });
 });
 
 describe("addMeeting / removeMeeting", () => {
   it("refuses an overlapping meeting within the same offering, but allows a non-overlapping one", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "D" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "4" });
     cleanupOfferingIds.push(offering.id);
 
     await addMeeting(adminActor, offering.id, { dayOfWeek: 1, startTime: "09:00", endTime: "10:30", room: "B4" });
@@ -169,7 +169,7 @@ describe("addMeeting / removeMeeting", () => {
   });
 
   it("refuses end time at or before start time", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "E" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "5" });
     cleanupOfferingIds.push(offering.id);
 
     await expect(
@@ -180,7 +180,7 @@ describe("addMeeting / removeMeeting", () => {
 
 describe("publishOffering", () => {
   it("requires at least one meeting time before publishing", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "F" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "6" });
     cleanupOfferingIds.push(offering.id);
 
     await expect(publishOffering(adminActor, offering.id)).rejects.toThrow(ValidationError);
@@ -193,7 +193,7 @@ describe("publishOffering", () => {
   });
 
   it("a meeting added after publication is audited; one added before is not", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "G" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "11" });
     cleanupOfferingIds.push(offering.id);
     await addMeeting(adminActor, offering.id, { dayOfWeek: 2, startTime: "09:00", endTime: "10:00" });
 
@@ -213,7 +213,7 @@ describe("publishOffering", () => {
 
 describe("updateOffering and cancelOffering", () => {
   it("updates instructor and capacity, and audits", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "H" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "12" });
     cleanupOfferingIds.push(offering.id);
 
     const updated = await updateOffering(adminActor, offering.id, { instructorName: "Dr. Kollie", capacity: 30 });
@@ -227,7 +227,7 @@ describe("updateOffering and cancelOffering", () => {
   });
 
   it("cancels an offering and refuses cancelling it twice", async () => {
-    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "J" });
+    const offering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "14" });
     cleanupOfferingIds.push(offering.id);
 
     const cancelled = await cancelOffering(adminActor, offering.id);
@@ -239,9 +239,9 @@ describe("updateOffering and cancelOffering", () => {
 
 describe("student visibility (Section 10.5)", () => {
   it("a student sees only PUBLISHED offerings; Admin sees everything", async () => {
-    const draftOffering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "K" });
+    const draftOffering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "15" });
     cleanupOfferingIds.push(draftOffering.id);
-    const publishedOffering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "L" });
+    const publishedOffering = await createOffering(adminActor, { semesterId: openSemesterId, courseId, section: "21" });
     cleanupOfferingIds.push(publishedOffering.id);
     await addMeeting(adminActor, publishedOffering.id, { dayOfWeek: 5, startTime: "09:00", endTime: "10:00" });
     await publishOffering(adminActor, publishedOffering.id);

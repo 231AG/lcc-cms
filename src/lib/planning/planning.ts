@@ -902,6 +902,86 @@ function rollupPlanStatus(items: Array<{ status: string }>): "APPROVED" | "REJEC
  * item, freeze credit hours, write audit entries. All succeed or none do
  * (Figure 14.1).
  */
+/**
+ * Create the registration behind an approval, or give back the one that is
+ * already there.
+ *
+ * `app.registration` carries a UNIQUE (student_id, offering_id) with NO
+ * partial WHERE, so it covers DROPPED rows as well as live ones. That makes
+ * a plain INSERT wrong in two different ways, and both of them reached the
+ * browser as a raw 500 rather than as anything a person could act on:
+ *
+ *   - the student already HOLDS this seat (the Registrar registered them
+ *     directly, and the same course is sitting PENDING in their plan).
+ *     Approving it raised a 23505 that escaped every caller as an
+ *     unhandled DrizzleQueryError -- the "server error" an Admin hit when
+ *     accepting a single course.
+ *   - the seat was dropped and is being given back. The index refuses the
+ *     new row for ever, so drop-then-re-approve was simply impossible.
+ *
+ * So: refuse the first with a sentence naming what to do, and REINSTATE
+ * the second rather than inserting beside it. The reinstatement is audited
+ * under its own action, because "this seat came back" and "this seat was
+ * created" are different events and an auditor should not have to infer
+ * which one happened from a timestamp.
+ */
+async function registerSeat(
+  tx: Tx,
+  actor: Actor,
+  values: {
+    studentId: string;
+    offeringId: string;
+    semesterId: string;
+    planItemId?: string | null;
+    source: "PLAN_APPROVAL" | "ADMIN_DIRECT";
+    isRetake?: boolean;
+    frozenCreditHours: number;
+  },
+  courseLabel: string,
+): Promise<{ row: typeof registration.$inferSelect; reinstated: boolean }> {
+  const existing = await tx.query.registration.findFirst({
+    where: and(eq(registration.studentId, values.studentId), eq(registration.offeringId, values.offeringId)),
+  });
+
+  if (existing?.status === "REGISTERED") {
+    throw new ValidationError(
+      `This student is already registered for ${courseLabel}. Drop that registration first, or turn this planned course down.`,
+    );
+  }
+
+  if (existing) {
+    const [row] = await tx
+      .update(registration)
+      .set({
+        semesterId: values.semesterId,
+        planItemId: values.planItemId ?? null,
+        source: values.source,
+        isRetake: values.isRetake ?? false,
+        status: "REGISTERED",
+        droppedReason: null,
+        frozenCreditHours: values.frozenCreditHours,
+      })
+      .where(eq(registration.id, existing.id))
+      .returning();
+    return { row, reinstated: true };
+  }
+
+  const [row] = await tx
+    .insert(registration)
+    .values({
+      studentId: values.studentId,
+      offeringId: values.offeringId,
+      semesterId: values.semesterId,
+      planItemId: values.planItemId ?? null,
+      source: values.source,
+      isRetake: values.isRetake ?? false,
+      status: "REGISTERED",
+      frozenCreditHours: values.frozenCreditHours,
+    })
+    .returning();
+  return { row, reinstated: false };
+}
+
 export async function approvePlan(actor: Actor, planId: string): Promise<ApprovePlanResult> {
   await assertCan(actor, "planning.reviewPlan");
 
@@ -952,25 +1032,26 @@ export async function approvePlan(actor: Actor, planId: string): Promise<Approve
 
     for (const item of items) {
       const offering = offeringById.get(item.offeringId)!;
-      const [reg] = await tx
-        .insert(registration)
-        .values({
+      const { row: reg, reinstated } = await registerSeat(
+        tx,
+        actor,
+        {
           studentId: plan.studentId,
           offeringId: item.offeringId,
           semesterId: plan.semesterId,
           planItemId: item.id,
           source: "PLAN_APPROVAL",
           isRetake: item.isRetake,
-          status: "REGISTERED",
           frozenCreditHours: offering.frozenCreditHours,
-        })
-        .returning();
+        },
+        offeringById.get(item.offeringId)?.id ?? "that course",
+      );
       createdRegistrations.push(reg);
 
       await auditWrite(tx, {
         actorUserId: actor.userId,
         actorRole: actor.role,
-        action: "REGISTRATION_CREATED",
+        action: reinstated ? "REGISTRATION_REINSTATED" : "REGISTRATION_CREATED",
         entityType: "registration",
         entityId: reg.id,
         studentId: plan.studentId,
@@ -1119,24 +1200,26 @@ export async function approvePlanItem(actor: Actor, planItemId: string): Promise
     if (!offering) throw new ValidationError("Offering not found.");
 
     const requestId = randomUUID();
-    const [reg] = await tx
-      .insert(registration)
-      .values({
+    const courseRow = await tx.query.course.findFirst({ where: eq(course.id, item.courseId) });
+    const { row: reg, reinstated } = await registerSeat(
+      tx,
+      actor,
+      {
         studentId: plan.studentId,
         offeringId: item.offeringId,
         semesterId: plan.semesterId,
         planItemId: item.id,
         source: "PLAN_APPROVAL",
         isRetake: item.isRetake,
-        status: "REGISTERED",
         frozenCreditHours: offering.frozenCreditHours,
-      })
-      .returning();
+      },
+      courseRow ? `${courseRow.code} \u2014 ${courseRow.title}` : "that course",
+    );
 
     await auditWrite(tx, {
       actorUserId: actor.userId,
       actorRole: actor.role,
-      action: "REGISTRATION_CREATED",
+      action: reinstated ? "REGISTRATION_REINSTATED" : "REGISTRATION_CREATED",
       entityType: "registration",
       entityId: reg.id,
       studentId: plan.studentId,
@@ -1265,11 +1348,6 @@ export async function registerDirect(actor: Actor, studentId: string, offeringId
 
     await tx.select().from(courseOffering).where(eq(courseOffering.id, offeringId)).for("update");
 
-    const existing = await tx.query.registration.findFirst({
-      where: and(eq(registration.studentId, studentId), eq(registration.offeringId, offeringId)),
-    });
-    if (existing && existing.status === "REGISTERED") throw new ValidationError("This student is already registered for this offering.");
-
     if (offering.capacity != null) {
       const registered = await tx.query.registration.findMany({
         where: and(eq(registration.offeringId, offeringId), eq(registration.status, "REGISTERED")),
@@ -1287,22 +1365,26 @@ export async function registerDirect(actor: Actor, studentId: string, offeringId
       },
     ]);
 
-    const [row] = await tx
-      .insert(registration)
-      .values({
+    // Was an inline "already registered?" check that tested only for
+    // REGISTERED, so a DROPPED row fell through to an INSERT the unique
+    // index then refused. registerSeat covers both.
+    const { row, reinstated } = await registerSeat(
+      tx,
+      actor,
+      {
         studentId,
         offeringId,
         semesterId: offering.semesterId,
         source: "ADMIN_DIRECT",
-        status: "REGISTERED",
         frozenCreditHours: offering.frozenCreditHours,
-      })
-      .returning();
+      },
+      "this offering",
+    );
 
     await auditWrite(tx, {
       actorUserId: actor.userId,
       actorRole: actor.role,
-      action: "REGISTRATION_CREATED",
+      action: reinstated ? "REGISTRATION_REINSTATED" : "REGISTRATION_CREATED",
       entityType: "registration",
       entityId: row.id,
       studentId,

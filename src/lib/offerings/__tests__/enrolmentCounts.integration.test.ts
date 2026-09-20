@@ -71,8 +71,8 @@ describe("enrolment counts on the offerings table", () => {
       { id: COURSE_EMPTY, departmentId: DEPT, code: `ENRL${COURSE_EMPTY.slice(0, 3)}`, title: "Quiet Course", creditHours: 3, isActive: true },
     ]);
     await db.insert(courseOffering).values([
-      { id: OFF_FULL, courseId: COURSE_FULL, semesterId: SEM, section: "A", capacity: 10, status: "PUBLISHED", frozenCreditHours: 3 },
-      { id: OFF_EMPTY, courseId: COURSE_EMPTY, semesterId: SEM, section: "A", capacity: 10, status: "PUBLISHED", frozenCreditHours: 3 },
+      { id: OFF_FULL, courseId: COURSE_FULL, semesterId: SEM, section: "1", capacity: 10, status: "PUBLISHED", frozenCreditHours: 3 },
+      { id: OFF_EMPTY, courseId: COURSE_EMPTY, semesterId: SEM, section: "1", capacity: 10, status: "PUBLISHED", frozenCreditHours: 3 },
     ]);
 
     // Two students hold a seat in the busy course.

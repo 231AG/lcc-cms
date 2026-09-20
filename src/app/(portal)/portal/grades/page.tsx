@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Award, BookOpen, GraduationCap, PieChart, Printer, TrendingUp } from "lucide-react";
+import { Award, GraduationCap, PieChart, Printer, TrendingUp } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { semesterDisplayName, semesterFullLabel } from "@/lib/academic/semesterName";
@@ -147,13 +147,36 @@ export default async function MyGradesPage({
                   <RecordPanel icon={<Award className="h-4 w-4" aria-hidden="true" />} term="Academic standing">
                     {cumulative?.standing ? STANDING_LABEL[cumulative.standing] : "Not yet available"}
                   </RecordPanel>
-                  <RecordPanel icon={<BookOpen className="h-4 w-4" aria-hidden="true" />} term="Credits earned">
-                    {cumulative ? `${cumulative.totalCreditsEarned} of 132 — ${cumulative.creditsToGraduation} remaining` : "—"}
-                  </RecordPanel>
-                  <RecordPanel icon={<GraduationCap className="h-4 w-4" aria-hidden="true" />} term="Credits attempted">
-                    {cumulative?.totalCreditsAttempted ?? "—"}
-                  </RecordPanel>
                 </dl>
+
+                {/* Degree progress as three plain numbers that add up, rather
+                    than "earned" beside "attempted" -- two figures that are
+                    equal for every student who has not failed anything, so
+                    the pair looked like the same fact printed twice. The
+                    total comes from the GPA policy, not a literal here, so
+                    it cannot drift from what the engine graduates on.
+
+                    Attempted has NOT been dropped, only moved: it is the
+                    denominator behind the CGPA above and it differs from
+                    earned exactly when a course was failed, so it belongs
+                    with the figure it explains rather than in a progress
+                    row. It shows below when the two disagree. */}
+                {cumulative && (
+                  <div className="border-line-subtle mt-3 rounded-xl border p-1">
+                    <dl className="grid grid-cols-3 divide-x divide-line-subtle">
+                      <ProgressFigure term="Total credits" value={cumulative.graduationCreditHours} />
+                      <ProgressFigure term="Completed" value={trimCredits(cumulative.totalCreditsEarned)} tone="brand" />
+                      <ProgressFigure term="Remaining" value={trimCredits(cumulative.creditsToGraduation)} />
+                    </dl>
+                  </div>
+                )}
+
+                {cumulative && cumulative.totalCreditsAttempted !== cumulative.totalCreditsEarned && (
+                  <p className="text-fg-muted mt-3 text-xs">
+                    {trimCredits(cumulative.totalCreditsAttempted)} credit hours attempted \u2014 the difference is coursework
+                    that did not earn credit.
+                  </p>
+                )}
               </CardBody>
             </Card>
 
@@ -261,3 +284,16 @@ export default async function MyGradesPage({
   );
 }
 
+/** One of the three degree-progress figures. Deliberately plainer than
+ *  RecordPanel: these read as a single sentence across, so each needs a
+ *  number and a word, not a bordered tile of its own. */
+function ProgressFigure({ term, value, tone }: { term: string; value: string | number; tone?: "brand" }) {
+  return (
+    <div className="px-3 py-2 text-center">
+      <dt className="text-fg-muted text-[11px] font-semibold tracking-wide uppercase">{term}</dt>
+      <dd className={tone === "brand" ? "text-brand-fg mt-0.5 text-xl font-extrabold" : "text-fg mt-0.5 text-xl font-bold"}>
+        {value}
+      </dd>
+    </div>
+  );
+}
