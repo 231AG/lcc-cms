@@ -1463,6 +1463,39 @@ export async function getPlanForStudentSemester(actor: Actor, studentId: string,
   );
 }
 
+/**
+ * The plan each of these students has for one semester, in a single query.
+ *
+ * The Course plan entry screen lists students and has to say, per row,
+ * whether there is already a plan to open or a new one to start. Asking
+ * getPlanForStudentSemester once per row would be a round trip per student
+ * on a page that shows twenty of them; this is the same read, batched.
+ *
+ * Returns a Map keyed by student id. A student with no plan for the
+ * semester is simply absent from it -- deliberately not a null entry, so a
+ * caller cannot mistake "no plan" for "plan with nothing in it".
+ *
+ * Gated exactly like getPlanForStudentSemester: either planning grant an
+ * Admin may hold is enough to read this row.
+ */
+export async function getPlansForStudentsInSemester(
+  actor: Actor,
+  studentIds: string[],
+  semesterId: string,
+): Promise<Map<string, typeof coursePlan.$inferSelect>> {
+  const { can } = await import("@/lib/permissions/kernel");
+  if (!(await can(actor, "planning.manageStudentPlan")) && !(await can(actor, "planning.reviewPlan"))) {
+    await assertCan(actor, "planning.manageStudentPlan"); // throws with the standard message
+  }
+  if (studentIds.length === 0) return new Map();
+  const rows = await asUser(actor.userId, (tx) =>
+    tx.query.coursePlan.findMany({
+      where: and(eq(coursePlan.semesterId, semesterId), inArray(coursePlan.studentId, studentIds)),
+    }),
+  );
+  return new Map(rows.map((row) => [row.studentId, row]));
+}
+
 /** A-11's queue: plans awaiting a decision. */
 export async function getPlanQueue(actor: Actor, semesterId: string) {
   await assertCan(actor, "planning.reviewPlan");
