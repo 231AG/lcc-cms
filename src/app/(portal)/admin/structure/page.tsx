@@ -12,7 +12,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select } from "@/components/ui/Form";
-import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { Table, Thead, Th, Tr, Td, SortableTh, type SortDirection } from "@/components/ui/Table";
 import {
   createCollegeAction,
   toggleCollegeActiveAction,
@@ -38,10 +38,22 @@ const PAGE_SIZE = 10;
 export default async function AcademicStructurePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; deptPage?: string; coursePage?: string; deptCollegeId?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    deptPage?: string;
+    coursePage?: string;
+    deptCollegeId?: string;
+    deptQ?: string;
+    deptSort?: string;
+    deptDir?: string;
+    courseQ?: string;
+    courseSort?: string;
+    courseDir?: string;
+  }>;
 }) {
   const actor = await getCurrentActor();
-  const { error, deptPage, coursePage, deptCollegeId } = await searchParams;
+  const { error, deptPage, coursePage, deptCollegeId, deptQ, deptSort, deptDir, courseQ, courseSort, courseDir } =
+    await searchParams;
 
   if (!actor)
     return (
@@ -70,35 +82,85 @@ export default async function AcademicStructurePage({
   const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? id;
   const courseCode = (id: string) => courses.find((c) => c.id === id)?.code ?? id;
 
-  // Departments filtered by college before they are paged, so page 2 is
-  // page 2 of the filtered list rather than of everything.
+  // Search, then sort, then page -- in that order, so page 2 is page 2 of
+  // what the user is actually looking at rather than of everything.
+  const hay = (...parts: Array<string | number | null | undefined>) =>
+    parts.filter((x) => x !== null && x !== undefined).join(" ").toLowerCase();
+  const matches = (needle: string | undefined, straw: string) =>
+    !needle?.trim() || straw.includes(needle.trim().toLowerCase());
+
+  /** Sorting by a column that does not exist would silently return the list
+   *  unsorted, so the known keys are named and anything else falls back. */
+  const dirOf = (d: string | undefined): SortDirection => (d === "desc" ? "desc" : "asc");
+  const byText = (a: string, b: string, dir: SortDirection) =>
+    dir === "asc" ? a.localeCompare(b) : b.localeCompare(a);
+
   const activeDeptCollege = deptCollegeId && colleges.some((c) => c.id === deptCollegeId) ? deptCollegeId : undefined;
-  const visibleDepartments = activeDeptCollege
-    ? departments.filter((d) => d.collegeId === activeDeptCollege)
-    : departments;
+  const deptSortColumn = ["code", "name", "college", "status"].includes(deptSort ?? "") ? deptSort! : "code";
+  const deptDirection = dirOf(deptDir);
+  const visibleDepartments = departments
+    .filter((d) => !activeDeptCollege || d.collegeId === activeDeptCollege)
+    .filter((d) => matches(deptQ, hay(d.code, d.name, collegeName(d.collegeId))))
+    .sort((a, b) => {
+      if (deptSortColumn === "name") return byText(a.name, b.name, deptDirection);
+      if (deptSortColumn === "college")
+        return byText(collegeName(a.collegeId), collegeName(b.collegeId), deptDirection);
+      if (deptSortColumn === "status")
+        return byText(String(a.isActive), String(b.isActive), deptDirection);
+      return byText(a.code, b.code, deptDirection);
+    });
+
+  const courseSortColumn = ["code", "title", "department", "credits", "status"].includes(courseSort ?? "")
+    ? courseSort!
+    : "code";
+  const courseDirection = dirOf(courseDir);
+  const visibleCourses = courses
+    .filter((c) => matches(courseQ, hay(c.code, c.title, departmentName(c.departmentId))))
+    .sort((a, b) => {
+      if (courseSortColumn === "title") return byText(a.title, b.title, courseDirection);
+      if (courseSortColumn === "department")
+        return byText(departmentName(a.departmentId), departmentName(b.departmentId), courseDirection);
+      if (courseSortColumn === "credits")
+        return courseDirection === "asc" ? a.creditHours - b.creditHours : b.creditHours - a.creditHours;
+      if (courseSortColumn === "status") return byText(String(a.isActive), String(b.isActive), courseDirection);
+      return byText(a.code, b.code, courseDirection);
+    });
 
   const deptPageNum = Math.max(1, Number(deptPage) || 1);
   const totalDeptPages = Math.max(1, Math.ceil(visibleDepartments.length / PAGE_SIZE));
   const pagedDepartments = visibleDepartments.slice((deptPageNum - 1) * PAGE_SIZE, deptPageNum * PAGE_SIZE);
-  const deptPageHref = (p: number) => {
+  /** Every link on this page keeps every OTHER control's state. Sorting the
+   *  courses must not clear the department filter, and paging must not
+   *  clear the search -- each of which is a small betrayal the first time
+   *  it happens. */
+  const structureHref = (extra: Record<string, string | undefined>, hash: string) => {
     const sp = new URLSearchParams();
-    if (activeDeptCollege) sp.set("deptCollegeId", activeDeptCollege);
-    if (p > 1) sp.set("deptPage", String(p));
+    const base: Record<string, string | undefined> = {
+      deptCollegeId: activeDeptCollege,
+      deptQ: deptQ?.trim() || undefined,
+      deptSort: deptSortColumn !== "code" ? deptSortColumn : undefined,
+      deptDir: deptDirection !== "asc" ? deptDirection : undefined,
+      courseQ: courseQ?.trim() || undefined,
+      courseSort: courseSortColumn !== "code" ? courseSortColumn : undefined,
+      courseDir: courseDirection !== "asc" ? courseDirection : undefined,
+    };
+    for (const [k, v] of Object.entries({ ...base, ...extra })) if (v) sp.set(k, v);
     const qs = sp.toString();
-    return `/admin/structure${qs ? `?${qs}` : ""}#departments`;
+    return `/admin/structure${qs ? `?${qs}` : ""}#${hash}`;
   };
 
-  const coursePageHref = (p: number) => {
-    const sp = new URLSearchParams();
-    if (activeDeptCollege) sp.set("deptCollegeId", activeDeptCollege);
-    if (p > 1) sp.set("coursePage", String(p));
-    const qs = sp.toString();
-    return `/admin/structure${qs ? `?${qs}` : ""}#courses`;
-  };
+  const deptPageHref = (p: number) => structureHref({ deptPage: p > 1 ? String(p) : undefined }, "departments");
+  const coursePageHref = (p: number) => structureHref({ coursePage: p > 1 ? String(p) : undefined }, "courses");
+  // A new sort starts at page 1: staying on page 4 of a list that has just
+  // been reordered shows rows nobody asked to see.
+  const deptSortHref = (column: string, direction: SortDirection) =>
+    structureHref({ deptSort: column, deptDir: direction, deptPage: undefined }, "departments");
+  const courseSortHref = (column: string, direction: SortDirection) =>
+    structureHref({ courseSort: column, courseDir: direction, coursePage: undefined }, "courses");
 
   const coursePageNum = Math.max(1, Number(coursePage) || 1);
-  const totalCoursePages = Math.max(1, Math.ceil(courses.length / PAGE_SIZE));
-  const pagedCourses = courses.slice((coursePageNum - 1) * PAGE_SIZE, coursePageNum * PAGE_SIZE);
+  const totalCoursePages = Math.max(1, Math.ceil(visibleCourses.length / PAGE_SIZE));
+  const pagedCourses = visibleCourses.slice((coursePageNum - 1) * PAGE_SIZE, coursePageNum * PAGE_SIZE);
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
@@ -207,6 +269,9 @@ export default async function AcademicStructurePage({
                data-auto-submit hook the other listings use, with the button
                kept as the no-JavaScript path. */
             <form method="GET" className="flex flex-wrap items-end gap-2">
+              {/* The courses table's own search belongs to the form below;
+                  carrying it here keeps this one from clearing it. */}
+              {courseQ?.trim() && <input type="hidden" name="courseQ" value={courseQ} />}
               <div>
                 <Label htmlFor="deptCollegeId" className="text-xs">
                   College
@@ -226,12 +291,25 @@ export default async function AcademicStructurePage({
                   ))}
                 </Select>
               </div>
+              <div>
+                <Label htmlFor="deptQ" className="text-xs">
+                  Search
+                </Label>
+                <Input
+                  id="deptQ"
+                  name="deptQ"
+                  type="search"
+                  defaultValue={deptQ ?? ""}
+                  placeholder="Code, name or college"
+                  className="sm:w-64"
+                />
+              </div>
               <SubmitButton variant="secondary">
                 Apply
               </SubmitButton>
-              {activeDeptCollege && (
+              {(activeDeptCollege || deptQ?.trim()) && (
                 <Link href="/admin/structure#departments" className={buttonClasses("ghost", "md")}>
-                  Clear filter
+                  Clear
                 </Link>
               )}
             </form>
@@ -240,10 +318,10 @@ export default async function AcademicStructurePage({
           <Table>
             <Thead>
               <tr>
-                <Th>Code</Th>
-                <Th>Name</Th>
-                <Th>College</Th>
-                <Th>Status</Th>
+                <SortableTh label="Code" column="code" activeColumn={deptSortColumn} direction={deptDirection} hrefFor={deptSortHref} />
+                <SortableTh label="Name" column="name" activeColumn={deptSortColumn} direction={deptDirection} hrefFor={deptSortHref} />
+                <SortableTh label="College" column="college" activeColumn={deptSortColumn} direction={deptDirection} hrefFor={deptSortHref} />
+                <SortableTh label="Status" column="status" activeColumn={deptSortColumn} direction={deptDirection} hrefFor={deptSortHref} />
                 <Th>Action</Th>
               </tr>
             </Thead>
@@ -326,15 +404,47 @@ export default async function AcademicStructurePage({
           </div>
           <SubmitButton pendingLabel="Adding…">Add course</SubmitButton>
         </form>
-        <TableCard title="Courses" count={courses.length} countLabel="course">
+        <TableCard
+          title="Courses"
+          count={visibleCourses.length}
+          countLabel="course"
+          filters={
+            <form method="GET" className="flex flex-wrap items-end gap-2">
+              {/* The department filter above belongs to the other table;
+                  carrying it through keeps this form from silently
+                  clearing it on submit. */}
+              {activeDeptCollege && <input type="hidden" name="deptCollegeId" value={activeDeptCollege} />}
+              {deptQ?.trim() && <input type="hidden" name="deptQ" value={deptQ} />}
+              <div>
+                <Label htmlFor="courseQ" className="text-xs">
+                  Search
+                </Label>
+                <Input
+                  id="courseQ"
+                  name="courseQ"
+                  type="search"
+                  defaultValue={courseQ ?? ""}
+                  placeholder="Code, title or department"
+                  className="sm:w-72"
+                />
+              </div>
+              <SubmitButton variant="secondary">Apply</SubmitButton>
+              {courseQ?.trim() && (
+                <Link href={structureHref({ courseQ: undefined, coursePage: undefined }, "courses")} className={buttonClasses("ghost", "md")}>
+                  Clear
+                </Link>
+              )}
+            </form>
+          }
+        >
           <Table>
             <Thead>
               <tr>
-                <Th>Code</Th>
-                <Th>Title</Th>
-                <Th>Department</Th>
-                <Th>Cr/Hrs</Th>
-                <Th>Status</Th>
+                <SortableTh label="Code" column="code" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
+                <SortableTh label="Title" column="title" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
+                <SortableTh label="Department" column="department" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
+                <SortableTh label="Cr/Hrs" column="credits" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
+                <SortableTh label="Status" column="status" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
                 <Th>Action</Th>
               </tr>
             </Thead>
