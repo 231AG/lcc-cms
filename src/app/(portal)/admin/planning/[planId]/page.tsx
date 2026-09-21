@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, CalendarClock, Printer, RotateCcw, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Check, CalendarClock, Printer, ShieldAlert, Trash2, X } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
@@ -20,8 +20,7 @@ import {
   overrideScheduleConflictAction,
   rejectPlanAction,
   rejectPlanItemAction,
-  undoPlanDecisionAction,
-  undoPlanItemDecisionAction,
+  deletePlanAction,
 } from "../actions";
 
 /** Every icon control carries the same treatment: a tooltip on hover, and
@@ -31,6 +30,14 @@ import {
  *  you go near it. */
 const iconAction =
   "inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+
+/** The one control here that destroys something, so the only one that is
+ *  red at rest rather than on hover. It fills on hover like the decide
+ *  buttons do, so the thing about to happen stops being a suggestion. */
+const deleteAction =
+  "inline-flex cursor-pointer list-none rounded-md border border-danger-line bg-danger-surface p-1.5 " +
+  "text-danger-fg transition-colors hover:border-danger-solid hover:bg-danger-solid hover:text-on-solid " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
 /**
@@ -86,11 +93,11 @@ export default async function PlanDetailPage({
   searchParams,
 }: {
   params: Promise<{ planId: string }>;
-  searchParams: Promise<{ error?: string; undone?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const actor = await getCurrentActor();
   const { planId } = await params;
-  const { error, undone } = await searchParams;
+  const { error } = await searchParams;
 
   if (!actor)
     return (
@@ -140,8 +147,9 @@ export default async function PlanDetailPage({
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
   const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
   const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, offeringIds);
-  // A decision exists to be undone only once the plan has left review.
-  const isDecided = plan.status === "APPROVED" || plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED";
+  // Approved courses are the ones carrying a registration, and so the
+  // ones the delete prompt has to be specific about.
+  const registeredCount = items.filter((i) => i.status === "APPROVED").length;
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
@@ -158,14 +166,6 @@ export default async function PlanDetailPage({
       {error && (
         <Alert tone="danger" className="mb-4">
           {error}
-        </Alert>
-      )}
-
-      {undone && (
-        <Alert tone="success" className="mb-4">
-          {undone === "course"
-            ? "That course is back to Pending and can be decided again. Every other course on the plan is untouched; any registration it created has been dropped."
-            : "The decision has been undone. This plan is back under review and every course on it is Pending again; any registration it created has been dropped."}
         </Alert>
       )}
 
@@ -234,53 +234,58 @@ export default async function PlanDetailPage({
             >
               <Printer className="h-4 w-4" aria-hidden="true" />
             </Link>
-            {/* Undoing a decision is only meaningful once there is one.
-                Shown disabled rather than hidden on an undecided plan, so
-                the control does not appear and vanish as the plan moves. */}
-            {isDecided ? (
-              <details className="relative">
-                <summary
-                  className={`${iconAction} cursor-pointer list-none`}
-                  title="Undo this decision"
-                  aria-label="Undo this decision"
-                >
-                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                </summary>
-                <div className="border-line bg-surface absolute right-0 z-10 mt-2 w-80 rounded-xl border p-3 shadow-lg">
-                  <p className="text-fg text-sm font-semibold">Undo this decision?</p>
-                  <p className="text-fg-muted mt-1 text-xs">
-                    The plan goes back to Submitted and every course on it returns to Pending, so it can be decided
-                    again. Any registration this approval created is dropped. The student&rsquo;s plan itself is not
-                    changed, and nothing is deleted.
-                  </p>
-                  <form action={undoPlanDecisionAction} className="mt-3">
-                    <input type="hidden" name="planId" value={plan.id} />
-                    <Label htmlFor="undo-reason" className="text-xs">
-                      Why? <Required />
-                    </Label>
-                    <Input
-                      id="undo-reason"
-                      name="reason"
-                      required
-                      maxLength={200}
-                      placeholder="Approved the wrong student"
-                    />
-                    <SubmitButton variant="danger" size="sm" className="mt-2 w-full" pendingLabel="Undoing…">
-                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                      Undo and re-open for review
-                    </SubmitButton>
-                  </form>
-                </div>
-              </details>
-            ) : (
-              <span
-                className="text-fg-subtle inline-flex cursor-not-allowed rounded-md p-1.5"
-                title="There is no decision on this plan to undo yet"
-                aria-label="There is no decision on this plan to undo yet"
+            {/* Red, because it is the only control on this page that
+                destroys something. The others change a status; this one
+                leaves nothing behind. */}
+            <details className="relative">
+              <summary
+                className={deleteAction}
+                title="Delete this plan"
+                aria-label="Delete this plan"
               >
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              </span>
-            )}
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </summary>
+              <div className="border-danger-line bg-surface absolute right-0 z-10 mt-2 w-80 rounded-xl border p-3 shadow-lg">
+                <p className="text-danger-fg flex items-center gap-2 text-sm font-semibold">
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Delete this plan?
+                </p>
+                {/* Spelled out in numbers rather than in general terms.
+                    "This cannot be undone" is true of a great many
+                    buttons; "4 courses and 4 registrations" is what this
+                    particular click costs. */}
+                <p className="text-fg-secondary mt-2 text-xs">
+                  This removes the plan, all {items.length} course{items.length === 1 ? "" : "s"} on it
+                  {registeredCount > 0 && (
+                    <>
+                      {" "}
+                      and the {registeredCount} registration{registeredCount === 1 ? "" : "s"} it created
+                    </>
+                  )}
+                  . The student would have to plan the semester again from scratch.
+                </p>
+                <p className="text-fg-muted mt-1 text-xs">
+                  It cannot be undone. The audit log keeps a record of what was here.
+                </p>
+                <form action={deletePlanAction} className="mt-3">
+                  <input type="hidden" name="planId" value={plan.id} />
+                  <Label htmlFor="delete-reason" className="text-xs">
+                    Why? <Required />
+                  </Label>
+                  <Input
+                    id="delete-reason"
+                    name="reason"
+                    required
+                    maxLength={200}
+                    placeholder="Entered against the wrong student"
+                  />
+                  <SubmitButton variant="danger" size="sm" className="mt-2 w-full" pendingLabel="Deleting…">
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    Yes, delete this plan
+                  </SubmitButton>
+                </form>
+              </div>
+            </details>
           </div>
         }
       >
@@ -432,37 +437,8 @@ export default async function PlanDetailPage({
                           </form>
                         </details>
                       )}
-                      {/* The correction that actually gets used. An Admin
-                          deciding row by row leaves the plan SUBMITTED the
-                          whole way -- so the whole-plan undo is unavailable
-                          exactly when a mis-click is most likely, and this
-                          is the one that reaches it. */}
-                      {i.status !== "PENDING" && (
-                        <details className="relative">
-                          <summary
-                            title={`Undo the decision on ${c?.code ?? "this course"}`}
-                            aria-label={`Undo the decision on ${c?.code ?? "this course"}`}
-                            className={`${iconAction} cursor-pointer list-none`}
-                          >
-                            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                          </summary>
-                          <form
-                            action={undoPlanItemDecisionAction}
-                            className="border-line bg-surface absolute right-0 z-10 mt-1 flex w-72 flex-col gap-2 rounded-md border p-3 text-left shadow-lg"
-                          >
-                            <input type="hidden" name="planId" value={planId} />
-                            <input type="hidden" name="planItemId" value={i.id} />
-                            <p className="text-fg-muted text-xs">
-                              Puts this course back to Pending so it can be decided again. Every other course on the
-                              plan is left as it is.
-                              {i.status === "APPROVED" && " The registration it created is dropped."}
-                            </p>
-                            <Input name="reason" required placeholder="Why?" className="py-1 text-xs" />
-                            <SubmitButton variant="secondary" size="sm" pendingLabel="Undoing…">
-                              Undo this decision
-                            </SubmitButton>
-                          </form>
-                        </details>
+                      {!decidable && i.status !== "PENDING" && (
+                        <span className="text-fg-muted text-xs">Decided</span>
                       )}
                     </span>
                   </Td>

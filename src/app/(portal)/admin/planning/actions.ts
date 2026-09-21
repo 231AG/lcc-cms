@@ -10,44 +10,34 @@ import {
   overrideScheduleConflict,
   rejectPlan,
   rejectPlanItem,
-  undoPlanDecision,
-  undoPlanItemDecision,
+  deletePlan,
 } from "@/lib/planning/planning";
 
 function errorRedirect(planId: string, message: string): never {
   redirect(`/admin/planning/${planId}?error=${encodeURIComponent(message)}`);
 }
 
-/** Takes a decided plan back to Submitted so it can be reviewed again.
- *  Lands on the same page, which is now showing the plan back under
- *  review -- there is nowhere better to send somebody who has just
- *  undone a decision than the decision they are about to redo. */
-export async function undoPlanDecisionAction(formData: FormData): Promise<void> {
-  const actor = await requireActor();
-  const planId = String(formData.get("planId") ?? "");
-  const reason = String(formData.get("reason") ?? "");
-  try {
-    await undoPlanDecision(actor, planId, reason);
-  } catch (err) {
-    if (err instanceof AppError) errorRedirect(planId, err.message);
-    throw err;
-  }
-  redirect(`/admin/planning/${planId}?undone=1`);
-}
 
-/** Puts one course back to Pending, leaving the rest of the plan alone. */
-export async function undoPlanItemDecisionAction(formData: FormData): Promise<void> {
+
+/**
+ * Deletes the plan and everything it produced.
+ *
+ * Redirects to the queue rather than back to the plan, because the plan
+ * this page was showing no longer exists -- landing on its own 404 is a
+ * worse answer than landing on the list it came from.
+ */
+export async function deletePlanAction(formData: FormData): Promise<void> {
   const actor = await requireActor();
   const planId = String(formData.get("planId") ?? "");
-  const planItemId = String(formData.get("planItemId") ?? "");
   const reason = String(formData.get("reason") ?? "");
+  let summary;
   try {
-    await undoPlanItemDecision(actor, planItemId, reason);
+    summary = await deletePlan(actor, planId, reason);
   } catch (err) {
     if (err instanceof AppError) errorRedirect(planId, err.message);
     throw err;
   }
-  redirect(`/admin/planning/${planId}?undone=course`);
+  redirect(`/admin/planning?deleted=${summary.coursesDeleted}`);
 }
 
 export async function approvePlanAction(formData: FormData): Promise<void> {

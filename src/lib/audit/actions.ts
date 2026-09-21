@@ -80,19 +80,13 @@ export const AUDIT_ACTIONS = [
   // the other is "I changed the plan". An Admin whose queue item vanished
   // needs to be able to tell which.
   "COURSE_PLAN_REOPENED",
-  // A reviewer taking back their own decision on a whole plan, because it
-  // was made in error. Distinct from REVISED (the student reworking a plan
-  // that was refused) and from REOPENED (an edit pulling a plan out of the
-  // queue): this one is the reviewer correcting themselves, and it is the
-  // only action that puts an already-decided plan back under review.
-  "COURSE_PLAN_DECISION_UNDONE",
+  // A plan thrown away from the review screen, because a decision on it
+  // was wrong. The entry carries what was destroyed -- the courses, the
+  // registration count, the status it was in -- because once the delete
+  // has run this log is the only place any of that still exists.
+  "COURSE_PLAN_DELETED",
   "COURSE_PLAN_ITEM_APPROVED",
   "COURSE_PLAN_ITEM_REJECTED",
-  // One course put back to Pending because the decision on it was wrong.
-  // Separate from the whole-plan undo: an Admin deciding row by row sits
-  // at SUBMITTED the whole time, so this is the correction that actually
-  // gets used, and it should be findable on its own in the log.
-  "COURSE_PLAN_ITEM_DECISION_UNDONE",
   "PREREQUISITE_OVERRIDDEN",
   // An Admin accepting that two planned courses overlap, so the plan can be
   // approved despite the clash.
