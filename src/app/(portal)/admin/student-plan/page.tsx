@@ -112,10 +112,7 @@ export default async function StudentPlanEntryPage({
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
-      <PageHeader
-        title="Course plan entry"
-        description="Build and submit a course plan for a student who cannot use the app themselves. It goes to Course plan review like any other plan."
-      />
+      <PageHeader title="Course plan entry" />
 
       {error && (
         <Alert tone="danger" className="mb-4">

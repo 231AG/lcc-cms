@@ -5,6 +5,7 @@ import { isPlanningOpen, pickPlanningSemester, type SemesterState } from "@/lib/
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds, getOfferingsForSemester } from "@/lib/offerings/offerings";
+import { expandDays, formatDays, groupMeetingSlots } from "@/lib/offerings/offeringRows";
 import { filterOfferings, pageSlice } from "@/lib/offerings/offeringSearch";
 import { getMyPlan, getMyPlans, getPlanItems, getRegistrationsForStudent } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -15,7 +16,7 @@ import { Label, Select } from "@/components/ui/Form";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { ClipboardList, Lock, Send, Trash2 } from "lucide-react";
 import { OfferingPicker } from "@/components/planning/OfferingPicker";
-import { PlanCourseRow, PlanEmpty, PlanStatusBanner, type PlanState } from "@/components/planning/PlanPieces";
+import { PlanCourseTable, PlanEmpty, PlanStatusBanner, type PlanCourse, type PlanState } from "@/components/planning/PlanPieces";
 import {
   startPlanAction,
   addPlanItemAction,
@@ -144,23 +145,43 @@ export default async function PlanningPage({
   const approvedCount = items.filter((i) => i.status === "APPROVED").length;
   const rejectedCount = items.filter((i) => i.status === "REJECTED").length;
   const pendingCount = items.filter((i) => i.status === "PENDING").length;
+  // Where and when every course in this plan actually meets. One batched
+  // query for the plan's own offerings, separate from the catalogue's --
+  // the catalogue is paged and the plan is not, so they are different sets
+  // and fetching either does not cover the other.
+  const planOfferingIds = [...new Set([...items.map((i) => i.offeringId), ...registrations.map((r) => r.offeringId)])];
+  const planMeetings = await getOfferingMeetingsForOfferings(actor, planOfferingIds);
+
+  /** The room, days and times one plan row shows. A course meeting twice
+   *  in the same room at the same hour is one slot with both days on it;
+   *  anything past the first slot is left to the catalogue below, which
+   *  has the room to list them all. */
+  const scheduleFor = (offeringId: string) => {
+    const slots = groupMeetingSlots(planMeetings.get(offeringId) ?? []);
+    const first = slots[0];
+    const days = first ? formatDays(first.days) : "";
+    return { days, daysFull: expandDays(days), room: first?.room ?? "", start: first?.start ?? "", end: first?.end ?? "" };
+  };
+
   /** One course's row props, so the editor and the read-only views cannot
    *  describe the same course differently. */
-  const rowFor = (i: (typeof items)[number]) => {
+  const rowFor = (i: (typeof items)[number]): PlanCourse => {
     const c = courseFor(i.courseId);
     const o = offeringById.get(i.offeringId);
     return {
-      code: c?.code ?? "—",
+      key: i.id,
+      code: c?.code ?? "\u2014",
       title: c?.title ?? i.courseId,
-      meta: [o?.section ? `Section ${o.section}` : null, o ? `${o.frozenCreditHours} Cr/Hrs` : null, i.isRetake ? "Retake" : null].filter(
-        (x): x is string => !!x,
-      ),
+      section: o?.section ?? "",
+      creditHours: o?.frozenCreditHours ?? "\u2014",
+      ...scheduleFor(i.offeringId),
+      isRetake: i.isRetake,
       state: i.status as "PENDING" | "APPROVED" | "REJECTED",
       note:
         i.status === "REJECTED" && i.rejectionReason
           ? i.rejectionReason
           : i.status === "APPROVED"
-            ? "Registered — ask the Registrar to drop it."
+            ? "Registered \u2014 ask the Registrar to drop it."
             : undefined,
     };
   };
@@ -292,43 +313,44 @@ export default async function PlanningPage({
                 {items.length} {items.length === 1 ? "course" : "courses"} · {totalCredits} Cr/Hrs
               </span>
             </CardHeader>
-            <CardBody>
-              {items.length === 0 ? (
+            {items.length === 0 ? (
+              <CardBody>
                 <PlanEmpty>No courses yet. Pick them from the catalogue below.</PlanEmpty>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {items.map((i) => (
-                    <PlanCourseRow
-                      key={i.id}
-                      {...rowFor(i)}
-                      action={
-                        i.status === "APPROVED" ? (
-                          <span className="text-fg-muted inline-flex items-center gap-1 text-xs font-medium">
-                            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-                            Locked
-                          </span>
-                        ) : (
-                          <form action={removePlanItemAction}>
-                            {Object.entries(contextFields).map(([name, value]) => (
-                              <input key={name} type="hidden" name={name} value={value} />
-                            ))}
-                            <input type="hidden" name="planItemId" value={i.id} />
-                            <SubmitTextButton
-                              pendingLabel="Removing…"
-                              className="text-danger-fg inline-flex items-center gap-1 text-xs font-medium hover:underline"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              Remove
-                            </SubmitTextButton>
-                          </form>
-                        )
-                      }
-                    />
-                  ))}
-                </ul>
-              )}
+              </CardBody>
+            ) : (
+              <PlanCourseTable
+                courses={items.map((i) => ({
+                  ...rowFor(i),
+                  action:
+                    i.status === "APPROVED" ? (
+                      <span className="text-fg-muted inline-flex items-center gap-1 text-xs font-medium">
+                        <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                        Locked
+                      </span>
+                    ) : (
+                      <form action={removePlanItemAction}>
+                        {Object.entries(contextFields).map(([name, value]) => (
+                          <input key={name} type="hidden" name={name} value={value} />
+                        ))}
+                        <input type="hidden" name="planItemId" value={i.id} />
+                        <SubmitTextButton
+                          pendingLabel="Removing…"
+                          className="text-danger-fg inline-flex items-center gap-1 text-xs font-medium hover:underline"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          Remove
+                        </SubmitTextButton>
+                      </form>
+                    ),
+                }))}
+              />
+            )}
 
-              <div className="border-line-subtle mt-5 flex flex-wrap items-center gap-3 border-t pt-5">
+            {/* The submit row is its own strip under the table, divided
+                from it by a rule, rather than sharing a box with the rows
+                it acts on. */}
+            <CardBody className="border-line-subtle border-t">
+              <div className="flex flex-wrap items-center gap-3">
                 <form action={submitPlanAction}>
                   {Object.entries(contextFields).map(([name, value]) => (
                     <input key={name} type="hidden" name={name} value={value} />
@@ -391,31 +413,28 @@ export default async function PlanningPage({
             <CardHeader>
               <CardTitle icon={<ClipboardList className="h-4 w-4" aria-hidden="true" />}>Registered courses</CardTitle>
             </CardHeader>
-            <CardBody>
-              {registeredRegistrations.length === 0 ? (
+            {registeredRegistrations.length === 0 ? (
+              <CardBody>
                 <PlanEmpty>No registrations are recorded against this plan.</PlanEmpty>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {registeredRegistrations.map((r) => {
-                    const o = offeringById.get(r.offeringId);
-                    const c = o ? courseFor(o.courseId) : undefined;
-                    return (
-                      <PlanCourseRow
-                        key={r.id}
-                        code={c?.code ?? "\u2014"}
-                        title={c?.title ?? r.offeringId}
-                        meta={[
-                          o?.section ? `Section ${o.section}` : null,
-                          o ? `${o.frozenCreditHours} Cr/Hrs` : null,
-                          r.isRetake ? "Retake" : null,
-                        ].filter((x): x is string => !!x)}
-                        state="APPROVED"
-                      />
-                    );
-                  })}
-                </ul>
-              )}
-            </CardBody>
+              </CardBody>
+            ) : (
+              <PlanCourseTable
+                courses={registeredRegistrations.map((r) => {
+                  const o = offeringById.get(r.offeringId);
+                  const c = o ? courseFor(o.courseId) : undefined;
+                  return {
+                    key: r.id,
+                    code: c?.code ?? "\u2014",
+                    title: c?.title ?? r.offeringId,
+                    section: o?.section ?? "",
+                    creditHours: o?.frozenCreditHours ?? "\u2014",
+                    ...scheduleFor(r.offeringId),
+                    isRetake: r.isRetake,
+                    state: "APPROVED" as const,
+                  };
+                })}
+              />
+            )}
           </Card>
         </>
       )}
@@ -444,17 +463,13 @@ export default async function PlanningPage({
             <CardHeader>
               <CardTitle icon={<ClipboardList className="h-4 w-4" aria-hidden="true" />}>Courses in this plan</CardTitle>
             </CardHeader>
-            <CardBody>
-              {items.length === 0 ? (
+            {items.length === 0 ? (
+              <CardBody>
                 <PlanEmpty>This plan has no courses in it. Please contact the Admin office.</PlanEmpty>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {items.map((i) => (
-                    <PlanCourseRow key={i.id} {...rowFor(i)} />
-                  ))}
-                </ul>
-              )}
-            </CardBody>
+              </CardBody>
+            ) : (
+              <PlanCourseTable courses={items.map(rowFor)} />
+            )}
           </Card>
         </>
       )}

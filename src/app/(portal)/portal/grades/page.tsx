@@ -115,10 +115,7 @@ export default async function MyGradesPage({
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 outline-none sm:px-6 sm:py-10 lg:px-8">
       <Breadcrumb items={[{ label: "My grades" }]} />
-      <PageHeader
-        title="My grades"
-        description="Your results semester by semester, and the cumulative figures they add up to."
-      />
+      <PageHeader title="My grades" />
 
       {resultSemesterIds.length === 0 && (
         <Alert tone="info">
@@ -171,12 +168,6 @@ export default async function MyGradesPage({
                   </div>
                 )}
 
-                {cumulative && cumulative.totalCreditsAttempted !== cumulative.totalCreditsEarned && (
-                  <p className="text-fg-muted mt-3 text-xs">
-                    {trimCredits(cumulative.totalCreditsAttempted)} Cr/Hrs attempted — the difference is coursework that
-                    did not earn credit.
-                  </p>
-                )}
               </CardBody>
             </Card>
 

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
 import { Pagination } from "@/components/ui/Pagination";
 import { SubmitTextButton } from "@/components/ui/SubmitButton";
+import { formatMeetingSlots } from "@/lib/offerings/offeringRows";
 
 /**
  * The "available offerings" picker used both by a student building their
@@ -18,7 +19,6 @@ import { SubmitTextButton } from "@/components/ui/SubmitButton";
  * list unusable before -- see getOfferingMeetingsForOfferings.
  */
 
-const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export interface PickerOffering {
   id: string;
@@ -29,6 +29,9 @@ export interface PickerOffering {
 }
 
 export interface PickerMeeting {
+  /** Carried so the shared slot formatter can group these the same way
+   *  the offerings listing does. */
+  id: string;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
@@ -134,10 +137,13 @@ export function OfferingPicker({
                   </span>
                   <span className="shrink-0 text-xs text-fg-muted">{o.frozenCreditHours}cr</span>
                 </div>
+                {/* "MWF 11:00-12:00 - PAPE 1" rather than the same class
+                    written out once per weekday with the seconds nobody
+                    schedules to. Same helper the plan table above and the
+                    Course offerings listing use, so one course reads the
+                    same way wherever it appears. */}
                 <p className="mb-2 text-xs text-fg-muted">
-                  {meetings
-                    .map((m) => `${DAY_NAMES[m.dayOfWeek]} ${m.startTime}-${m.endTime}${m.room ? ` (${m.room})` : ""}`)
-                    .join(", ")}
+                  {formatMeetingSlots(meetings).join(", ")}
                   {o.instructorName ? ` — ${o.instructorName}` : ""}
                 </p>
                 {already ? (

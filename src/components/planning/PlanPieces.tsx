@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { CheckCircle2, CircleDashed, Clock, FileEdit, XCircle } from "lucide-react";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
+import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { cn } from "@/components/ui/cn";
 
 /**
@@ -118,56 +119,105 @@ const ITEM_PRESENTATION: Record<ItemState, { tone: Tone; label: string }> = {
   REJECTED: { tone: "danger", label: "Turned down" },
 };
 
-const ACCENT: Record<ItemState, string> = {
-  PENDING: "before:bg-info-line",
-  APPROVED: "before:bg-success-line",
-  REJECTED: "before:bg-danger-line",
-};
-
-/**
- * One planned course: its code as a monospace chip, its title, whatever
- * meta the caller has (section, credit hours, retake), the decision as a
- * pill, and the caller's own control on the right.
- *
- * The coloured edge is `::before` rather than a border-left, so it hugs the
- * rounded corner instead of squaring it off.
- */
-export function PlanCourseRow({
-  code,
-  title,
-  meta = [],
-  state,
-  note,
-  action,
-}: {
+/** One course in a student's plan, with where and when it actually meets. */
+export interface PlanCourse {
+  key: string;
   code: string;
   title: string;
-  meta?: string[];
+  section: string;
+  creditHours: number | string;
+  /** Already reduced to the one slot a plan row shows: several meetings in
+   *  the same room at the same hour are one line with their days collected.
+   *  Empty when the offering has no meetings recorded. */
+  days: string;
+  daysFull: string;
+  room: string;
+  start: string;
+  end: string;
+  isRetake: boolean;
   state: ItemState;
+  /** A rejection reason, or anything else true of this row. */
   note?: string;
+  /** The caller's own control for this row -- remove, or a lock. */
   action?: ReactNode;
-}) {
-  const { tone, label } = ITEM_PRESENTATION[state];
+}
+
+/**
+ * A student's plan as a timetable rather than a list of names.
+ *
+ * It used to be one stacked card per course carrying the code, the title
+ * and "Section 1 \u00b7 3 Cr/Hrs" -- which is most of what a student needs
+ * EXCEPT the two things they open this page to check: which room, and at
+ * what time. Those live on the offering and were simply never shown here,
+ * though the Registrar has seen them on the review screen all along.
+ *
+ * Same columns, in the same order, dropping away at the same widths as the
+ * admin review table, so the student and the Registrar are reading one
+ * document rather than two designs of it.
+ */
+export function PlanCourseTable({ courses, actionHeader }: { courses: PlanCourse[]; actionHeader?: string }) {
+  const showAction = courses.some((c) => c.action);
 
   return (
-    <li
-      className={cn(
-        "border-line bg-surface relative flex flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-xl border py-3 pr-4 pl-5",
-        "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:content-['']",
-        ACCENT[state],
-      )}
-    >
-      <span className="bg-brand-subtle text-brand-fg shrink-0 rounded-md px-2 py-1 font-mono text-xs font-bold">{code}</span>
-
-      <span className="min-w-0 flex-1">
-        <span className="text-fg block text-sm font-semibold">{title}</span>
-        {meta.length > 0 && <span className="text-fg-muted mt-0.5 block text-xs">{meta.join(" · ")}</span>}
-        {note && <span className="text-fg-secondary mt-1 block text-xs">{note}</span>}
-      </span>
-
-      <Badge tone={tone}>{label}</Badge>
-      {action && <span className="shrink-0">{action}</span>}
-    </li>
+    <Table>
+      <Thead>
+        <tr>
+          <Th className="whitespace-nowrap">Code</Th>
+          <Th>Course Title</Th>
+          <Th className="hidden whitespace-nowrap sm:table-cell">Sec</Th>
+          <Th className="hidden whitespace-nowrap sm:table-cell">Cr/Hrs</Th>
+          <Th className="hidden whitespace-nowrap md:table-cell">Room</Th>
+          <Th className="hidden whitespace-nowrap sm:table-cell">Day</Th>
+          <Th className="hidden whitespace-nowrap lg:table-cell">Start</Th>
+          <Th className="hidden whitespace-nowrap lg:table-cell">End</Th>
+          <Th className="whitespace-nowrap">Status</Th>
+          {showAction && <Th className="text-right">{actionHeader ?? "Action"}</Th>}
+        </tr>
+      </Thead>
+      <tbody>
+        {courses.map((c) => {
+          const { tone, label } = ITEM_PRESENTATION[c.state];
+          return (
+            <Tr key={c.key}>
+              <Td className="text-brand-fg font-mono text-xs font-bold whitespace-nowrap">{c.code}</Td>
+              <Td className="text-fg font-medium">
+                {c.title}
+                {c.isRetake && <span className="text-fg-muted ml-1.5 text-xs font-normal">(retake)</span>}
+                {c.note && <span className="text-fg-secondary mt-0.5 block text-xs font-normal">{c.note}</span>}
+                {/* Every column that drops away above is repeated here, so
+                    a phone answers "which section, where and when" from the
+                    row itself rather than from a sideways scroll. Below sm
+                    the table is down to code, course, status and the
+                    control -- which is what actually fits. */}
+                <span className="text-fg-muted mt-0.5 block text-xs font-normal sm:hidden">
+                  {[
+                    c.section ? `Section ${c.section}` : null,
+                    `${c.creditHours} Cr/Hrs`,
+                    c.days || null,
+                    c.start ? `${c.start}\u2013${c.end}` : null,
+                    c.room || null,
+                  ]
+                    .filter(Boolean)
+                    .join(" \u00b7 ")}
+                </span>
+              </Td>
+              <Td className="hidden whitespace-nowrap sm:table-cell">{c.section || "\u2014"}</Td>
+              <Td className="hidden whitespace-nowrap sm:table-cell">{c.creditHours}</Td>
+              <Td className="text-fg-secondary hidden whitespace-nowrap md:table-cell">{c.room || "\u2014"}</Td>
+              <Td className="hidden whitespace-nowrap sm:table-cell" title={c.daysFull || undefined}>
+                {c.days || "\u2014"}
+              </Td>
+              <Td className="hidden whitespace-nowrap lg:table-cell">{c.start || "\u2014"}</Td>
+              <Td className="hidden whitespace-nowrap lg:table-cell">{c.end || "\u2014"}</Td>
+              <Td className="whitespace-nowrap">
+                <Badge tone={tone}>{label}</Badge>
+              </Td>
+              {showAction && <Td className="text-right">{c.action}</Td>}
+            </Tr>
+          );
+        })}
+      </tbody>
+    </Table>
   );
 }
 

@@ -388,9 +388,7 @@ export default async function PortalPage({
               </RecordPanel>
               <RecordPanel icon={<BookOpen className="h-4 w-4" aria-hidden="true" />} term="Credits earned">
                 {cumulative
-                  ? `${trimCredits(cumulative.totalCreditsEarned)} of ${cumulative.graduationCreditHours} Cr/Hrs — ${trimCredits(
-                      cumulative.creditsToGraduation,
-                    )} remaining`
+                  ? `${trimCredits(cumulative.totalCreditsEarned)} of ${cumulative.graduationCreditHours} Cr/Hrs`
                   : "—"}
               </RecordPanel>
               <RecordPanel icon={<GraduationCap className="h-4 w-4" aria-hidden="true" />} term="Credits attempted">
