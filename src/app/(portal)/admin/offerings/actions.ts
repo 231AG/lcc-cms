@@ -14,7 +14,7 @@ import {
   UnknownCourseCodeError,
   updateOffering,
 } from "@/lib/offerings/offerings";
-import { courseCodeKey } from "@/lib/courses/courseCode";
+import { courseCodeKey, effectiveCourseCode } from "@/lib/courses/courseCode";
 
 function errorRedirect(semesterId: string, message: string): never {
   redirect(`/admin/offerings?semesterId=${semesterId}&error=${encodeURIComponent(message)}`);
@@ -38,10 +38,17 @@ function formStateParams(formData: FormData): URLSearchParams {
     if (value) params.set(name, value);
   }
   for (const day of formData.getAll("days")) params.append("days", String(day));
-  for (const name of ["newTitle", "newCreditHours", "newDepartmentId"]) {
+  for (const name of ["newCourseCode", "newTitle", "newCreditHours", "newDepartmentId"]) {
     const value = String(formData.get(name) ?? "").trim();
     if (value) params.set(name, value);
   }
+  // The panel's code wins where it differs, so the round trip has to carry
+  // the winner as the Course box's value too -- otherwise the confirmation
+  // screen would print the code that was overridden, which is the one
+  // moment this form must not be wrong about.
+  const panelCode = String(formData.get("newCourseCode") ?? "").trim();
+  if (panelCode) params.set("courseCode", panelCode);
+
   // Intent is deliberately NOT carried. Publish-or-draft is re-chosen on
   // the confirmation screen, because by then the registrar has seen what
   // the course actually is -- and that is a fair moment to change their
@@ -55,25 +62,35 @@ export async function createOfferingAction(formData: FormData): Promise<void> {
   const capacityRaw = String(formData.get("capacity") ?? "").trim();
   const courseCode = String(formData.get("courseCode") ?? "");
 
-  // The "not on record yet" panel. All three are needed before a course
-  // can be created; a half-filled panel is treated as not filled at all,
-  // so a stray keystroke in one field cannot start a creation.
+  // The "not on record yet" panel. Title, credit hours and department are
+  // all needed before a course can be created; a half-filled panel is
+  // treated as not filled at all, so a stray keystroke in one field cannot
+  // start a creation.
   const newTitle = String(formData.get("newTitle") ?? "").trim();
   const newCreditHoursRaw = String(formData.get("newCreditHours") ?? "").trim();
   const newDepartmentId = String(formData.get("newDepartmentId") ?? "").trim();
   const newCourseFilled = !!(newTitle && newCreditHoursRaw && newDepartmentId);
+
+  // The panel carries the code as well, so it reads as the whole course
+  // rather than three details about a code kept somewhere else. It arrives
+  // pre-filled from the Course box, and when it differs it WINS -- for the
+  // course created and for the offering. That is not a silent override:
+  // the panel is the more specific statement of intent, and nothing is
+  // written until the confirmation step, which prints the exact code.
+  const newCourseCode = String(formData.get("newCourseCode") ?? "").trim();
+  const code = effectiveCourseCode(courseCode, newCourseCode);
 
   // Confirmation is tied to the exact code it was given for. Editing the
   // code after confirming -- the likeliest way to fix a typo, and so the
   // likeliest way to introduce a second one -- makes the confirmation
   // stale and asks again.
   const confirmedFor = String(formData.get("confirmCourse") ?? "").trim();
-  const confirmed = !!confirmedFor && courseCodeKey(confirmedFor) === courseCodeKey(courseCode);
+  const confirmed = !!confirmedFor && courseCodeKey(confirmedFor) === courseCodeKey(code);
 
   try {
     await createOffering(actor, {
       semesterId,
-      courseCode,
+      courseCode: code,
       section: String(formData.get("section") ?? ""),
       // Blank instructor and capacity are left undefined rather than sent
       // as "" / NaN, so the service layer's documented defaults apply.

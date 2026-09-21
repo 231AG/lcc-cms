@@ -183,6 +183,7 @@ export default async function OfferingsPage({
     instructorName?: string;
     capacity?: string;
     days?: string | string[];
+    newCourseCode?: string;
     newTitle?: string;
     newCreditHours?: string;
     newDepartmentId?: string;
@@ -217,6 +218,7 @@ export default async function OfferingsPage({
     instructorName: draftInstructor,
     capacity: draftCapacity,
     days: draftDays,
+    newCourseCode: draftNewCourseCode,
     newTitle: draftNewTitle,
     newCreditHours: draftNewCreditHours,
     newDepartmentId: draftNewDepartmentId,
@@ -564,7 +566,28 @@ export default async function OfferingsPage({
                       <span className="text-brand-fg">+</span> Course not on record yet? Add it here
                     </summary>
                     <div className="border-line-subtle border-t px-4 py-4">
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                          {/* The panel used to describe a course without
+                              naming it -- three details about a code kept
+                              in the Course box above, which reads as a
+                              form somebody forgot to finish. It arrives
+                              pre-filled with whatever was typed up there,
+                              and where it differs it is the one that
+                              counts: it is the more specific statement of
+                              intent, and the confirmation step prints the
+                              exact code before anything is written. */}
+                          <Label htmlFor="newCourseCode" className="text-xs">
+                            Course code
+                          </Label>
+                          <Input
+                            id="newCourseCode"
+                            name="newCourseCode"
+                            autoComplete="off"
+                            defaultValue={draftNewCourseCode ?? draftCourseCode ?? ""}
+                            placeholder="ACCT 301"
+                          />
+                        </div>
                         <div className="sm:col-span-2 lg:col-span-1">
                           <Label htmlFor="newTitle" className="text-xs">
                             Course title
@@ -610,8 +633,10 @@ export default async function OfferingsPage({
                         </div>
                       </div>
                       <p className="text-fg-muted mt-3 text-xs">
-                        All three are needed. The credit hours are copied onto this offering permanently, so a wrong number
-                        here follows the course onto every grade sheet. If the department is missing too, add it on{" "}
+                        All four are needed. The code is taken from the Course box above — change it here and this
+                        offering uses the new one. The credit hours are copied onto this offering permanently, so a wrong
+                        number here follows the course onto every grade sheet. If the department is missing too, add it
+                        on{" "}
                         <Link href="/admin/structure#courses" className="text-brand-fg font-medium hover:underline">
                           Academic structure
                         </Link>{" "}
