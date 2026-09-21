@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Pencil, Printer, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, Download, Pencil, Printer, Trash2 } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
 import { formatCourseCode } from "@/lib/courses/courseCode";
+import { findNearbyCourseCodes } from "@/lib/courses/courseCodeMatch";
 import {
   DAY_LETTER,
   DAY_NAMES,
@@ -116,6 +117,11 @@ function loadReference(userId: string) {
       tx.query.academicYear.findMany(),
       tx.query.course.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
       tx.query.college.findMany({ where: (c, { eq }) => eq(c.isActive, true), orderBy: (c, { asc }) => asc(c.code) }),
+      // For the "not on record yet" panel's department picker. Read with
+      // the rest rather than on demand: it is one more small list in a
+      // round trip this page already makes, and fetching it only when the
+      // panel opens would cost a second trip at the worst moment.
+      tx.query.department.findMany({ where: (d, { eq }) => eq(d.isActive, true), orderBy: (d, { asc }) => asc(d.code) }),
     ]),
   );
 }
@@ -165,6 +171,20 @@ export default async function OfferingsPage({
 }: {
   searchParams: Promise<{
     semesterId?: string;
+    // Carried back by createOfferingAction so a half-filled Add-an-offering
+    // form survives a round trip -- see formStateParams in actions.ts.
+    stage?: "course" | "confirm";
+    courseCode?: string;
+    section?: string;
+    room?: string;
+    startTime?: string;
+    endTime?: string;
+    instructorName?: string;
+    capacity?: string;
+    days?: string | string[];
+    newTitle?: string;
+    newCreditHours?: string;
+    newDepartmentId?: string;
     error?: string;
     q?: string;
     collegeId?: string;
@@ -177,7 +197,32 @@ export default async function OfferingsPage({
   }>;
 }) {
   const actor = await getCurrentActor();
-  const { semesterId: requestedSemesterId, error, q, collegeId, page, sort, dir, pageSize, debug } = await searchParams;
+  const {
+    semesterId: requestedSemesterId,
+    error,
+    q,
+    collegeId,
+    page,
+    sort,
+    dir,
+    pageSize,
+    debug,
+    stage,
+    courseCode: draftCourseCode,
+    section: draftSection,
+    room: draftRoom,
+    startTime: draftStartTime,
+    endTime: draftEndTime,
+    instructorName: draftInstructor,
+    capacity: draftCapacity,
+    days: draftDays,
+    newTitle: draftNewTitle,
+    newCreditHours: draftNewCreditHours,
+    newDepartmentId: draftNewDepartmentId,
+  } = await searchParams;
+  const draftDayNumbers = new Set(
+    (Array.isArray(draftDays) ? draftDays : draftDays ? [draftDays] : []).map((d) => Number(d)),
+  );
   // An unrecognised size falls back rather than erroring, so a hand-edited
   // URL cannot produce a page of 10,000 rows.
   const size = (PAGE_SIZES as readonly number[]).includes(Number(pageSize))
@@ -210,8 +255,9 @@ export default async function OfferingsPage({
   let academicYears: Awaited<ReturnType<typeof loadReference>>[1];
   let courses: Awaited<ReturnType<typeof loadReference>>[2];
   let colleges: Awaited<ReturnType<typeof loadReference>>[3];
+  let departments: Awaited<ReturnType<typeof loadReference>>[4];
   try {
-    [semesters, academicYears, courses, colleges] = await loadReference(actor.userId);
+    [semesters, academicYears, courses, colleges, departments] = await loadReference(actor.userId);
   } catch (err) {
     return <LoadFailure stage="reading the semester and course lists" err={err} debug={debug === "1"} />;
   }
@@ -386,6 +432,7 @@ export default async function OfferingsPage({
                         list="offering-course-options"
                         required
                         autoComplete="off"
+                        defaultValue={draftCourseCode ?? ""}
                         placeholder="Type a code or title, e.g. ACCT 301"
                       />
                       {/* Offered spaced, matching the table and the grade
@@ -407,14 +454,21 @@ export default async function OfferingsPage({
                         Section
                         <Required />
                       </Label>
-                      <Input id="section" name="section" required inputMode="numeric" placeholder="1" />
+                      <Input
+                        id="section"
+                        name="section"
+                        required
+                        inputMode="numeric"
+                        defaultValue={draftSection ?? ""}
+                        placeholder="1"
+                      />
                     </div>
                     <div>
                       <Label htmlFor="room" className="text-xs">
                         Room
                         <Required />
                       </Label>
-                      <Select id="room" name="room" required defaultValue="">
+                      <Select id="room" name="room" required defaultValue={draftRoom ?? ""}>
                         <option value="" disabled>
                           Select room
                         </option>
@@ -430,26 +484,38 @@ export default async function OfferingsPage({
                         Start time
                         <Required />
                       </Label>
-                      <Input id="startTime" name="startTime" type="time" required />
+                      <Input id="startTime" name="startTime" type="time" required defaultValue={draftStartTime ?? ""} />
                     </div>
                     <div>
                       <Label htmlFor="endTime" className="text-xs">
                         End time
                         <Required />
                       </Label>
-                      <Input id="endTime" name="endTime" type="time" required />
+                      <Input id="endTime" name="endTime" type="time" required defaultValue={draftEndTime ?? ""} />
                     </div>
                     <div>
                       <Label htmlFor="instructorName" className="text-xs">
                         Instructor
                       </Label>
-                      <Input id="instructorName" name="instructorName" placeholder={DEFAULT_INSTRUCTOR} />
+                      <Input
+                        id="instructorName"
+                        name="instructorName"
+                        defaultValue={draftInstructor ?? ""}
+                        placeholder={DEFAULT_INSTRUCTOR}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="capacity" className="text-xs">
                         Capacity
                       </Label>
-                      <Input id="capacity" name="capacity" type="number" min={1} placeholder={String(DEFAULT_CAPACITY)} />
+                      <Input
+                        id="capacity"
+                        name="capacity"
+                        type="number"
+                        min={1}
+                        defaultValue={draftCapacity ?? ""}
+                        placeholder={String(DEFAULT_CAPACITY)}
+                      />
                     </div>
                     <fieldset className="sm:col-span-2 lg:col-span-4">
                       {/* Checkboxes rather than a multiple-select: a
@@ -467,6 +533,7 @@ export default async function OfferingsPage({
                               type="checkbox"
                               name="days"
                               value={index + 1}
+                              defaultChecked={draftDayNumbers.has(index + 1)}
                               className="h-4 w-4 rounded border-line-strong text-brand accent-[var(--color-brand)]"
                             />
                             {name}
@@ -475,9 +542,109 @@ export default async function OfferingsPage({
                       </div>
                     </fieldset>
                   </div>
-                  <div className="mt-4 flex items-center gap-3">
-                    <Button type="submit">Add offering</Button>
-                    <p className="text-xs text-fg-muted">
+                  {/* The course the code names is not on record. Rather
+                      than sending the registrar to Academic structure and
+                      back -- four screens for one row -- the course is
+                      described here and created with the offering, in one
+                      transaction, once confirmed. */}
+                  {/* `key` on the stage, deliberately. A server action's
+                      redirect is a SOFT navigation: React keeps this exact
+                      <details> node and does not re-apply `open`, because
+                      the browser mutates that property itself whenever
+                      anyone clicks the summary. Without the key the panel
+                      stays shut on the very trip that exists to open it --
+                      which is how this was found, by driving the form in a
+                      real browser rather than trusting the markup. */}
+                  <details key={stage ?? "closed"} className="border-line mt-4 rounded-xl border" open={stage !== undefined}>
+                    <summary className="text-fg cursor-pointer list-none px-4 py-3 text-sm font-semibold">
+                      <span className="text-brand-fg">+</span> Course not on record yet? Add it here
+                    </summary>
+                    <div className="border-line-subtle border-t px-4 py-4">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="sm:col-span-2 lg:col-span-1">
+                          <Label htmlFor="newTitle" className="text-xs">
+                            Course title
+                          </Label>
+                          <Input
+                            id="newTitle"
+                            name="newTitle"
+                            autoComplete="off"
+                            defaultValue={draftNewTitle ?? ""}
+                            placeholder="Introduction to Financial Accounting I"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="newCreditHours" className="text-xs">
+                            Credit hours
+                          </Label>
+                          <Input
+                            id="newCreditHours"
+                            name="newCreditHours"
+                            type="number"
+                            min={1}
+                            defaultValue={draftNewCreditHours ?? ""}
+                            placeholder="3"
+                          />
+                        </div>
+                        <div>
+                          {/* Deliberately not pre-selected from the code's
+                              letters. The prefix usually matches a
+                              department code, but "usually" is worse than
+                              "never" here: a field that is right most of
+                              the time is a field nobody reads. */}
+                          <Label htmlFor="newDepartmentId" className="text-xs">
+                            Department
+                          </Label>
+                          <Select id="newDepartmentId" name="newDepartmentId" defaultValue={draftNewDepartmentId ?? ""}>
+                            <option value="">Select department…</option>
+                            {departments.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.code} — {d.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                      </div>
+                      <p className="text-fg-muted mt-3 text-xs">
+                        All three are needed. The credit hours are copied onto this offering permanently, so a wrong number
+                        here follows the course onto every grade sheet. If the department is missing too, add it on{" "}
+                        <Link href="/admin/structure#courses" className="text-brand-fg font-medium hover:underline">
+                          Academic structure
+                        </Link>{" "}
+                        first.
+                      </p>
+                    </div>
+                  </details>
+
+                  {stage === "confirm" && draftCourseCode && (
+                    <NewCourseConfirmation
+                      code={draftCourseCode}
+                      title={draftNewTitle ?? ""}
+                      creditHours={draftNewCreditHours ?? ""}
+                      departmentLabel={
+                        departments.find((d) => d.id === draftNewDepartmentId)
+                          ? `${departments.find((d) => d.id === draftNewDepartmentId)!.code} — ${
+                              departments.find((d) => d.id === draftNewDepartmentId)!.name
+                            }`
+                          : "—"
+                      }
+                      nearby={findNearbyCourseCodes(draftCourseCode, courses)}
+                    />
+                  )}
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {/* Two intents, one form. Publishing is the common case
+                        -- a Draft offering is invisible to students and
+                        gives no clue why -- so it leads, and the second
+                        trip to the table to publish is gone. */}
+                    <Button type="submit" name="intent" value="publish">
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                      {stage === "confirm" ? "Create course, offering and publish" : "Create and publish"}
+                    </Button>
+                    <Button type="submit" name="intent" value="draft" variant="secondary">
+                      Save as draft
+                    </Button>
+                    <p className="text-fg-muted text-xs">
                       Blank instructor becomes &ldquo;{DEFAULT_INSTRUCTOR}&rdquo;; blank capacity becomes {DEFAULT_CAPACITY}.
                     </p>
                   </div>
@@ -829,5 +996,85 @@ export default async function OfferingsPage({
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * The last thing between a typed code and a new course in the catalogue.
+ *
+ * Two jobs. It states plainly what is about to be created, because the
+ * credit hours in particular are copied onto the offering and then onto
+ * every grade record under it -- a wrong 4 where a 3 belongs is not
+ * something anyone notices until a transcript is printed. And it shows
+ * near-miss codes already on record, because the failure this whole step
+ * exists for is not a wrong title, it is BSPH4O1 quietly becoming a second
+ * BSPH401.
+ *
+ * The confirmation is tied to the exact code: the hidden field carries it,
+ * and the action ignores a confirmation whose code no longer matches what
+ * was submitted. Fixing the typo therefore asks again, which is the point.
+ */
+function NewCourseConfirmation({
+  code,
+  title,
+  creditHours,
+  departmentLabel,
+  nearby,
+}: {
+  code: string;
+  title: string;
+  creditHours: string;
+  departmentLabel: string;
+  nearby: { code: string; title: string }[];
+}) {
+  return (
+    <div className="border-warning-line bg-warning-surface mt-4 rounded-xl border p-4">
+      <input type="hidden" name="confirmCourse" value={code} />
+      <p className="text-warning-fg flex items-center gap-2 text-sm font-bold">
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+        This will add a new course to the catalogue
+      </p>
+      <dl className="border-line-subtle bg-surface mt-3 grid gap-x-6 gap-y-2 rounded-lg border p-3 text-sm sm:grid-cols-2">
+        <div className="flex gap-2">
+          <dt className="text-fg-muted">Code</dt>
+          <dd className="text-fg font-mono font-bold">{formatCourseCode(code)}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-fg-muted">Credit hours</dt>
+          <dd className="text-fg font-bold">{creditHours || "—"}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-fg-muted">Title</dt>
+          <dd className="text-fg font-medium">{title || "—"}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-fg-muted">Department</dt>
+          <dd className="text-fg font-medium">{departmentLabel}</dd>
+        </div>
+      </dl>
+
+      {nearby.length > 0 && (
+        <div className="mt-3">
+          <p className="text-warning-fg text-sm font-semibold">
+            Did you mean one of these? They are already on record:
+          </p>
+          <ul className="text-fg-secondary mt-1 flex flex-col gap-0.5 text-sm">
+            {nearby.map((c) => (
+              <li key={c.code}>
+                <span className="text-fg font-mono font-bold">{formatCourseCode(c.code)}</span> — {c.title}
+              </li>
+            ))}
+          </ul>
+          <p className="text-fg-muted mt-1 text-xs">
+            If so, correct the code above and submit again — nothing has been created yet.
+          </p>
+        </div>
+      )}
+
+      <p className="text-fg-secondary mt-3 text-xs">
+        Check it, then press the button below to create the course and its offering together. Nothing is written until
+        you do.
+      </p>
+    </div>
   );
 }

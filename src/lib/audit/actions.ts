@@ -46,6 +46,9 @@ export const AUDIT_ACTIONS = [
   "DEPARTMENT_DEACTIVATED",
   "DEPARTMENT_REACTIVATED",
   "COURSE_CREATED",
+  // One entry for a whole pasted catalogue, not one per course: the event
+  // is "the catalogue was loaded", and 800 rows would bury the log.
+  "COURSE_IMPORTED",
   "COURSE_UPDATED",
   "COURSE_DEACTIVATED",
   "COURSE_REACTIVATED",

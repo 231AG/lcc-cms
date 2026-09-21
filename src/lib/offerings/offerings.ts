@@ -6,6 +6,7 @@ import { course, courseOffering, offeringMeeting, registration, semester } from 
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
+import { createCourse } from "@/lib/academic/structure";
 import { isRoom } from "./rooms";
 import {
   isOfferingEditable,
@@ -80,6 +81,22 @@ export interface CreateOfferingInput {
   room?: string;
   startTime?: string;
   endTime?: string;
+  /** Create the course as part of creating the offering, when `courseCode`
+   *  matches nothing on record. Present only when an Admin has filled in
+   *  the "not on record yet" panel and confirmed it -- the form never sends
+   *  this on its own, because a course created by accident is expensive to
+   *  unpick once registrations hang off it. */
+  newCourse?: NewCourseInput;
+  /** Publish the offering immediately rather than leaving it a Draft.
+   *  Safe by construction: publishing requires at least one meeting time
+   *  and this call always writes them. */
+  publish?: boolean;
+}
+
+export interface NewCourseInput {
+  departmentId: string;
+  title: string;
+  creditHours: number;
 }
 
 /** An offering created with no capacity given seats this many. A number the
@@ -91,27 +108,24 @@ export const DEFAULT_CAPACITY = 30;
  *  same placeholder a printed timetable uses before an assignment is made. */
 export const DEFAULT_INSTRUCTOR = "Staff";
 
+/**
+ * The code typed into the Add-an-offering form matches no course.
+ *
+ * Its own class, rather than a plain ValidationError, because the form
+ * treats it differently from every other refusal: an unknown code is not a
+ * dead end any more, it is the point at which the screen offers to create
+ * the course. A caller that cannot tell this apart from "end time is
+ * before start time" cannot make that offer.
+ */
+export class UnknownCourseCodeError extends ValidationError {
+  constructor(public readonly code: string) {
+    super(`No course on record with the code "${code}".`);
+  }
+}
+
 export async function createOffering(actor: Actor, input: CreateOfferingInput) {
   await assertCan(actor, "offering.manage");
   await assertSemesterEditable(input.semesterId);
-
-  // The picker is a datalist, so what arrives is the course CODE typed or
-  // chosen by the user. Codes are unique case-insensitively (0011's
-  // course_code_unique_idx on lower(trim(code))), so this resolves to at
-  // most one course -- and matching the same way the index does means a
-  // code that looks right to the user is never rejected over its casing.
-  const wantedCode = input.courseCode ? courseCodeKey(input.courseCode) : undefined;
-  const courseRow = input.courseId
-    ? await db.query.course.findFirst({ where: eq(course.id, input.courseId) })
-    : wantedCode
-      ? (await db.query.course.findMany()).find((c) => courseCodeKey(c.code) === wantedCode)
-      : undefined;
-  if (!courseRow) {
-    throw new ValidationError(
-      input.courseCode ? `No course with the code "${input.courseCode.trim()}".` : "Course not found.",
-    );
-  }
-  if (!courseRow.isActive) throw new ValidationError("Cannot create an offering for an inactive course.");
 
   const section = normalizeSection(input.section);
   if (!section) throw new ValidationError("Section is required.");
@@ -134,6 +148,55 @@ export async function createOffering(actor: Actor, input: CreateOfferingInput) {
   const capacity = input.capacity ?? DEFAULT_CAPACITY;
   const instructorName = input.instructorName?.trim() || DEFAULT_INSTRUCTOR;
 
+  // Resolving -- and possibly creating -- the course comes AFTER every
+  // check above, deliberately. A course created from this form and then
+  // orphaned by a bad end time would be exactly the junk row the
+  // confirmation step exists to prevent, so nothing is written until the
+  // whole request is known to be sound.
+  //
+  // The picker is a datalist, so what arrives is the course CODE typed or
+  // chosen by the user. Codes are unique case-insensitively (0011's
+  // course_code_unique_idx on lower(trim(code))), so this resolves to at
+  // most one course -- and matching the same way the index does means a
+  // code that looks right to the user is never rejected over its casing.
+  const wantedCode = input.courseCode ? courseCodeKey(input.courseCode) : undefined;
+  let courseRow = input.courseId
+    ? await db.query.course.findFirst({ where: eq(course.id, input.courseId) })
+    : wantedCode
+      ? (await db.query.course.findMany()).find((c) => courseCodeKey(c.code) === wantedCode)
+      : undefined;
+
+  // A code matching nothing used to be a dead end. It is one now only when
+  // the caller has offered no course to create: the Add-an-offering form's
+  // "not on record yet" panel is what fills that in, and walking to
+  // another screen to do exactly this and walking back was the registrar's
+  // most repeated task.
+  const creatingCourse = !courseRow;
+  if (!courseRow) {
+    if (!input.newCourse) {
+      if (!input.courseCode) throw new ValidationError("Course not found.");
+      throw new UnknownCourseCodeError(input.courseCode.trim());
+    }
+    // Creating a course is its own permission and offering.manage does not
+    // imply it. Asserted rather than assumed from the fact that today's
+    // Admin happens to hold both.
+    await assertCan(actor, "structure.manageCourse");
+    courseRow = await createCourse(actor, {
+      departmentId: input.newCourse.departmentId,
+      // Stored without its spaces. The course picker SHOWS codes spaced
+      // ("ACCT 101") because that is how a person reads one, so that is
+      // what gets submitted -- but course_code_unique_idx is on
+      // lower(trim(code)), which only trims the ends. Storing what was
+      // typed would let "ACCT 101" and "ACCT101" both exist as separate
+      // courses without the index objecting, which is the exact duplicate
+      // this whole flow is careful about.
+      code: input.courseCode!.replace(/\s+/g, ""),
+      title: input.newCourse.title,
+      creditHours: input.newCourse.creditHours,
+    });
+  }
+  if (!courseRow.isActive) throw new ValidationError("Cannot create an offering for an inactive course.");
+
   try {
     return await asUser(actor.userId, async (tx) => {
       const [row] = await tx
@@ -144,6 +207,10 @@ export async function createOffering(actor: Actor, input: CreateOfferingInput) {
           section,
           instructorName,
           capacity,
+          // Always born a Draft, even when it is about to be published a
+          // few lines down: the lifecycle is the same either way, and the
+          // audit trail should read "created, then published" rather than
+          // showing an offering that sprang into existence already live.
           status: "DRAFT",
           frozenCreditHours: courseRow.creditHours,
         })
@@ -176,9 +243,33 @@ export async function createOffering(actor: Actor, input: CreateOfferingInput) {
           room,
           startTime: input.startTime,
           endTime: input.endTime,
+          courseCreatedHere: creatingCourse || undefined,
         },
       });
-      return row;
+
+      // Publishing in the same transaction rather than as a second call.
+      // publishOffering's two preconditions are satisfied by construction
+      // here -- the row is a Draft because the insert above made it one,
+      // and it has meeting times because this function always writes them
+      // -- so the only thing a separate round trip would add is a window
+      // in which the offering exists but is invisible to students.
+      if (!input.publish) return row;
+
+      const [published] = await tx
+        .update(courseOffering)
+        .set({ status: "PUBLISHED" })
+        .where(eq(courseOffering.id, row.id))
+        .returning();
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "OFFERING_PUBLISHED",
+        entityType: "course_offering",
+        entityId: row.id,
+        oldValue: { status: "DRAFT" },
+        newValue: { status: "PUBLISHED" },
+      });
+      return published;
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
