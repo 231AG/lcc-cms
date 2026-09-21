@@ -8,8 +8,8 @@ import { getPlan, getPlanItems, getPlanValidation } from "@/lib/planning/plannin
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Input, Label, Required } from "@/components/ui/Form";
+import { SubmitButton, SubmitIconButton } from "@/components/ui/SubmitButton";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { TableCard } from "@/components/ui/TableCard";
 import { expandDays, formatDays } from "@/lib/offerings/offeringRows";
@@ -21,6 +21,7 @@ import {
   rejectPlanAction,
   rejectPlanItemAction,
   undoPlanDecisionAction,
+  undoPlanItemDecisionAction,
 } from "../actions";
 
 /** Every icon control carries the same treatment: a tooltip on hover, and
@@ -162,8 +163,9 @@ export default async function PlanDetailPage({
 
       {undone && (
         <Alert tone="success" className="mb-4">
-          The decision has been undone. This plan is back under review and every course on it is Pending again; any
-          registration it created has been dropped.
+          {undone === "course"
+            ? "That course is back to Pending and can be decided again. Every other course on the plan is untouched; any registration it created has been dropped."
+            : "The decision has been undone. This plan is back under review and every course on it is Pending again; any registration it created has been dropped."}
         </Alert>
       )}
 
@@ -263,10 +265,10 @@ export default async function PlanDetailPage({
                       maxLength={200}
                       placeholder="Approved the wrong student"
                     />
-                    <Button type="submit" variant="danger" size="sm" className="mt-2 w-full">
+                    <SubmitButton variant="danger" size="sm" className="mt-2 w-full" pendingLabel="Undoing…">
                       <RotateCcw className="h-4 w-4" aria-hidden="true" />
                       Undo and re-open for review
-                    </Button>
+                    </SubmitButton>
                   </form>
                 </div>
               </details>
@@ -346,15 +348,14 @@ export default async function PlanDetailPage({
                           <form action={approvePlanItemAction}>
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
-                            <button
-                              type="submit"
+                            <SubmitIconButton
                               title={`Approve ${c?.code ?? "this course"}`}
                               aria-label={`Approve ${c?.code ?? "this course"}`}
                               className={approveAction}
+                              icon={<Check className="h-3.5 w-3.5" aria-hidden="true" />}
                             >
-                              <Check className="h-3.5 w-3.5" aria-hidden="true" />
                               Approve
-                            </button>
+                            </SubmitIconButton>
                           </form>
                           {/* Reject needs a reason -- the database refuses a
                               rejection without one -- so the icon opens the
@@ -375,9 +376,9 @@ export default async function PlanDetailPage({
                               <input type="hidden" name="planId" value={planId} />
                               <input type="hidden" name="planItemId" value={i.id} />
                               <Input name="reason" required placeholder="Reason for rejection" className="py-1 text-xs" />
-                              <Button type="submit" variant="danger" size="sm">
+                              <SubmitButton variant="danger" size="sm" pendingLabel="Rejecting…">
                                 Reject course
-                              </Button>
+                              </SubmitButton>
                             </form>
                           </details>
                         </>
@@ -403,9 +404,9 @@ export default async function PlanDetailPage({
                               <input type="hidden" name="planId" value={planId} />
                               <input type="hidden" name="planItemId" value={i.id} />
                               <Input name="reason" required placeholder="Why is the overlap acceptable?" className="py-1 text-xs" />
-                              <Button type="submit" variant="secondary" size="sm">
+                              <SubmitButton variant="secondary" size="sm" pendingLabel="Accepting…">
                                 Accept clash
-                              </Button>
+                              </SubmitButton>
                             </form>
                           </details>
                         )}
@@ -425,13 +426,44 @@ export default async function PlanDetailPage({
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
                             <Input name="reason" required placeholder="Reason for override" className="py-1 text-xs" />
-                            <Button type="submit" variant="secondary" size="sm">
+                            <SubmitButton variant="secondary" size="sm" pendingLabel="Overriding…">
                               Override prerequisite
-                            </Button>
+                            </SubmitButton>
                           </form>
                         </details>
                       )}
-                      {!decidable && i.status !== "PENDING" && <span className="text-xs text-fg-muted">Decided</span>}
+                      {/* The correction that actually gets used. An Admin
+                          deciding row by row leaves the plan SUBMITTED the
+                          whole way -- so the whole-plan undo is unavailable
+                          exactly when a mis-click is most likely, and this
+                          is the one that reaches it. */}
+                      {i.status !== "PENDING" && (
+                        <details className="relative">
+                          <summary
+                            title={`Undo the decision on ${c?.code ?? "this course"}`}
+                            aria-label={`Undo the decision on ${c?.code ?? "this course"}`}
+                            className={`${iconAction} cursor-pointer list-none`}
+                          >
+                            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                          </summary>
+                          <form
+                            action={undoPlanItemDecisionAction}
+                            className="border-line bg-surface absolute right-0 z-10 mt-1 flex w-72 flex-col gap-2 rounded-md border p-3 text-left shadow-lg"
+                          >
+                            <input type="hidden" name="planId" value={planId} />
+                            <input type="hidden" name="planItemId" value={i.id} />
+                            <p className="text-fg-muted text-xs">
+                              Puts this course back to Pending so it can be decided again. Every other course on the
+                              plan is left as it is.
+                              {i.status === "APPROVED" && " The registration it created is dropped."}
+                            </p>
+                            <Input name="reason" required placeholder="Why?" className="py-1 text-xs" />
+                            <SubmitButton variant="secondary" size="sm" pendingLabel="Undoing…">
+                              Undo this decision
+                            </SubmitButton>
+                          </form>
+                        </details>
+                      )}
                     </span>
                   </Td>
                 </Tr>
@@ -452,10 +484,10 @@ export default async function PlanDetailPage({
             <div className="flex flex-wrap items-end justify-between gap-4">
               <form action={approvePlanAction}>
                 <input type="hidden" name="planId" value={planId} />
-                <Button type="submit">
+                <SubmitButton pendingLabel="Approving…">
                   <Check className="h-4 w-4" aria-hidden="true" />
                   Approve all
-                </Button>
+                </SubmitButton>
               </form>
               <form action={rejectPlanAction} className="flex items-end gap-2">
                 <input type="hidden" name="planId" value={planId} />
@@ -465,10 +497,10 @@ export default async function PlanDetailPage({
                   </Label>
                   <Input id="bulk-reason" name="reason" required placeholder="Why the whole plan is turned down" className="w-56 sm:w-72" />
                 </div>
-                <Button type="submit" variant="danger" className="shrink-0">
+                <SubmitButton variant="danger" className="shrink-0" pendingLabel="Rejecting…">
                   <X className="h-4 w-4" aria-hidden="true" />
                   Reject all
-                </Button>
+                </SubmitButton>
               </form>
             </div>
             <p className="text-fg-muted mt-3 text-xs">

@@ -7,10 +7,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { TableCard } from "@/components/ui/TableCard";
 import { Pagination } from "@/components/ui/Pagination";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { SubmitButton } from "@/components/ui/SubmitButton";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import {
@@ -150,9 +150,9 @@ export default async function AcademicStructurePage({
                     <form action={toggleCollegeActiveAction}>
                       <input type="hidden" name="collegeId" value={c.id} />
                       <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
-                      <button type="submit" className="font-medium text-brand-fg hover:underline">
+                      <SubmitTextButton className="font-medium text-brand-fg hover:underline">
                         {c.isActive ? "Deactivate" : "Reactivate"}
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   </Td>
                 </Tr>
@@ -226,9 +226,9 @@ export default async function AcademicStructurePage({
                   ))}
                 </Select>
               </div>
-              <Button type="submit" variant="secondary">
+              <SubmitButton variant="secondary">
                 Apply
-              </Button>
+              </SubmitButton>
               {activeDeptCollege && (
                 <Link href="/admin/structure#departments" className={buttonClasses("ghost", "md")}>
                   Clear filter
@@ -260,9 +260,9 @@ export default async function AcademicStructurePage({
                     <form action={toggleDepartmentActiveAction}>
                       <input type="hidden" name="departmentId" value={d.id} />
                       <input type="hidden" name="isActive" value={(!d.isActive).toString()} />
-                      <button type="submit" className="font-medium text-brand-fg hover:underline">
+                      <SubmitTextButton className="font-medium text-brand-fg hover:underline">
                         {d.isActive ? "Deactivate" : "Reactivate"}
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   </Td>
                 </Tr>
@@ -352,9 +352,9 @@ export default async function AcademicStructurePage({
                     <form action={toggleCourseActiveAction}>
                       <input type="hidden" name="courseId" value={c.id} />
                       <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
-                      <button type="submit" className="font-medium text-brand-fg hover:underline">
+                      <SubmitTextButton className="font-medium text-brand-fg hover:underline">
                         {c.isActive ? "Deactivate" : "Reactivate"}
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   </Td>
                 </Tr>
@@ -423,9 +423,9 @@ export default async function AcademicStructurePage({
                     <form action={removePrerequisiteAction}>
                       <input type="hidden" name="courseId" value={p.courseId} />
                       <input type="hidden" name="prerequisiteCourseId" value={p.prerequisiteCourseId} />
-                      <button type="submit" className="font-medium text-danger-fg hover:underline">
+                      <SubmitTextButton className="font-medium text-danger-fg hover:underline">
                         Remove
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   </Td>
                 </Tr>

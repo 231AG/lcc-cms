@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
 import { Pagination } from "@/components/ui/Pagination";
-import { SubmitTextButton } from "@/components/ui/SubmitButton";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { formatMeetingSlots } from "@/lib/offerings/offeringRows";
 
 /**
@@ -104,9 +103,9 @@ export function OfferingPicker({
               className="w-72"
             />
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Search
-          </Button>
+          </SubmitButton>
           {q && (
             <Link href={clearSearchHref} className="pb-2 text-sm text-fg-muted hover:underline">
               Clear

@@ -9,5 +9,5 @@ export { Label, Input, Select, Textarea, FormField } from "./Form";
 export { PageHeader } from "./PageHeader";
 export { Pagination, pageWindow } from "./Pagination";
 export { Preloader } from "./Preloader";
-export { SubmitButton, SubmitTextButton } from "./SubmitButton";
+export { SubmitButton, SubmitTextButton, SubmitIconButton, Spinner } from "./SubmitButton";
 export { Breadcrumb, type Crumb } from "./Breadcrumb";

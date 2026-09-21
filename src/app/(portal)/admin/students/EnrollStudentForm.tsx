@@ -3,8 +3,8 @@
 import { useActionState, useMemo, useState } from "react";
 import { Card, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { enrollStudentAction, type EnrollStudentState } from "./actions";
 
 const initialState: EnrollStudentState = {};
@@ -179,9 +179,9 @@ export function EnrollStudentForm({ departments }: { departments: DepartmentOpti
           </div>
 
           <div className="mt-4 flex items-center gap-3">
-            <Button type="submit" disabled={pending}>
+            <SubmitButton disabled={pending}>
               {pending ? "Enrolling..." : "Enrol student"}
-            </Button>
+            </SubmitButton>
             <p className="text-xs text-fg-muted">
               Fields marked <span className="text-danger-fg">*</span> are required.
             </p>

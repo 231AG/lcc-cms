@@ -1393,6 +1393,106 @@ export async function rejectPlanItem(actor: Actor, planItemId: string, reason: s
   });
 }
 
+/**
+ * Taking back the decision on ONE course.
+ *
+ * The plan-level undo could not help here, and this is the case that
+ * needed help most. A plan only rolls up to APPROVED / REJECTED /
+ * PARTIALLY_APPROVED once EVERY course on it has been decided, so an
+ * Admin working down the rows one at a time sits at SUBMITTED the whole
+ * way -- while each approval has already written a registration. That is
+ * exactly the window where a mis-click happens, and undoPlanDecision
+ * refuses it: "There is no decision on this plan to undo (currently
+ * SUBMITTED)."
+ *
+ * So this undoes the row instead of the plan. Every other course on the
+ * plan is left exactly as it is, decided or not.
+ *
+ * It works whether or not the plan has finished rolling up: a course
+ * inside a PARTIALLY_APPROVED plan can be put back the same way, which
+ * takes the plan with it back to SUBMITTED -- there is again something
+ * left to decide, and that is what SUBMITTED means. Same guards as the
+ * whole-plan undo: a reason, an audit entry, the registration DROPPED
+ * rather than deleted so registerSeat can reinstate it, and a published
+ * grade as the hard stop.
+ */
+export async function undoPlanItemDecision(actor: Actor, planItemId: string, reason: string) {
+  await assertCan(actor, "planning.reviewPlan");
+  if (!reason?.trim()) throw new ValidationError("A reason is required to undo a decision.");
+
+  return db.transaction(async (tx) => {
+    const item = await tx.query.coursePlanItem.findFirst({ where: eq(coursePlanItem.id, planItemId) });
+    if (!item) throw new ValidationError("Planned course not found.");
+    if (item.status === "PENDING") {
+      throw new StateError("This course has not been decided yet, so there is nothing to undo.");
+    }
+
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, item.planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+    await assertSemesterOpenForRegistration(tx, plan.semesterId);
+
+    const live = await tx.query.registration.findMany({
+      where: and(eq(registration.planItemId, planItemId), eq(registration.status, "REGISTERED")),
+    });
+
+    if (live.length > 0) {
+      const graded = await tx.query.academicRecord.findFirst({
+        where: and(eq(academicRecord.studentId, plan.studentId), eq(academicRecord.isVoid, false)),
+      });
+      if (graded?.gradeRecordId) {
+        throw new StateError("A grade has been published for this student, so this decision can no longer be undone.");
+      }
+    }
+
+    for (const reg of live) {
+      await tx
+        .update(registration)
+        .set({ status: "DROPPED", droppedReason: `Decision undone: ${reason}` })
+        .where(eq(registration.id, reg.id));
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "REGISTRATION_DROPPED",
+        entityType: "registration",
+        entityId: reg.id,
+        studentId: plan.studentId,
+        reason,
+      });
+    }
+
+    const [updatedItem] = await tx
+      .update(coursePlanItem)
+      .set({ status: "PENDING", rejectionReason: null, decidedBy: null, decidedAt: null })
+      .where(eq(coursePlanItem.id, planItemId))
+      .returning();
+
+    // The plan has something left to decide again, which is what SUBMITTED
+    // means. Clearing the review stamp with it: a plan back in the queue
+    // has not been reviewed, and a stale reviewer on it reads as though
+    // somebody has already looked.
+    if (plan.status !== "SUBMITTED") {
+      await tx
+        .update(coursePlan)
+        .set({ status: "SUBMITTED", reviewedBy: null, reviewedAt: null, rejectionReason: null })
+        .where(eq(coursePlan.id, plan.id));
+    }
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "COURSE_PLAN_ITEM_DECISION_UNDONE",
+      entityType: "course_plan_item",
+      entityId: planItemId,
+      studentId: plan.studentId,
+      oldValue: { status: item.status, decidedBy: item.decidedBy },
+      newValue: { status: "PENDING", registrationsDropped: live.length, planStatus: "SUBMITTED" },
+      reason,
+    });
+
+    return { item: updatedItem, registrationsDropped: live.length };
+  });
+}
+
 /** Rolls the plan's own status up once no item is left PENDING (shared by approvePlanItem/rejectPlanItem); returns the plan unchanged while any item is still awaiting a decision. */
 async function resolvePlanIfComplete(tx: Tx, actor: Actor, planId: string): Promise<typeof coursePlan.$inferSelect> {
   const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });

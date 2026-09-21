@@ -38,8 +38,9 @@ import { SemesterResultsPicker, SemesterResultsTable } from "@/components/grades
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { GENDER_LABEL } from "@/lib/students/gender";
 import { removeStudentPhotoAction, updateStudentProfileAction, uploadStudentPhotoAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
@@ -324,19 +325,19 @@ export default async function StudentDetailPage({
                     {/* Only rendered when enhance.js never ran -- then the
                         change handler above does not exist and the file
                         would sit there chosen but unsent. */}
-                    <button
-                      type="submit"
+                    <SubmitTextButton
                       className="no-enhance-only text-brand-fg block text-xs font-semibold hover:underline"
+                      pendingLabel="Uploading…"
                     >
                       Upload
-                    </button>
+                    </SubmitTextButton>
                   </form>
                   {photoMeta && (
                     <form action={removeStudentPhotoAction}>
                       <input type="hidden" name="studentId" value={record.id} />
-                      <button type="submit" className="text-danger-fg text-xs font-medium hover:underline">
+                      <SubmitTextButton className="text-danger-fg text-xs font-medium hover:underline">
                         Remove
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   )}
                 </div>
@@ -562,9 +563,9 @@ export default async function StudentDetailPage({
                     </Select>
                   </div>
                   <p className="text-xs text-fg-muted">Import status: {record.historicalImportStatus}</p>
-                  <Button type="submit" className="w-fit">
+                  <SubmitButton className="w-fit">
                     Save changes
-                  </Button>
+                  </SubmitButton>
                 </form>
               ) : (
                 /* Read-only view: the same fields, rendered as values

@@ -3,8 +3,8 @@
 import { useActionState } from "react";
 import { Card, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Input, Select } from "@/components/ui/Form";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { createStaffAccountAction, type CreateAccountState } from "./actions";
 
 const initialState: CreateAccountState = {};
@@ -61,9 +61,9 @@ export function CreateAccountForm() {
               <option value="SUPER_ADMIN">Super Admin</option>
             </Select>
           </div>
-          <Button type="submit" disabled={pending} className="w-fit">
+          <SubmitButton disabled={pending} className="w-fit">
             {pending ? "Creating..." : "Create account"}
-          </Button>
+          </SubmitButton>
         </form>
       </CardBody>
     </Card>

@@ -7,8 +7,8 @@ import { getClassRoster } from "@/lib/grades/grades";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Select } from "@/components/ui/Form";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import ClassEntryForm from "./ClassEntryForm";
 import { submitClassAction } from "./actions";
 
@@ -101,9 +101,9 @@ export default async function GradesPage({
               ))}
           </Select>
         </div>
-        <Button type="submit" variant="secondary">
+        <SubmitButton variant="secondary">
           Select
-        </Button>
+        </SubmitButton>
       </form>
 
       {semesterId && (
@@ -120,9 +120,9 @@ export default async function GradesPage({
               ))}
             </Select>
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Select
-          </Button>
+          </SubmitButton>
         </form>
       )}
 
@@ -150,9 +150,9 @@ export default async function GradesPage({
                       placeholder="Note (required if submitting with missing grades)"
                       className="w-96 rounded-md border border-line-strong px-3 py-2 text-sm"
                     />
-                    <Button type="submit" className="w-fit">
+                    <SubmitButton className="w-fit">
                       Submit
-                    </Button>
+                    </SubmitButton>
                   </form>
                 </CardBody>
               </Card>

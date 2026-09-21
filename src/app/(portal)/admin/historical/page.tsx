@@ -10,9 +10,9 @@ import { NotFoundError } from "@/lib/errors";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import {
   correctHistoricalRecordAction,
   createRetrospectiveSemesterAction,
@@ -140,7 +140,7 @@ export default async function HistoricalEntryPage({
           {isAdmin && record.historicalImportStatus !== "COMPLETE" && (
             <form action={markImportCompleteAction}>
               <input type="hidden" name="studentId" value={studentId} />
-              <Button type="submit">Mark import Complete</Button>
+              <SubmitButton>Mark import Complete</SubmitButton>
             </form>
           )}
           {isAdmin && record.historicalImportStatus === "COMPLETE" && (
@@ -152,9 +152,9 @@ export default async function HistoricalEntryPage({
                 </Label>
                 <Input id="reopen-reason" name="reason" required className="w-64" />
               </div>
-              <Button type="submit" variant="secondary">
+              <SubmitButton variant="secondary">
                 Reopen import
-              </Button>
+              </SubmitButton>
             </form>
           )}
         </CardBody>
@@ -181,9 +181,9 @@ export default async function HistoricalEntryPage({
                   ))}
                 </Select>
               </div>
-              <Button type="submit" variant="secondary">
+              <SubmitButton variant="secondary">
                 Select
-              </Button>
+              </SubmitButton>
             </form>
 
             <details className="mb-4">
@@ -231,9 +231,9 @@ export default async function HistoricalEntryPage({
                   </Label>
                   <Input id="sem-end" name="endDate" type="date" required />
                 </div>
-                <Button type="submit" variant="secondary">
+                <SubmitButton variant="secondary">
                   Create semester
-                </Button>
+                </SubmitButton>
               </form>
             </details>
 
@@ -280,9 +280,9 @@ export default async function HistoricalEntryPage({
                     ))}
                   </tbody>
                 </Table>
-                <Button type="submit" className="w-fit">
+                <SubmitButton className="w-fit">
                   Save semester
-                </Button>
+                </SubmitButton>
               </form>
             )}
           </CardBody>
@@ -331,17 +331,17 @@ export default async function HistoricalEntryPage({
                               <input name="creditHours" type="number" step="0.5" placeholder="Credits" defaultValue={r.creditHours} className="w-16 rounded border border-line-strong px-1 py-0.5 text-xs" />
                               <input name="score" type="number" placeholder="Score" defaultValue={r.score ?? ""} className="w-16 rounded border border-line-strong px-1 py-0.5 text-xs" />
                               <input name="reason" required placeholder="Reason (required)" className="w-32 rounded border border-line-strong px-1 py-0.5 text-xs" />
-                              <button type="submit" className="font-medium text-brand-fg hover:underline">
+                              <SubmitTextButton className="font-medium text-brand-fg hover:underline">
                                 Save correction
-                              </button>
+                              </SubmitTextButton>
                             </form>
                             <form action={voidHistoricalRecordAction} className="mt-1 flex items-center gap-1">
                               <input type="hidden" name="studentId" value={studentId} />
                               <input type="hidden" name="recordId" value={r.id} />
                               <input name="reason" required placeholder="Reason to void" className="w-32 rounded border border-line-strong px-1 py-0.5 text-xs" />
-                              <button type="submit" className="font-medium text-danger-fg hover:underline">
+                              <SubmitTextButton className="font-medium text-danger-fg hover:underline">
                                 Void
-                              </button>
+                              </SubmitTextButton>
                             </form>
                           </details>
                         </Td>

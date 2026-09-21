@@ -23,6 +23,7 @@ import {
   rejectPlanItem,
   submitPlan,
   undoPlanDecision,
+  undoPlanItemDecision,
 } from "../planning";
 import { getControlSheet } from "../controlSheet";
 import { StateError, ValidationError } from "@/lib/errors";
@@ -195,6 +196,97 @@ describe("undoing a review decision", () => {
   it("will not let a student undo the decision on their own plan", async () => {
     const { student, planId } = await approvedPlan();
     await expect(undoPlanDecision(student, planId, "I changed my mind.")).rejects.toThrow(
+      /Not available to your role/i,
+    );
+  });
+
+  // ---- per-course undo -------------------------------------------------
+
+  /** Two courses submitted; the first approved, the second left alone. The
+   *  plan is still SUBMITTED, because it only rolls up once every course
+   *  has a decision -- which is exactly the state the whole-plan undo
+   *  cannot reach. */
+  async function oneApprovedOnePending() {
+    const student = await newStudent();
+    const plan = await getOrCreateDraftPlan(student, semesterId);
+    await addPlanItem(student, plan.id, offeringAId);
+    await addPlanItem(student, plan.id, offeringBId);
+    await submitPlan(student, plan.id);
+    const [first, second] = await itemsOf(plan.id);
+    await approvePlanItem(admin(), first.id);
+    return { student, planId: plan.id, approvedId: first.id, pendingId: second.id };
+  }
+
+  it("reaches the case the whole-plan undo cannot: a decided course on a still-submitted plan", async () => {
+    const { planId, approvedId } = await oneApprovedOnePending();
+    // The gap this exists to close, stated as an assertion rather than a
+    // comment: the plan-level undo refuses here.
+    expect((await planOf(planId))!.status).toBe("SUBMITTED");
+    await expect(undoPlanDecision(admin(), planId, "x")).rejects.toThrow(StateError);
+
+    await undoPlanItemDecision(admin(), approvedId, "Approved the wrong row.");
+
+    const items = await itemsOf(planId);
+    expect(items.find((i) => i.id === approvedId)!.status).toBe("PENDING");
+  });
+
+  it("leaves every other course on the plan exactly as it was", async () => {
+    const { planId, approvedId, pendingId } = await oneApprovedOnePending();
+    await undoPlanItemDecision(admin(), approvedId, "Wrong row.");
+    const items = await itemsOf(planId);
+    // The one still awaiting a decision is untouched, and so is its lack
+    // of one -- undoing one row is not a reason to disturb another.
+    expect(items.find((i) => i.id === pendingId)!.status).toBe("PENDING");
+    expect(items.find((i) => i.id === pendingId)!.decidedBy).toBeNull();
+  });
+
+  it("drops only that course's registration", async () => {
+    const { planId, approvedId } = await oneApprovedOnePending();
+    expect((await registrationsOf(planId)).filter((r) => r.status === "REGISTERED")).toHaveLength(1);
+
+    await undoPlanItemDecision(admin(), approvedId, "Wrong row.");
+
+    const regs = await registrationsOf(planId);
+    expect(regs.filter((r) => r.status === "REGISTERED")).toHaveLength(0);
+    expect(regs.filter((r) => r.status === "DROPPED")).toHaveLength(1);
+  });
+
+  it("lets the course be approved again, reinstating its registration", async () => {
+    const { planId, approvedId } = await oneApprovedOnePending();
+    await undoPlanItemDecision(admin(), approvedId, "Wrong row.");
+    await approvePlanItem(admin(), approvedId);
+    expect((await registrationsOf(planId)).filter((r) => r.status === "REGISTERED")).toHaveLength(1);
+  });
+
+  it("takes a fully decided plan back to submitted when one of its courses is undone", async () => {
+    const { planId } = await approvedPlan();
+    expect((await planOf(planId))!.status).toBe("APPROVED");
+    const [first] = await itemsOf(planId);
+
+    await undoPlanItemDecision(admin(), first.id, "One of these was wrong.");
+
+    // There is something left to decide again, which is what SUBMITTED
+    // means -- and the other course keeps its approval.
+    const plan = await planOf(planId);
+    expect(plan!.status).toBe("SUBMITTED");
+    expect(plan!.reviewedBy).toBeNull();
+    const items = await itemsOf(planId);
+    expect(items.filter((i) => i.status === "APPROVED")).toHaveLength(1);
+    expect(items.filter((i) => i.status === "PENDING")).toHaveLength(1);
+  });
+
+  it("refuses a course that has not been decided, and an unexplained undo", async () => {
+    const { pendingId, approvedId } = await oneApprovedOnePending();
+    await expect(undoPlanItemDecision(admin(), pendingId, "Nothing to undo.")).rejects.toThrow(StateError);
+    await expect(undoPlanItemDecision(admin(), approvedId, "  ")).rejects.toThrow(ValidationError);
+  });
+
+  it("will not let a Super Admin or the student undo one course", async () => {
+    const { student, approvedId } = await oneApprovedOnePending();
+    await expect(
+      undoPlanItemDecision(actorOf(superAdminId, "SUPER_ADMIN"), approvedId, "Back door."),
+    ).rejects.toThrow(/Not available to your role/i);
+    await expect(undoPlanItemDecision(student, approvedId, "Mine.")).rejects.toThrow(
       /Not available to your role/i,
     );
   });

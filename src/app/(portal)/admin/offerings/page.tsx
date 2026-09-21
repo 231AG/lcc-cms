@@ -23,10 +23,11 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td, SortableTh, type SortDirection } from "@/components/ui/Table";
 import { Pagination } from "@/components/ui/Pagination";
+import { SubmitButton, SubmitIconButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import {
   addMeetingAction,
   cancelOfferingAction,
@@ -394,9 +395,9 @@ export default async function OfferingsPage({
               ))}
             </Select>
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Search
-          </Button>
+          </SubmitButton>
           {hasFilters && (
             <Link href={`/admin/offerings?semesterId=${semesterId ?? ""}`} className={buttonClasses("ghost", "md")}>
               Clear filters
@@ -640,13 +641,13 @@ export default async function OfferingsPage({
                         -- a Draft offering is invisible to students and
                         gives no clue why -- so it leads, and the second
                         trip to the table to publish is gone. */}
-                    <Button type="submit" name="intent" value="publish">
+                    <SubmitButton name="intent" value="publish">
                       <Check className="h-4 w-4" aria-hidden="true" />
                       {stage === "confirm" ? "Create course, offering and publish" : "Create and publish"}
-                    </Button>
-                    <Button type="submit" name="intent" value="draft" variant="secondary">
+                    </SubmitButton>
+                    <SubmitButton name="intent" value="draft" variant="secondary">
                       Save as draft
-                    </Button>
+                    </SubmitButton>
                     <p className="text-fg-muted text-xs">
                       Blank instructor becomes &ldquo;{DEFAULT_INSTRUCTOR}&rdquo;; blank capacity becomes {DEFAULT_CAPACITY}.
                     </p>
@@ -797,9 +798,9 @@ export default async function OfferingsPage({
                                         <input type="hidden" name="offeringId" value={row.offeringId} />
                                         <Input name="instructorName" defaultValue={row.instructor} placeholder="Instructor" className="w-36 py-1 text-xs" />
                                         <Input name="capacity" type="number" min={1} defaultValue={row.capacity} placeholder="Capacity" className="w-20 py-1 text-xs" />
-                                        <Button type="submit" variant="secondary" size="sm">
+                                        <SubmitButton variant="secondary" size="sm">
                                           Save
-                                        </Button>
+                                        </SubmitButton>
                                       </form>
 
                                       {/* CHANGE this slot, as against adding
@@ -849,9 +850,9 @@ export default async function OfferingsPage({
                                               </option>
                                             ))}
                                           </Select>
-                                          <Button type="submit" variant="secondary" size="sm">
+                                          <SubmitButton variant="secondary" size="sm">
                                             Change time
-                                          </Button>
+                                          </SubmitButton>
                                         </form>
                                       )}
 
@@ -881,9 +882,9 @@ export default async function OfferingsPage({
                                             </option>
                                           ))}
                                         </Select>
-                                        <Button type="submit" variant="secondary" size="sm">
+                                        <SubmitButton variant="secondary" size="sm">
                                           Add another day
-                                        </Button>
+                                        </SubmitButton>
                                       </form>
 
                                       {/* The lifecycle, and a way back from
@@ -898,31 +899,30 @@ export default async function OfferingsPage({
                                           <form action={publishOfferingAction}>
                                             <input type="hidden" name="semesterId" value={semesterId} />
                                             <input type="hidden" name="offeringId" value={row.offeringId} />
-                                            <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
+                                            <SubmitTextButton className="text-xs font-medium text-brand-fg hover:underline">
                                               Publish
-                                            </button>
+                                            </SubmitTextButton>
                                           </form>
                                         )}
                                         {row.status === "CANCELLED" && (
                                           <form action={reinstateOfferingAction}>
                                             <input type="hidden" name="semesterId" value={semesterId} />
                                             <input type="hidden" name="offeringId" value={row.offeringId} />
-                                            <button
-                                              type="submit"
+                                            <SubmitTextButton
                                               title="Bring this offering back as a draft, then publish it"
                                               className="text-xs font-medium text-brand-fg hover:underline"
                                             >
                                               Reinstate as draft
-                                            </button>
+                                            </SubmitTextButton>
                                           </form>
                                         )}
                                         {row.status !== "CANCELLED" && (
                                           <form action={cancelOfferingAction}>
                                             <input type="hidden" name="semesterId" value={semesterId} />
                                             <input type="hidden" name="offeringId" value={row.offeringId} />
-                                            <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
+                                            <SubmitTextButton className="text-xs font-medium text-danger-fg hover:underline">
                                               Cancel offering
-                                            </button>
+                                            </SubmitTextButton>
                                           </form>
                                         )}
                                       </div>
@@ -941,14 +941,12 @@ export default async function OfferingsPage({
                               <form action={removeMeetingAction}>
                                 <input type="hidden" name="semesterId" value={semesterId} />
                                 <input type="hidden" name="meetingIds" value={row.meetingIds} />
-                                <button
-                                  type="submit"
+                                <SubmitIconButton
                                   title={`Delete the ${row.day} ${row.startTime}–${row.endTime} meeting`}
                                   aria-label={`Delete the ${expandDays(row.day)} ${row.startTime} to ${row.endTime} meeting for ${row.code} section ${row.section}`}
                                   className={iconDanger}
-                                >
-                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                </button>
+                                  icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                                />
                               </form>
                             )}
                           </span>
@@ -987,9 +985,9 @@ export default async function OfferingsPage({
                         </option>
                       ))}
                     </Select>
-                    <Button type="submit" variant="secondary" size="sm">
+                    <SubmitButton variant="secondary" size="sm">
                       Set
-                    </Button>
+                    </SubmitButton>
                   </form>
                   <Pagination page={pageNum} totalPages={totalPages} hrefForPage={hrefForPage} label="Offerings pagination" />
                 </div>

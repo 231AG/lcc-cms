@@ -11,6 +11,7 @@ import {
   rejectPlan,
   rejectPlanItem,
   undoPlanDecision,
+  undoPlanItemDecision,
 } from "@/lib/planning/planning";
 
 function errorRedirect(planId: string, message: string): never {
@@ -32,6 +33,21 @@ export async function undoPlanDecisionAction(formData: FormData): Promise<void> 
     throw err;
   }
   redirect(`/admin/planning/${planId}?undone=1`);
+}
+
+/** Puts one course back to Pending, leaving the rest of the plan alone. */
+export async function undoPlanItemDecisionAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const planId = String(formData.get("planId") ?? "");
+  const planItemId = String(formData.get("planItemId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  try {
+    await undoPlanItemDecision(actor, planItemId, reason);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(planId, err.message);
+    throw err;
+  }
+  redirect(`/admin/planning/${planId}?undone=course`);
 }
 
 export async function approvePlanAction(formData: FormData): Promise<void> {

@@ -9,7 +9,7 @@ import { searchStudents } from "@/lib/students/students";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
@@ -196,9 +196,9 @@ export default async function RegistrationsPage({
                       ))}
                     </Select>
                   </div>
-                  <Button type="submit" variant="secondary">
+                  <SubmitButton variant="secondary">
                     Apply
-                  </Button>
+                  </SubmitButton>
                   {(oq || collegeId || departmentId) && (
                     <Link href="/admin/registrations" className={buttonClasses("ghost", "md")}>
                       Clear filters
@@ -287,9 +287,9 @@ export default async function RegistrationsPage({
                   </Label>
                   <Input id="sq" name="sq" defaultValue={sq ?? ""} placeholder="Student ID or name" className="w-64" />
                 </div>
-                <Button type="submit" variant="secondary">
+                <SubmitButton variant="secondary">
                   Search
-                </Button>
+                </SubmitButton>
               </form>
 
               {!candidates && <p className="text-sm text-fg-muted">Search for a student to register them directly.</p>}

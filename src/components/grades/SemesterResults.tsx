@@ -1,6 +1,7 @@
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { Label, Select } from "@/components/ui/Form";
 import { buttonClasses } from "@/components/ui/Button";
+import { SubmitTextButton } from "@/components/ui/SubmitButton";
 import { trimCredits, type GradeSheetData } from "@/lib/gradesheet/gradeSheet";
 import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
 
@@ -84,9 +85,9 @@ export function SemesterResultsPicker({
           ))}
         </Select>
       </div>
-      <button type="submit" className={buttonClasses("secondary", "md")}>
+      <SubmitTextButton className={buttonClasses("secondary", "md")} pendingLabel="Loading…">
         View
-      </button>
+      </SubmitTextButton>
     </form>
   );
 }

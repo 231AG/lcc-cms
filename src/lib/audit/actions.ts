@@ -88,6 +88,11 @@ export const AUDIT_ACTIONS = [
   "COURSE_PLAN_DECISION_UNDONE",
   "COURSE_PLAN_ITEM_APPROVED",
   "COURSE_PLAN_ITEM_REJECTED",
+  // One course put back to Pending because the decision on it was wrong.
+  // Separate from the whole-plan undo: an Admin deciding row by row sits
+  // at SUBMITTED the whole time, so this is the correction that actually
+  // gets used, and it should be findable on its own in the log.
+  "COURSE_PLAN_ITEM_DECISION_UNDONE",
   "PREREQUISITE_OVERRIDDEN",
   // An Admin accepting that two planned courses overlap, so the plan can be
   // approved despite the clash.
