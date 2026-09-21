@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
+import { Eye, PenLine, Plus } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { fullName, listName } from "@/lib/students/name";
@@ -10,7 +12,7 @@ import { NotFoundError } from "@/lib/errors";
 import type { Actor } from "@/lib/permissions/kernel";
 import { getOfferingMeetingsForOfferings, getOfferingsByIds, getOfferingsForSemester } from "@/lib/offerings/offerings";
 import { filterOfferings, pageSlice } from "@/lib/offerings/offeringSearch";
-import { getPlanForStudentSemester, getPlanItems } from "@/lib/planning/planning";
+import { getPlanForStudentSemester, getPlanItems, getPlansForStudentsInSemester } from "@/lib/planning/planning";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -56,6 +58,7 @@ export default async function StudentPlanEntryPage({
     studentId?: string;
     semesterId?: string;
     sq?: string;
+    sp?: string;
     q?: string;
     page?: string;
     error?: string;
@@ -63,7 +66,7 @@ export default async function StudentPlanEntryPage({
   }>;
 }) {
   const actor = await getCurrentActor();
-  const { studentId, semesterId: rawSemesterId, sq, q, page, error, submitted } = await searchParams;
+  const { studentId, semesterId: rawSemesterId, sq, sp, q, page, error, submitted } = await searchParams;
 
   if (!actor)
     return (
@@ -109,10 +112,7 @@ export default async function StudentPlanEntryPage({
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
-      <PageHeader
-        title="Course plan entry"
-        description="Build and submit a course plan for a student who cannot use the app themselves. It goes to Course plan review like any other plan."
-      />
+      <PageHeader title="Course plan entry" />
 
       {error && (
         <Alert tone="danger" className="mb-4">
@@ -156,7 +156,7 @@ export default async function StudentPlanEntryPage({
       )}
 
       {!chosen ? (
-        <StudentChooser actor={actor} sq={sq} semesterId={semesterId} />
+        <StudentChooser actor={actor} sq={sq} sp={sp} semesterId={semesterId} />
       ) : (
         <StudentPlanEditor
           actor={actor}
@@ -173,53 +173,129 @@ export default async function StudentPlanEntryPage({
   );
 }
 
-/** Search-and-pick rather than a <select> of every student: there are 158
- * live student rows and rendering them all as options is the pattern this
- * pass is removing elsewhere. */
+/**
+ * Pick the student whose plan is being entered.
+ *
+ * The search box stays -- 158 live student rows is too many for a
+ * `<select>` -- but the listing below it is no longer hidden until you
+ * type. An Admin sitting down to enter plans wants to see who is waiting,
+ * so the first page of students is on screen from the moment the page
+ * loads, and searching narrows the same table rather than summoning it.
+ *
+ * Each row carries the one action that row is for, chosen from what is
+ * actually in the database for the selected semester:
+ *
+ *   - a plan already submitted (or partly/fully decided)  -> View, into
+ *     Course plan review, because there is nothing to add here;
+ *   - a plan started but not yet sent (DRAFT / REJECTED)  -> Continue,
+ *     back into this screen where it can be finished;
+ *   - no plan at all                                      -> Add.
+ *
+ * With no semester selected there is nothing to look up, so every row
+ * falls back to the neutral "Plan courses" it always had rather than
+ * guessing at a status.
+ */
+const PAGE_SIZE_STUDENTS = 10;
+
+type RowAction = { label: string; href: string; variant: "primary" | "secondary" | "ghost"; icon: ReactNode };
+
 async function StudentChooser({
   actor,
   sq,
   semesterId,
+  sp,
 }: {
   actor: Actor;
   sq?: string;
   semesterId?: string;
+  sp?: string;
 }) {
-  const results = sq?.trim() ? await searchStudents(actor, { query: sq, page: 1, pageSize: 10 }) : undefined;
+  const pageNum = Math.max(1, Number(sp) || 1);
+  const results = await searchStudents(actor, { query: sq?.trim() || undefined, page: pageNum, pageSize: PAGE_SIZE_STUDENTS });
+
   // Reference data read whole and resolved in memory rather than joined per
   // row -- tens of departments, and the same approach every other listing
   // in this app takes.
-  const departments = results?.rows.length
-    ? await asUser(actor.userId, (tx) => tx.query.department.findMany())
-    : [];
+  const departments = results.rows.length ? await asUser(actor.userId, (tx) => tx.query.department.findMany()) : [];
   const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? "—";
+
+  // One query for the whole page of students, not one per row.
+  const plans =
+    semesterId && results.rows.length
+      ? await getPlansForStudentsInSemester(actor, results.rows.map((s) => s.id), semesterId)
+      : new Map();
+
+  const planHref = (studentId: string) =>
+    `/admin/student-plan?studentId=${studentId}${semesterId ? `&semesterId=${semesterId}` : ""}${sq ? `&sq=${encodeURIComponent(sq)}` : ""}`;
+
+  const actionFor = (studentId: string): RowAction => {
+    const plan = plans.get(studentId);
+    if (!plan) {
+      return {
+        label: semesterId ? "Add plan" : "Plan courses",
+        href: planHref(studentId),
+        variant: "primary",
+        icon: <Plus className="h-3.5 w-3.5" aria-hidden="true" />,
+      };
+    }
+    if (plan.status === "DRAFT" || plan.status === "REJECTED") {
+      return {
+        label: "Continue",
+        href: planHref(studentId),
+        variant: "secondary",
+        icon: <PenLine className="h-3.5 w-3.5" aria-hidden="true" />,
+      };
+    }
+    return {
+      label: "View plan",
+      href: `/admin/planning/${plan.id}`,
+      variant: "secondary",
+      icon: <Eye className="h-3.5 w-3.5" aria-hidden="true" />,
+    };
+  };
+
+  const pageHref = (p: number) =>
+    `/admin/student-plan?${new URLSearchParams({
+      ...(semesterId ? { semesterId } : {}),
+      ...(sq ? { sq } : {}),
+      ...(p > 1 ? { sp: String(p) } : {}),
+    }).toString()}`;
+
+  const lastPage = Math.max(1, Math.ceil(results.total / PAGE_SIZE_STUDENTS));
+  const firstOnPage = results.total === 0 ? 0 : (pageNum - 1) * PAGE_SIZE_STUDENTS + 1;
+  const lastOnPage = (pageNum - 1) * PAGE_SIZE_STUDENTS + results.rows.length;
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-wrap items-center justify-between gap-3">
         <CardTitle>Choose a student</CardTitle>
-      </CardHeader>
-      <CardBody>
-        <form method="GET" className="mb-4 flex flex-wrap items-end gap-2">
+        <form method="GET" className="flex flex-wrap items-center gap-2">
           {semesterId && <input type="hidden" name="semesterId" value={semesterId} />}
-          <div>
-            <Label htmlFor="sq" className="text-xs">
-              Search students
-            </Label>
-            <Input id="sq" name="sq" defaultValue={sq ?? ""} placeholder="Student ID or name" className="w-64" />
+          <Label htmlFor="sq" className="sr-only">
+            Search students
+          </Label>
+          {/* The width lives on a wrapper, not on the Input: `fieldBase`
+              already carries `w-full` and `cn` is a plain joiner with no
+              tailwind-merge, so a `w-56` passed in here would lose. */}
+          <div className="w-56">
+            <Input id="sq" name="sq" defaultValue={sq ?? ""} placeholder="Student ID or name" />
           </div>
           <Button type="submit" variant="secondary">
             Search
           </Button>
+          {sq && (
+            <Link href={`/admin/student-plan${semesterId ? `?semesterId=${semesterId}` : ""}`} className="text-xs font-medium text-brand-fg hover:underline">
+              Clear
+            </Link>
+          )}
         </form>
-
-        {!results && <p className="text-sm text-fg-muted">Search for a student by Student ID or name to begin.</p>}
-
-        {results && results.rows.length === 0 && (
-          <p className="text-sm text-fg-muted">No students match &ldquo;{sq}&rdquo;.</p>
-        )}
-
-        {results && results.rows.length > 0 && (
+      </CardHeader>
+      <CardBody>
+        {results.rows.length === 0 ? (
+          <p className="text-sm text-fg-muted">
+            {sq ? <>No students match &ldquo;{sq}&rdquo;.</> : "No students on record yet."}
+          </p>
+        ) : (
           <>
             <Table>
               <Thead>
@@ -227,46 +303,89 @@ async function StudentChooser({
                   <Th className="whitespace-nowrap">Student ID</Th>
                   <Th>Name</Th>
                   <Th className="hidden sm:table-cell">Department</Th>
-                  <Th className="whitespace-nowrap">Status</Th>
+                  <Th className="hidden whitespace-nowrap md:table-cell">Plan</Th>
+                  {/* Same reasoning as the Student grades listing: below sm
+                      the action button needs the width more than the pill. */}
+                  <Th className="hidden whitespace-nowrap sm:table-cell">Status</Th>
                   <Th className="text-right">Action</Th>
                 </tr>
               </Thead>
               <tbody>
-                {results.rows.map((s) => (
-                  <Tr key={s.id}>
-                    <Td className="font-mono text-xs whitespace-nowrap text-fg-secondary">{s.studentNumber}</Td>
-                    <Td className="font-medium text-fg">{listName(s)}</Td>
-                    <Td className="hidden text-fg-secondary sm:table-cell">{departmentName(s.departmentId)}</Td>
-                    <Td className="whitespace-nowrap">
-                      <Badge tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status}</Badge>
-                    </Td>
-                    <Td className="text-right">
-                      {/* The same destination the row used to link to, as a
-                          button: this is the action the row exists for, and
-                          a text link beside four data cells did not read as
-                          one. */}
-                      <Link
-                        href={`/admin/student-plan?studentId=${s.id}${semesterId ? `&semesterId=${semesterId}` : ""}`}
-                        className={buttonClasses("secondary", "sm")}
-                      >
-                        Plan courses
-                      </Link>
-                    </Td>
-                  </Tr>
-                ))}
+                {results.rows.map((s) => {
+                  const plan = plans.get(s.id);
+                  const action = actionFor(s.id);
+                  return (
+                    <Tr key={s.id}>
+                      <Td className="font-mono text-xs whitespace-nowrap text-fg-secondary">{s.studentNumber}</Td>
+                      <Td className="font-medium text-fg">{listName(s)}</Td>
+                      <Td className="hidden text-fg-secondary sm:table-cell">{departmentName(s.departmentId)}</Td>
+                      <Td className="hidden whitespace-nowrap md:table-cell">
+                        {!semesterId ? (
+                          <span className="text-xs text-fg-muted">Select a semester</span>
+                        ) : plan ? (
+                          <Badge tone={PLAN_STATUS_TONE[plan.status as keyof typeof PLAN_STATUS_TONE] ?? "neutral"}>
+                            {PLAN_STATUS_LABEL[plan.status] ?? plan.status}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-fg-muted">None yet</span>
+                        )}
+                      </Td>
+                      <Td className="hidden whitespace-nowrap sm:table-cell">
+                        <Badge tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status}</Badge>
+                      </Td>
+                      <Td className="text-right">
+                        <Link
+                          href={action.href}
+                          className={buttonClasses(action.variant, "sm", "gap-1.5")}
+                          aria-label={`${action.label} — ${listName(s)}`}
+                        >
+                          {action.icon}
+                          {action.label}
+                        </Link>
+                      </Td>
+                    </Tr>
+                  );
+                })}
               </tbody>
             </Table>
-            {results.total > results.rows.length && (
-              <p className="mt-3 text-xs text-fg-muted">
-                Showing the first {results.rows.length} of {results.total} matches — narrow the search to see others.
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-fg-muted">
+                Showing {firstOnPage}–{lastOnPage} of {results.total} student{results.total === 1 ? "" : "s"}
+                {sq && <> matching &ldquo;{sq}&rdquo;</>}
               </p>
-            )}
+              {lastPage > 1 && (
+                <div className="flex items-center gap-2">
+                  {pageNum > 1 && (
+                    <Link href={pageHref(pageNum - 1)} className={buttonClasses("secondary", "sm")}>
+                      Previous
+                    </Link>
+                  )}
+                  <span className="text-xs text-fg-muted">
+                    Page {pageNum} of {lastPage}
+                  </span>
+                  {pageNum < lastPage && (
+                    <Link href={pageHref(pageNum + 1)} className={buttonClasses("secondary", "sm")}>
+                      Next
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </CardBody>
     </Card>
   );
 }
+
+const PLAN_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draft",
+  SUBMITTED: "Awaiting decision",
+  APPROVED: "Approved",
+  REJECTED: "Returned",
+  PARTIALLY_APPROVED: "Partly approved",
+};
 
 const PLAN_STATUS_TONE = {
   DRAFT: "neutral",
@@ -368,7 +487,7 @@ async function StudentPlanEditor({
           <CardBody className="flex flex-wrap items-center gap-3">
             <Badge tone={PLAN_STATUS_TONE[plan.status as keyof typeof PLAN_STATUS_TONE] ?? "neutral"}>{plan.status}</Badge>
             <span className="text-sm text-fg-secondary">
-              {plan.totalCredits} credit hours
+              {plan.totalCredits} Cr/Hrs
               {plan.status === "SUBMITTED" && " — awaiting a decision in Course plan review"}
             </span>
             {plan.status === "REJECTED" && plan.rejectionReason && (
@@ -396,7 +515,7 @@ async function StudentPlanEditor({
         <>
           <Card className="mb-6">
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Planned courses — {totalCredits} credit hours</CardTitle>
+              <CardTitle>Planned courses — {totalCredits} Cr/Hrs</CardTitle>
               {plan.enteredBy && <Badge tone="brand">Admin-entered</Badge>}
             </CardHeader>
             <CardBody>

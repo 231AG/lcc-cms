@@ -1,4 +1,4 @@
-import { SkeletonPage } from "@/components/ui/Skeleton";
+import { Preloader } from "@/components/ui/Preloader";
 
 /**
  * Covers every /admin/* route. Before this existed, navigating to an admin
@@ -6,11 +6,10 @@ import { SkeletonPage } from "@/components/ui/Skeleton";
  * indication anything was happening -- these pages do real cross-region
  * database work on every render.
  *
- * One shared shell rather than a bespoke skeleton per route: the admin
- * pages share a title-block / controls / table-in-a-card structure, and a
- * per-route skeleton would be one more thing to keep in sync with a
- * redesign for very little gain.
+ * One shared pre-loader rather than a bespoke skeleton per route: the
+ * skeletons that used to live here had to be kept in step with every
+ * redesign of the page behind them, and drifted from it anyway.
  */
 export default function AdminLoading() {
-  return <SkeletonPage />;
+  return <Preloader />;
 }

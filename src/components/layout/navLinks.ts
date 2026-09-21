@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   UserCheck,
   Users,
+  UserRoundSearch,
 } from "lucide-react";
 import type { Role } from "@/lib/permissions/kernel";
 
@@ -103,6 +104,10 @@ export const ADMIN_GROUPS: NavGroup[] = [
   {
     label: "Grades",
     links: [
+      // A student's results, reachable without walking through the Student
+      // Listing and their whole profile first -- the office looks a single
+      // student's grades up far more often than it enters a whole class's.
+      { href: "/admin/student-grades", label: "Student grades", icon: UserRoundSearch },
       { href: "/admin/grades", label: "Class grade entry", icon: GraduationCap },
       { href: "/admin/grade-corrections", label: "Grade corrections", icon: FilePen },
       { href: "/admin/export", label: "Semester export", icon: Download },

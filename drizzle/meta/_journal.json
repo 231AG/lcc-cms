@@ -204,6 +204,13 @@
       "when": 1788800000000,
       "tag": "0028_student_photo",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788900000000,
+      "tag": "0029_numeric_sections",
+      "breakpoints": true
     }
   ]
 }

@@ -23,7 +23,7 @@ import { semesterDisplayName, semesterFullLabel } from "@/lib/academic/semesterN
 import { asUser } from "@/lib/db/asUser";
 import { getStudent, STUDENT_STATUSES } from "@/lib/students/students";
 import { getStudentPhotoMeta } from "@/lib/students/photo";
-import { getGradeSheet } from "@/lib/gradesheet/gradeSheet";
+import { getGradeSheet, trimCredits } from "@/lib/gradesheet/gradeSheet";
 import { fullName, listName } from "@/lib/students/name";
 import { getStudentHistory } from "@/lib/historical/historical";
 import { getCumulativeSummary, getOutstandingRepeatObligations, getSemesterSummaries } from "@/lib/gpa/gpa";
@@ -405,10 +405,18 @@ export default async function StudentDetailPage({
         <Stat
           icon={GraduationCap}
           label="Credits earned"
-          value={cumulative ? `${cumulative.totalCreditsEarned}` : "—"}
-          hint={cumulative ? `of 132 — ${cumulative.creditsToGraduation} remaining` : undefined}
+          value={cumulative ? `${trimCredits(cumulative.totalCreditsEarned)} Cr/Hrs` : "—"}
+          hint={
+            cumulative
+              ? `of ${cumulative.graduationCreditHours} Cr/Hrs — ${trimCredits(cumulative.creditsToGraduation)} remaining`
+              : undefined
+          }
         />
-        <Stat icon={BookOpen} label="Credits attempted" value={cumulative ? `${cumulative.totalCreditsAttempted}` : "—"} />
+        <Stat
+          icon={BookOpen}
+          label="Credits attempted"
+          value={cumulative ? `${trimCredits(cumulative.totalCreditsAttempted)} Cr/Hrs` : "—"}
+        />
       </div>
 
       {(cumulative?.isProvisional ?? true) && (

@@ -161,7 +161,9 @@ export function SemesterResultsTable({
             <td colSpan={5} className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
               Total Credit Earned
             </td>
-            <td className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">{trimCredits(sheet.summary.creditsEarned)}</td>
+            <td className="border-t-2 border-brand-fg px-3 py-2 text-right font-bold">
+              {trimCredits(sheet.summary.creditsEarned)} Cr/Hrs
+            </td>
           </tr>
           <tr>
             <td colSpan={5} className="px-3 py-2 text-right font-bold">

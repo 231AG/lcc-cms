@@ -104,6 +104,99 @@ export async function getSubmissionDetail(actor: Actor, submissionId: string) {
   return { submission, grades };
 }
 
+export interface StudentGradeRow {
+  gradeRecordId: string;
+  registrationId: string;
+  offeringId: string;
+  courseCode: string;
+  courseTitle: string;
+  section: string;
+  creditHours: number;
+  score: string | null;
+  letter: string;
+  gradePoint: string | null;
+  /** DRAFT | SUBMITTED | PUBLISHED | LOCKED. */
+  status: string;
+  isRetake: boolean;
+  /** True when a correction for this grade is already awaiting a decision,
+   *  so the screen offers no second request it would only refuse. */
+  correctionPending: boolean;
+}
+
+/**
+ * One student's grades for one semester, course by course.
+ *
+ * The opposite axis to getClassRoster: that one is a class down a column
+ * of students, this one is a student across a row of courses. The Student
+ * grades screen needs the second, and needs the grade_record id with it --
+ * a grade sheet is built from published academic_record snapshots and
+ * cannot tell you which row to correct.
+ *
+ * Read through asUser, so row-level security scopes it, and gated on
+ * grade.manageClass: whoever may enter a grade may see what is already
+ * recorded.
+ *
+ * Every grade is returned, not only published ones, because the purpose of
+ * the screen is to show the Admin where a grade has got to. The caller
+ * decides what each status may be acted on.
+ */
+export async function getStudentGradesForSemester(
+  actor: Actor,
+  studentId: string,
+  semesterId: string,
+): Promise<StudentGradeRow[]> {
+  await assertCan(actor, "grade.manageClass");
+
+  return asUser(actor.userId, async (tx) => {
+    const regs = await tx.query.registration.findMany({
+      where: and(eq(registration.studentId, studentId), eq(registration.semesterId, semesterId), eq(registration.status, "REGISTERED")),
+    });
+    if (regs.length === 0) return [];
+
+    const [grades, offerings] = await Promise.all([
+      tx.query.gradeRecord.findMany({ where: inArray(gradeRecord.registrationId, regs.map((r) => r.id)) }),
+      tx.query.courseOffering.findMany({ where: inArray(courseOffering.id, regs.map((r) => r.offeringId)) }),
+    ]);
+    const courseIds = [...new Set(offerings.map((o) => o.courseId))];
+    const [courses, pending] = await Promise.all([
+      courseIds.length ? tx.query.course.findMany({ where: inArray(course.id, courseIds) }) : Promise.resolve([]),
+      grades.length
+        ? tx.query.gradeCorrectionRequest.findMany({
+            where: and(
+              inArray(gradeCorrectionRequest.gradeRecordId, grades.map((g) => g.id)),
+              eq(gradeCorrectionRequest.status, "PENDING"),
+            ),
+          })
+        : Promise.resolve([]),
+    ]);
+    const pendingIds = new Set(pending.map((p) => p.gradeRecordId));
+
+    const rows: StudentGradeRow[] = [];
+    for (const reg of regs) {
+      const grade = grades.find((g) => g.registrationId === reg.id);
+      if (!grade) continue; // registered but not yet graded -- nothing to show or correct
+      const offering = offerings.find((o) => o.id === reg.offeringId);
+      const courseRow = offering ? courses.find((c) => c.id === offering.courseId) : undefined;
+      rows.push({
+        gradeRecordId: grade.id,
+        registrationId: reg.id,
+        offeringId: reg.offeringId,
+        courseCode: courseRow?.code ?? "—",
+        courseTitle: courseRow?.title ?? "—",
+        section: offering?.section ?? "—",
+        creditHours: offering?.frozenCreditHours ?? 0,
+        score: grade.score,
+        letter: grade.letter,
+        gradePoint: grade.gradePoint,
+        status: grade.status,
+        isRetake: reg.isRetake,
+        correctionPending: pendingIds.has(grade.id),
+      });
+    }
+    return rows.sort((a, b) => a.courseCode.localeCompare(b.courseCode));
+  });
+}
+
 export async function getCorrectionQueue(actor: Actor) {
   await assertCan(actor, "grade.decideCorrection");
   return db.query.gradeCorrectionRequest.findMany({ where: eq(gradeCorrectionRequest.status, "PENDING") });

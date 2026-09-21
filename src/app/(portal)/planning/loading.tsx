@@ -1,5 +1,5 @@
-import { SkeletonPage } from "@/components/ui/Skeleton";
+import { Preloader } from "@/components/ui/Preloader";
 
 export default function PlanningLoading() {
-  return <SkeletonPage columns={3} rows={6} />;
+  return <Preloader label="Loading course planning…" />;
 }

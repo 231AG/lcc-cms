@@ -781,6 +781,108 @@ html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Pre-loaders
+   ---------------------------------------------------------------------------
+   Three candidate treatments for the whole-page wait, all CSS-only: a
+   route loader renders before any client JavaScript is in play, so an
+   animation that needed React would arrive after the thing it is meant to
+   cover.
+
+   Every one of them stops moving under prefers-reduced-motion, and the
+   block that stops them sets the final, readable state rather than just
+   `animation: none` on a half-built frame. */
+
+/* A -- the seal, with a ring drawn round it. A conic gradient masked to a
+   ring: one element, no SVG, and it inherits the brand colour rather than
+   hard-coding it. */
+@keyframes preloader-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.preloader-ring {
+  background: conic-gradient(from 0deg, transparent 0deg, var(--brand-fg) 300deg, var(--brand-fg) 360deg);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  animation: preloader-spin 1.1s linear infinite;
+}
+
+/* B -- five bars rising and falling, the same figure the dashboards draw
+   their charts with. The delays are per-bar so the wave reads left to
+   right. */
+@keyframes preloader-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.preloader-bar {
+  transform-origin: bottom;
+  animation: preloader-bar 1s ease-in-out infinite;
+}
+
+/* C -- an indeterminate bar that sweeps the track, plus three dots that
+   pulse in turn beneath it. Nothing here claims a percentage: the app does
+   not know how far through it is, and a bar that pretended to would be
+   lying. */
+@keyframes preloader-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+@keyframes preloader-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.preloader-sweep {
+  animation: preloader-sweep 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.preloader-dot {
+  animation: preloader-dot 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preloader-ring {
+    animation: none;
+    /* Still a ring, still clearly the brand -- just a still one. */
+    background: conic-gradient(from 0deg, var(--brand-line) 0deg, var(--brand-fg) 360deg);
+  }
+
+  .preloader-bar,
+  .preloader-dot {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+
+  .preloader-sweep {
+    animation: none;
+    transform: none;
+    width: 100%;
+  }
+}
+
 /* ===========================================================================
    6. PRINT
    ===========================================================================

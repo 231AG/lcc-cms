@@ -33,6 +33,9 @@ export async function getSemesterSummaries(actor: Actor, studentId: string): Pro
 }
 
 export interface CumulativeSummaryView {
+  /** What the degree requires, so a screen can show progress against it
+   *  without importing the policy itself. */
+  graduationCreditHours: number;
   cgpa: string | null; // 3dp display value, or null
   totalCreditsAttempted: string;
   totalCreditsEarned: string;
@@ -53,6 +56,7 @@ export async function getCumulativeSummary(actor: Actor, studentId: string): Pro
     totalCreditsAttempted: row.totalCreditsAttempted,
     totalCreditsEarned: row.totalCreditsEarned,
     creditsToGraduation: creditsToGraduation(row.totalCreditsEarned, DEFAULT_GPA_POLICY),
+    graduationCreditHours: DEFAULT_GPA_POLICY.graduationCreditHours,
     isProvisional: row.isProvisional,
     standing: deriveAcademicStanding(cgpa, row.isProvisional, DEFAULT_GPA_POLICY),
   };

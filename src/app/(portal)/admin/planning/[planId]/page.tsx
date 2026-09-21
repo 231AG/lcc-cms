@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Form";
+import { Input, Label } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { TableCard } from "@/components/ui/TableCard";
 import { expandDays, formatDays } from "@/lib/offerings/offeringRows";
@@ -24,9 +24,39 @@ import {
 /** Every icon control carries the same treatment: a tooltip on hover, and
  *  an accessible name that says the same thing for anyone not using a
  *  mouse. Matches the Students and Offerings tables. */
+/** The two overrides and any other secondary glyph on a row: quiet until
+ *  you go near it. */
 const iconAction =
   "inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+
+/**
+ * The decide buttons.
+ *
+ * These were bare grey glyphs that looked identical to the two override
+ * icons beside them -- nothing said which one registered a student for a
+ * course and which one opened a note. They are tinted, labelled and
+ * bordered now: green approve, red reject, each with its word next to the
+ * mark, so the consequential pair reads as a pair and the overrides stay
+ * quiet behind them.
+ */
+const decideAction =
+  "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring " +
+  "active:translate-y-px";
+
+//  The hover state fills: the soft tint becomes the solid colour and the
+//  label flips to white, so the button you are about to press stops being
+//  a suggestion. Only tokens that exist are used -- `cn` is a plain
+//  joiner with no tailwind-merge, so an invented class name here would
+//  silently do nothing at all.
+const approveAction =
+  `${decideAction} border-success-line bg-success-surface text-success-fg ` +
+  "hover:border-success-solid hover:bg-success-solid hover:text-on-solid hover:shadow-sm";
+
+const rejectAction =
+  `${decideAction} border-danger-line bg-danger-surface text-danger-fg ` +
+  "hover:border-danger-solid hover:bg-danger-solid hover:text-on-solid hover:shadow-sm";
 
 const PLAN_STATUS_TONE: Record<string, Tone> = {
   DRAFT: "neutral",
@@ -115,7 +145,7 @@ export default async function PlanDetailPage({
         description={
           <>
             {semester?.name ?? plan.semesterId} — status <Badge tone={PLAN_STATUS_TONE[plan.status] ?? "neutral"}>{plan.status}</Badge> —{" "}
-            {plan.totalCredits} credit hours
+            {plan.totalCredits} Cr/Hrs
           </>
         }
       />
@@ -250,9 +280,10 @@ export default async function PlanDetailPage({
                               type="submit"
                               title={`Approve ${c?.code ?? "this course"}`}
                               aria-label={`Approve ${c?.code ?? "this course"}`}
-                              className={iconAction}
+                              className={approveAction}
                             >
-                              <Check className="h-4 w-4" aria-hidden="true" />
+                              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                              Approve
                             </button>
                           </form>
                           {/* Reject needs a reason -- the database refuses a
@@ -262,9 +293,10 @@ export default async function PlanDetailPage({
                             <summary
                               title={`Reject ${c?.code ?? "this course"}`}
                               aria-label={`Reject ${c?.code ?? "this course"}`}
-                              className={`${iconAction} list-none`}
+                              className={`${rejectAction} cursor-pointer list-none`}
                             >
-                              <X className="h-4 w-4" aria-hidden="true" />
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                              Reject
                             </summary>
                             <form
                               action={rejectPlanItemAction}
@@ -341,23 +373,35 @@ export default async function PlanDetailPage({
         {/* At the bottom of the table, where a reviewer arrives after
             reading every row, rather than in a separate card below it. */}
         {plan.status === "SUBMITTED" && items.some((i) => i.status === "PENDING") && (
-          <div className="flex flex-wrap items-start gap-4 border-t border-line-subtle px-4 py-4 sm:px-5">
-            <form action={approvePlanAction}>
-              <input type="hidden" name="planId" value={planId} />
-              <Button type="submit">
-                <Check className="h-4 w-4" aria-hidden="true" />
-                Approve all
-              </Button>
-            </form>
-            <form action={rejectPlanAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="planId" value={planId} />
-              <Input name="reason" required placeholder="Reason for rejection" className="w-64" />
-              <Button type="submit" variant="danger">
-                <X className="h-4 w-4" aria-hidden="true" />
-                Reject all
-              </Button>
-            </form>
-            <p className="w-full text-xs text-fg-muted">
+          <div className="border-line-subtle bg-surface-subtle border-t px-4 py-4 sm:px-5">
+            {/* Approve on the left, reject on the right, with the reason
+                attached to the button that needs it. The two used to sit
+                side by side in one wrapping row, which put the reason box
+                between them and let "Reject all" wrap underneath its own
+                input. */}
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <form action={approvePlanAction}>
+                <input type="hidden" name="planId" value={planId} />
+                <Button type="submit">
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                  Approve all
+                </Button>
+              </form>
+              <form action={rejectPlanAction} className="flex items-end gap-2">
+                <input type="hidden" name="planId" value={planId} />
+                <div>
+                  <Label htmlFor="bulk-reason" className="text-xs">
+                    Reason
+                  </Label>
+                  <Input id="bulk-reason" name="reason" required placeholder="Why the whole plan is turned down" className="w-56 sm:w-72" />
+                </div>
+                <Button type="submit" variant="danger" className="shrink-0">
+                  <X className="h-4 w-4" aria-hidden="true" />
+                  Reject all
+                </Button>
+              </form>
+            </div>
+            <p className="text-fg-muted mt-3 text-xs">
               Both apply to every course still pending above; courses already decided are left alone.
             </p>
           </div>

@@ -35,8 +35,22 @@ async function assertSemesterEditable(semesterId: string): Promise<void> {
   }
 }
 
+/**
+ * Sections are numbers at this College (migration 0029, and a CHECK on the
+ * column enforces it). This used to trim and upper-case, which quietly
+ * accepted "a" as "A" and let the data drift to letters in the first
+ * place. Leading zeros are stripped so "01" and "1" are the same section
+ * rather than two that collide on nothing.
+ */
 function normalizeSection(section: string): string {
-  return section.trim().toUpperCase();
+  const trimmed = section.trim();
+  if (!trimmed) return "";
+  if (!/^[0-9]+$/.test(trimmed)) {
+    throw new ValidationError(`Section must be a number, not "${trimmed}". The College numbers its sections 1, 2, 3.`);
+  }
+  const n = Number(trimmed);
+  if (n < 1) throw new ValidationError("Section numbering starts at 1.");
+  return String(n);
 }
 
 function isUniqueViolation(err: unknown): boolean {

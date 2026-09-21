@@ -248,7 +248,7 @@ export default async function HistoricalEntryPage({
                   <Thead>
                     <tr>
                       <Th>Course code</Th>
-                      <Th>Credit hours</Th>
+                      <Th>Cr/Hrs</Th>
                       <Th>Grade</Th>
                       <Th>Score</Th>
                       <Th>Note</Th>
