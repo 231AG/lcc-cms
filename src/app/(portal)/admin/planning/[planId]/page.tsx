@@ -1,4 +1,5 @@
-import { Check, CalendarClock, ShieldAlert, X } from "lucide-react";
+import Link from "next/link";
+import { Check, CalendarClock, Printer, RotateCcw, ShieldAlert, X } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
@@ -8,7 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Form";
+import { Input, Label, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { TableCard } from "@/components/ui/TableCard";
 import { expandDays, formatDays } from "@/lib/offerings/offeringRows";
@@ -19,6 +20,7 @@ import {
   overrideScheduleConflictAction,
   rejectPlanAction,
   rejectPlanItemAction,
+  undoPlanDecisionAction,
 } from "../actions";
 
 /** Every icon control carries the same treatment: a tooltip on hover, and
@@ -83,11 +85,11 @@ export default async function PlanDetailPage({
   searchParams,
 }: {
   params: Promise<{ planId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; undone?: string }>;
 }) {
   const actor = await getCurrentActor();
   const { planId } = await params;
-  const { error } = await searchParams;
+  const { error, undone } = await searchParams;
 
   if (!actor)
     return (
@@ -137,6 +139,8 @@ export default async function PlanDetailPage({
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
   const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
   const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, offeringIds);
+  // A decision exists to be undone only once the plan has left review.
+  const isDecided = plan.status === "APPROVED" || plan.status === "REJECTED" || plan.status === "PARTIALLY_APPROVED";
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
@@ -153,6 +157,13 @@ export default async function PlanDetailPage({
       {error && (
         <Alert tone="danger" className="mb-4">
           {error}
+        </Alert>
+      )}
+
+      {undone && (
+        <Alert tone="success" className="mb-4">
+          The decision has been undone. This plan is back under review and every course on it is Pending again; any
+          registration it created has been dropped.
         </Alert>
       )}
 
@@ -211,6 +222,65 @@ export default async function PlanDetailPage({
         count={items.length}
         countLabel="course"
         id="planned-courses"
+        actions={
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/admin/planning/${plan.id}/control-sheet`}
+              className={iconAction}
+              title="Print the Control Sheet"
+              aria-label="Print the Control Sheet"
+            >
+              <Printer className="h-4 w-4" aria-hidden="true" />
+            </Link>
+            {/* Undoing a decision is only meaningful once there is one.
+                Shown disabled rather than hidden on an undecided plan, so
+                the control does not appear and vanish as the plan moves. */}
+            {isDecided ? (
+              <details className="relative">
+                <summary
+                  className={`${iconAction} cursor-pointer list-none`}
+                  title="Undo this decision"
+                  aria-label="Undo this decision"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                </summary>
+                <div className="border-line bg-surface absolute right-0 z-10 mt-2 w-80 rounded-xl border p-3 shadow-lg">
+                  <p className="text-fg text-sm font-semibold">Undo this decision?</p>
+                  <p className="text-fg-muted mt-1 text-xs">
+                    The plan goes back to Submitted and every course on it returns to Pending, so it can be decided
+                    again. Any registration this approval created is dropped. The student&rsquo;s plan itself is not
+                    changed, and nothing is deleted.
+                  </p>
+                  <form action={undoPlanDecisionAction} className="mt-3">
+                    <input type="hidden" name="planId" value={plan.id} />
+                    <Label htmlFor="undo-reason" className="text-xs">
+                      Why? <Required />
+                    </Label>
+                    <Input
+                      id="undo-reason"
+                      name="reason"
+                      required
+                      maxLength={200}
+                      placeholder="Approved the wrong student"
+                    />
+                    <Button type="submit" variant="danger" size="sm" className="mt-2 w-full">
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                      Undo and re-open for review
+                    </Button>
+                  </form>
+                </div>
+              </details>
+            ) : (
+              <span
+                className="text-fg-subtle inline-flex cursor-not-allowed rounded-md p-1.5"
+                title="There is no decision on this plan to undo yet"
+                aria-label="There is no decision on this plan to undo yet"
+              >
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              </span>
+            )}
+          </div>
+        }
       >
         <Table>
           <Thead>

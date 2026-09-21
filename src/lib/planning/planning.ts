@@ -743,6 +743,114 @@ export async function revisePlan(actor: Actor, planId: string) {
   });
 }
 
+/**
+ * A reviewer taking back their own decision, because it was wrong.
+ *
+ * Until this existed, an approval was a one-way door. A mis-click on the
+ * wrong row left an Admin with nothing to do about it: an APPROVED plan
+ * refuses editing, refuses overriding, and there was no un-approve. The
+ * only remedy anybody could think of was deleting the plan, which throws
+ * away the student's work and the record of the decision to fix a typo.
+ *
+ * So: APPROVED / REJECTED / PARTIALLY_APPROVED -> SUBMITTED, with every
+ * item back to PENDING. The plan lands back in the review queue and is
+ * decided again, properly, through the same path as the first time. No new
+ * way to approve anything -- only a way back to the question.
+ *
+ * WHAT HAPPENS TO THE REGISTRATIONS. Approving writes one per approved
+ * course, and those are the enrolment record, so undoing has to deal with
+ * them. They are DROPPED, not deleted: the history stays readable, and
+ * registerSeat already reinstates a dropped row if the course is approved
+ * again, so the correction does not collide with
+ * registration_unique_student_offering_idx on the second pass.
+ *
+ * WHAT IT REFUSES. A published grade is the hard stop -- the same one
+ * dropRegistration enforces. Once a student has a grade for a course, the
+ * registration behind it is not a clerical detail anybody may quietly
+ * withdraw, and no correction on this screen is worth breaking that.
+ * The semester must also still be open for registration, for the same
+ * reason revisePlan requires it: re-opening a plan after planning closes
+ * would let a student's enrolment change under a timetable everyone has
+ * already started teaching to.
+ */
+export async function undoPlanDecision(actor: Actor, planId: string, reason: string) {
+  await assertCan(actor, "planning.reviewPlan");
+  if (!reason?.trim()) throw new ValidationError("A reason is required to undo a decision.");
+
+  return db.transaction(async (tx) => {
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+    if (plan.status !== "APPROVED" && plan.status !== "REJECTED" && plan.status !== "PARTIALLY_APPROVED") {
+      throw new StateError(`There is no decision on this plan to undo (currently ${plan.status}).`);
+    }
+    await assertSemesterOpenForRegistration(tx, plan.semesterId);
+
+    const items = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
+    const itemIds = items.map((i) => i.id);
+
+    // Only the live ones. A registration already dropped by hand stays
+    // dropped -- undoing a review decision is not a reason to resurrect
+    // something a Registrar deliberately removed.
+    const live = itemIds.length
+      ? await tx.query.registration.findMany({
+          where: and(inArray(registration.planItemId, itemIds), eq(registration.status, "REGISTERED")),
+        })
+      : [];
+
+    if (live.length > 0) {
+      const graded = await tx.query.academicRecord.findFirst({
+        where: and(eq(academicRecord.studentId, plan.studentId), eq(academicRecord.isVoid, false)),
+      });
+      if (graded?.gradeRecordId) {
+        throw new StateError("A grade has been published for this student, so this decision can no longer be undone.");
+      }
+    }
+
+    for (const reg of live) {
+      await tx
+        .update(registration)
+        .set({ status: "DROPPED", droppedReason: `Review decision undone: ${reason}` })
+        .where(eq(registration.id, reg.id));
+      await auditWrite(tx, {
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: "REGISTRATION_DROPPED",
+        entityType: "registration",
+        entityId: reg.id,
+        studentId: plan.studentId,
+        reason,
+      });
+    }
+
+    if (itemIds.length > 0) {
+      await tx
+        .update(coursePlanItem)
+        .set({ status: "PENDING", rejectionReason: null, decidedBy: null, decidedAt: null })
+        .where(eq(coursePlanItem.planId, planId));
+    }
+
+    const [row] = await tx
+      .update(coursePlan)
+      .set({ status: "SUBMITTED", reviewedBy: null, reviewedAt: null, rejectionReason: null })
+      .where(eq(coursePlan.id, planId))
+      .returning();
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "COURSE_PLAN_DECISION_UNDONE",
+      entityType: "course_plan",
+      entityId: planId,
+      studentId: plan.studentId,
+      oldValue: { status: plan.status, reviewedBy: plan.reviewedBy },
+      newValue: { status: "SUBMITTED", registrationsDropped: live.length },
+      reason,
+    });
+
+    return { plan: row, registrationsDropped: live.length };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Admin: review, override, approve, reject (Section 14.5, REQ-P10/P11)
 // ---------------------------------------------------------------------------

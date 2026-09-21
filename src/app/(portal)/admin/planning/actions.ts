@@ -10,10 +10,28 @@ import {
   overrideScheduleConflict,
   rejectPlan,
   rejectPlanItem,
+  undoPlanDecision,
 } from "@/lib/planning/planning";
 
 function errorRedirect(planId: string, message: string): never {
   redirect(`/admin/planning/${planId}?error=${encodeURIComponent(message)}`);
+}
+
+/** Takes a decided plan back to Submitted so it can be reviewed again.
+ *  Lands on the same page, which is now showing the plan back under
+ *  review -- there is nowhere better to send somebody who has just
+ *  undone a decision than the decision they are about to redo. */
+export async function undoPlanDecisionAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const planId = String(formData.get("planId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  try {
+    await undoPlanDecision(actor, planId, reason);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(planId, err.message);
+    throw err;
+  }
+  redirect(`/admin/planning/${planId}?undone=1`);
 }
 
 export async function approvePlanAction(formData: FormData): Promise<void> {

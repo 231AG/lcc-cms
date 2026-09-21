@@ -80,6 +80,12 @@ export const AUDIT_ACTIONS = [
   // the other is "I changed the plan". An Admin whose queue item vanished
   // needs to be able to tell which.
   "COURSE_PLAN_REOPENED",
+  // A reviewer taking back their own decision on a whole plan, because it
+  // was made in error. Distinct from REVISED (the student reworking a plan
+  // that was refused) and from REOPENED (an edit pulling a plan out of the
+  // queue): this one is the reviewer correcting themselves, and it is the
+  // only action that puts an already-decided plan back under review.
+  "COURSE_PLAN_DECISION_UNDONE",
   "COURSE_PLAN_ITEM_APPROVED",
   "COURSE_PLAN_ITEM_REJECTED",
   "PREREQUISITE_OVERRIDDEN",
