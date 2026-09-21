@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ClipboardPaste } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -283,7 +284,15 @@ export default async function AcademicStructurePage({
 
       {/* Courses */}
       <section id="courses" className="mb-10">
-        <h2 className="mb-3 font-medium text-fg">Courses</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-fg font-medium">Courses</h2>
+          {/* The form below adds one course. The catalogue has hundreds,
+              and they arrive as a list, not as an afternoon of typing. */}
+          <Link href="/admin/structure/import" className={buttonClasses("secondary", "sm", "gap-1.5")}>
+            <ClipboardPaste className="h-3.5 w-3.5" aria-hidden="true" />
+            Import a course list
+          </Link>
+        </div>
         <form action={createCourseAction} className="mb-4 flex flex-wrap items-end gap-2">
           <div>
             <Label className="text-xs" htmlFor="course-dept">
