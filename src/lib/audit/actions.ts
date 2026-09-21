@@ -34,6 +34,9 @@ export const AUDIT_ACTIONS = [
   "OFFERING_CANCELLED",
   "OFFERING_REINSTATED",
   "OFFERING_UPDATED",
+  // An offering removed from the record. Carries its code, section, status
+  // and timetable, because afterwards there is no row left to describe.
+  "OFFERING_DELETED",
   "OFFERING_MEETING_CHANGED",
 
   // Academic structure (Stage 3)

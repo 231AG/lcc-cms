@@ -32,6 +32,7 @@ import {
   addMeetingAction,
   cancelOfferingAction,
   createOfferingAction,
+  deleteOfferingAction,
   publishOfferingAction,
   reinstateOfferingAction,
   rescheduleMeetingsAction,
@@ -188,6 +189,8 @@ export default async function OfferingsPage({
     newCreditHours?: string;
     newDepartmentId?: string;
     error?: string;
+    confirmDelete?: string;
+    deleted?: string;
     q?: string;
     collegeId?: string;
     page?: string;
@@ -202,6 +205,8 @@ export default async function OfferingsPage({
   const {
     semesterId: requestedSemesterId,
     error,
+    confirmDelete,
+    deleted,
     q,
     collegeId,
     page,
@@ -318,6 +323,11 @@ export default async function OfferingsPage({
     }
   });
 
+  // Resolved from every row in the semester, not just the page on screen:
+  // the confirmation must survive a click that happens to be the last row
+  // of page three.
+  const confirmDeleteRow = confirmDelete ? allRows.find((r) => r.offeringId === confirmDelete) : undefined;
+
   const queryParams = (extra: Record<string, string | undefined> = {}) => {
     const sp = new URLSearchParams();
     if (semesterId) sp.set("semesterId", semesterId);
@@ -356,6 +366,43 @@ export default async function OfferingsPage({
       {error && (
         <Alert tone="danger" className="mb-4">
           {error}
+        </Alert>
+      )}
+
+      {deleted && (
+        <Alert tone="success" className="mb-4">
+          {formatCourseCode(deleted)} has been removed from this semester.
+        </Alert>
+      )}
+
+      {/* The confirmation lives HERE, above the table, rather than in the
+          row that asked for it. A row's popover is inside the table's
+          scroll wrapper, which carries `contain: paint` and clips anything
+          drawn over it -- so a confirmation opened on a lower row is cut
+          off, taking its buttons with it. Above the table it is always
+          whole, and always in the same place. */}
+      {confirmDeleteRow && (
+        <Alert tone="danger" className="mb-4">
+          <p className="font-semibold">
+            Delete {formatCourseCode(confirmDeleteRow.code)} section {confirmDeleteRow.section}?
+          </p>
+          <p className="mt-1 text-sm">
+            This removes the offering and its timetable from {selectedSemester?.name ?? "this semester"} for good. The
+            course itself stays in the catalogue.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <form action={deleteOfferingAction}>
+              <input type="hidden" name="semesterId" value={semesterId} />
+              <input type="hidden" name="offeringId" value={confirmDeleteRow.offeringId} />
+              <SubmitButton variant="danger" size="sm" pendingLabel="Deleting…">
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                Yes, delete it
+              </SubmitButton>
+            </form>
+            <Link href={`/admin/offerings?semesterId=${semesterId}`} className={buttonClasses("ghost", "sm")}>
+              Cancel
+            </Link>
+          </div>
         </Alert>
       )}
 
@@ -959,6 +1006,24 @@ export default async function OfferingsPage({
                                   )}
                                 </div>
                               </details>
+                            )}
+                            {/* Removes the OFFERING, as against the slot
+                                below. Cancelled, published or draft: the
+                                rule is whether anything still points at it,
+                                not what colour its badge is. A link rather
+                                than a form, because the confirmation it
+                                arms is drawn above the table -- a
+                                confirmation inside this cell would be
+                                clipped by the table's scroll wrapper. */}
+                            {canManage && firstRowOfOffering.has(i) && (
+                              <Link
+                                href={`/admin/offerings?${queryParams({ confirmDelete: row.offeringId })}`}
+                                className={iconDanger}
+                                title={`Delete ${row.code} section ${row.section} from this semester`}
+                                aria-label={`Delete ${row.code} section ${row.section} from this semester`}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </Link>
                             )}
                             {/* Deletes the whole slot this row shows, every
                                 day of it -- see removeMeetingAction. */}

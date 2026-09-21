@@ -13,6 +13,7 @@ import {
   rescheduleMeetings,
   UnknownCourseCodeError,
   updateOffering,
+  deleteOffering,
 } from "@/lib/offerings/offerings";
 import { courseCodeKey, effectiveCourseCode } from "@/lib/courses/courseCode";
 
@@ -144,6 +145,28 @@ export async function updateOfferingAction(formData: FormData): Promise<void> {
     throw err;
   }
   redirect(`/admin/offerings?semesterId=${semesterId}`);
+}
+
+/**
+ * Removes the offering for good.
+ *
+ * Confirmed from a banner above the table rather than a popover inside a
+ * row: the table's scroll wrapper carries `contain: paint`, which clips
+ * anything a row tries to open over it, and a confirmation that is half
+ * cut off is worse than none.
+ */
+export async function deleteOfferingAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const semesterId = String(formData.get("semesterId") ?? "");
+  const offeringId = String(formData.get("offeringId") ?? "");
+  let summary;
+  try {
+    summary = await deleteOffering(actor, offeringId);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(semesterId, err.message);
+    throw err;
+  }
+  redirect(`/admin/offerings?semesterId=${semesterId}&deleted=${encodeURIComponent(summary.code)}`);
 }
 
 export async function publishOfferingAction(formData: FormData): Promise<void> {
