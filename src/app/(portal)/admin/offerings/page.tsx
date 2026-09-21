@@ -449,7 +449,10 @@ export default async function OfferingsPage({
                       </datalist>
                     </div>
                     <div>
-                      {/* Sections are numbered, not lettered. */}
+                      {/* Sections are numbered, not lettered, and the
+                          College teaches one section of a course per
+                          semester -- so 1 is the answer nearly every time
+                          and the field starts there (0030). */}
                       <Label htmlFor="section" className="text-xs">
                         Section
                         <Required />
@@ -459,7 +462,7 @@ export default async function OfferingsPage({
                         name="section"
                         required
                         inputMode="numeric"
-                        defaultValue={draftSection ?? ""}
+                        defaultValue={draftSection ?? "1"}
                         placeholder="1"
                       />
                     </div>
