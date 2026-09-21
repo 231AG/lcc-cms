@@ -29,10 +29,9 @@ function errorRedirect(planId: string, message: string): never {
 export async function deletePlanAction(formData: FormData): Promise<void> {
   const actor = await requireActor();
   const planId = String(formData.get("planId") ?? "");
-  const reason = String(formData.get("reason") ?? "");
   let summary;
   try {
-    summary = await deletePlan(actor, planId, reason);
+    summary = await deletePlan(actor, planId);
   } catch (err) {
     if (err instanceof AppError) errorRedirect(planId, err.message);
     throw err;

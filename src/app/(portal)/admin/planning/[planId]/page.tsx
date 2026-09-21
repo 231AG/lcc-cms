@@ -8,7 +8,7 @@ import { getPlan, getPlanItems, getPlanValidation } from "@/lib/planning/plannin
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
-import { Input, Label, Required } from "@/components/ui/Form";
+import { Input, Label } from "@/components/ui/Form";
 import { SubmitButton, SubmitIconButton } from "@/components/ui/SubmitButton";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { TableCard } from "@/components/ui/TableCard";
@@ -147,9 +147,6 @@ export default async function PlanDetailPage({
   const courseFor = (courseId: string) => courses.find((c) => c.id === courseId);
   const offeringFor = (offeringId: string) => offerings.find((o) => o.id === offeringId);
   const meetingsByOffering = await getOfferingMeetingsForOfferings(actor, offeringIds);
-  // Approved courses are the ones carrying a registration, and so the
-  // ones the delete prompt has to be specific about.
-  const registeredCount = items.filter((i) => i.status === "APPROVED").length;
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
@@ -245,41 +242,14 @@ export default async function PlanDetailPage({
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
               </summary>
-              <div className="border-danger-line bg-surface absolute right-0 z-10 mt-2 w-80 rounded-xl border p-3 shadow-lg">
+              <div className="border-danger-line bg-surface absolute right-0 z-10 mt-2 w-64 rounded-xl border p-3 shadow-lg">
                 <p className="text-danger-fg flex items-center gap-2 text-sm font-semibold">
                   <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  Delete this plan?
-                </p>
-                {/* Spelled out in numbers rather than in general terms.
-                    "This cannot be undone" is true of a great many
-                    buttons; "4 courses and 4 registrations" is what this
-                    particular click costs. */}
-                <p className="text-fg-secondary mt-2 text-xs">
-                  This removes the plan, all {items.length} course{items.length === 1 ? "" : "s"} on it
-                  {registeredCount > 0 && (
-                    <>
-                      {" "}
-                      and the {registeredCount} registration{registeredCount === 1 ? "" : "s"} it created
-                    </>
-                  )}
-                  . The student would have to plan the semester again from scratch.
-                </p>
-                <p className="text-fg-muted mt-1 text-xs">
-                  It cannot be undone. The audit log keeps a record of what was here.
+                  Are you sure you want to delete?
                 </p>
                 <form action={deletePlanAction} className="mt-3">
                   <input type="hidden" name="planId" value={plan.id} />
-                  <Label htmlFor="delete-reason" className="text-xs">
-                    Why? <Required />
-                  </Label>
-                  <Input
-                    id="delete-reason"
-                    name="reason"
-                    required
-                    maxLength={200}
-                    placeholder="Entered against the wrong student"
-                  />
-                  <SubmitButton variant="danger" size="sm" className="mt-2 w-full" pendingLabel="Deleting…">
+                  <SubmitButton variant="danger" size="sm" className="w-full" pendingLabel="Deleting…">
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                     Yes, delete this plan
                   </SubmitButton>

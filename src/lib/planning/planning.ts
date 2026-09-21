@@ -752,6 +752,10 @@ export async function revisePlan(actor: Actor, planId: string) {
  * things it destroys are listed in the audit log BEFORE they go, because
  * afterwards the log is the only place any of it still exists.
  *
+ * No reason is asked for. The confirmation on screen is a plain "are you
+ * sure", by decision, so the log records who deleted it, when, and what
+ * was in it, but not why.
+ *
  * WHAT GOES. The plan, every course on it, and every registration those
  * courses created. A registration made directly by an Admin
  * (source ADMIN_DIRECT) carries no plan item and is therefore untouched:
@@ -775,11 +779,8 @@ export interface DeletedPlanSummary {
   previousStatus: string;
 }
 
-export async function deletePlan(actor: Actor, planId: string, reason: string): Promise<DeletedPlanSummary> {
+export async function deletePlan(actor: Actor, planId: string): Promise<DeletedPlanSummary> {
   await assertCan(actor, "planning.reviewPlan");
-  if (!reason?.trim()) {
-    throw new ValidationError("A reason is required to delete a plan.");
-  }
 
   return db.transaction(async (tx) => {
     const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
@@ -825,7 +826,6 @@ export async function deletePlan(actor: Actor, planId: string, reason: string): 
         courses: courseCodes,
         registrationsDeleted: regs.length,
       },
-      reason,
     });
 
     // Order matters: registration -> plan item -> plan. Both foreign keys

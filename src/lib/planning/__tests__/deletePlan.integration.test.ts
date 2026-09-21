@@ -132,7 +132,7 @@ describe("deleting a plan", () => {
     expect((await registrationsOf(planId)).filter((r) => r.status === "REGISTERED")).toHaveLength(2);
     const itemIds = (await itemsOf(planId)).map((i) => i.id);
 
-    const summary = await deletePlan(admin(), planId, "Entered against the wrong student.");
+    const summary = await deletePlan(admin(), planId);
 
     expect(summary.coursesDeleted).toBe(2);
     expect(summary.registrationsDeleted).toBe(2);
@@ -152,7 +152,7 @@ describe("deleting a plan", () => {
     await submitPlan(student, plan.id);
     expect((await planOf(plan.id))!.status).toBe("SUBMITTED");
 
-    await deletePlan(admin(), plan.id, "Duplicate of another plan.");
+    await deletePlan(admin(), plan.id);
     expect(await planOf(plan.id)).toBeUndefined();
   });
 
@@ -167,7 +167,7 @@ describe("deleting a plan", () => {
     await approvePlanItem(admin(), second.id);
     expect((await planOf(plan.id))!.status).toBe("PARTIALLY_APPROVED");
 
-    const summary = await deletePlan(admin(), plan.id, "Start again.");
+    const summary = await deletePlan(admin(), plan.id);
     expect(summary.previousStatus).toBe("PARTIALLY_APPROVED");
     expect(await planOf(plan.id)).toBeUndefined();
   });
@@ -180,7 +180,7 @@ describe("deleting a plan", () => {
     const direct = await registerDirect(admin(), other.userId, offeringAId, "Special case.");
     const { planId } = await approvedPlan();
 
-    await deletePlan(admin(), planId, "Gone.");
+    await deletePlan(admin(), planId);
 
     const stillThere = await db.query.registration.findFirst({ where: eq(registration.id, direct.registration.id) });
     expect(stillThere).toBeTruthy();
@@ -190,7 +190,7 @@ describe("deleting a plan", () => {
 
   it("records what it destroyed before destroying it", async () => {
     const { planId } = await approvedPlan();
-    await deletePlan(admin(), planId, "Wrong semester entirely.");
+    await deletePlan(admin(), planId);
 
     const entry = (await db.query.auditLog.findMany({ where: eq(auditLog.entityId, planId) })).find(
       (e) => e.action === "COURSE_PLAN_DELETED",
@@ -198,28 +198,23 @@ describe("deleting a plan", () => {
     // The plan row is gone, so this entry is the only place any of this
     // still exists. It has to carry the detail, not just the id.
     expect(entry).toBeTruthy();
-    expect(entry!.reason).toBe("Wrong semester entirely.");
+    // No reason is asked for on screen, so the entry carries who, when and
+    // what -- but not why.
     const old = entry!.oldValue as { courses: string[]; status: string; registrationsDeleted: number };
     expect(old.courses).toHaveLength(2);
     expect(old.status).toBe("APPROVED");
     expect(old.registrationsDeleted).toBe(2);
   });
 
-  it("refuses without a reason, and deletes nothing", async () => {
-    const { planId } = await approvedPlan();
-    await expect(deletePlan(admin(), planId, "   ")).rejects.toThrow(ValidationError);
-    expect(await planOf(planId)).toBeTruthy();
-  });
-
   it("refuses a plan that does not exist", async () => {
-    await expect(deletePlan(admin(), id(), "Ghost.")).rejects.toThrow(ValidationError);
+    await expect(deletePlan(admin(), id())).rejects.toThrow(ValidationError);
   });
 
   it("will not let a Super Admin delete a plan", async () => {
     // Section 9.4.9: a Super Admin has no role in course planning at all,
     // and deleting one is still course planning.
     const { planId } = await approvedPlan();
-    await expect(deletePlan(actorOf(superAdminId, "SUPER_ADMIN"), planId, "Back door.")).rejects.toThrow(
+    await expect(deletePlan(actorOf(superAdminId, "SUPER_ADMIN"), planId)).rejects.toThrow(
       /Not available to your role/i,
     );
     expect(await planOf(planId)).toBeTruthy();
@@ -227,7 +222,7 @@ describe("deleting a plan", () => {
 
   it("will not let a student delete their own plan", async () => {
     const { student, planId } = await approvedPlan();
-    await expect(deletePlan(student, planId, "I changed my mind.")).rejects.toThrow(
+    await expect(deletePlan(student, planId)).rejects.toThrow(
       /Not available to your role/i,
     );
     expect(await planOf(planId)).toBeTruthy();
