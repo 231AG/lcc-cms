@@ -11,21 +11,69 @@ import {
   reinstateOffering,
   removeMeeting,
   rescheduleMeetings,
+  UnknownCourseCodeError,
   updateOffering,
 } from "@/lib/offerings/offerings";
+import { courseCodeKey } from "@/lib/courses/courseCode";
 
 function errorRedirect(semesterId: string, message: string): never {
   redirect(`/admin/offerings?semesterId=${semesterId}&error=${encodeURIComponent(message)}`);
+}
+
+/**
+ * Everything the Add-an-offering form holds, as query parameters.
+ *
+ * The form can come back to the user twice before anything is written --
+ * once to offer to create an unknown course, once to confirm it -- and on
+ * neither trip should they retype a word of what they had already filled
+ * in. A GET redirect is how this app carries state between server round
+ * trips everywhere else, so the whole form rides along in the URL rather
+ * than the page growing a client-side store to remember it.
+ */
+function formStateParams(formData: FormData): URLSearchParams {
+  const params = new URLSearchParams();
+  const carry = ["semesterId", "courseCode", "section", "room", "startTime", "endTime", "instructorName", "capacity"];
+  for (const name of carry) {
+    const value = String(formData.get(name) ?? "").trim();
+    if (value) params.set(name, value);
+  }
+  for (const day of formData.getAll("days")) params.append("days", String(day));
+  for (const name of ["newTitle", "newCreditHours", "newDepartmentId"]) {
+    const value = String(formData.get(name) ?? "").trim();
+    if (value) params.set(name, value);
+  }
+  // Intent is deliberately NOT carried. Publish-or-draft is re-chosen on
+  // the confirmation screen, because by then the registrar has seen what
+  // the course actually is -- and that is a fair moment to change their
+  // mind about making it visible to students.
+  return params;
 }
 
 export async function createOfferingAction(formData: FormData): Promise<void> {
   const actor = await requireActor();
   const semesterId = String(formData.get("semesterId") ?? "");
   const capacityRaw = String(formData.get("capacity") ?? "").trim();
+  const courseCode = String(formData.get("courseCode") ?? "");
+
+  // The "not on record yet" panel. All three are needed before a course
+  // can be created; a half-filled panel is treated as not filled at all,
+  // so a stray keystroke in one field cannot start a creation.
+  const newTitle = String(formData.get("newTitle") ?? "").trim();
+  const newCreditHoursRaw = String(formData.get("newCreditHours") ?? "").trim();
+  const newDepartmentId = String(formData.get("newDepartmentId") ?? "").trim();
+  const newCourseFilled = !!(newTitle && newCreditHoursRaw && newDepartmentId);
+
+  // Confirmation is tied to the exact code it was given for. Editing the
+  // code after confirming -- the likeliest way to fix a typo, and so the
+  // likeliest way to introduce a second one -- makes the confirmation
+  // stale and asks again.
+  const confirmedFor = String(formData.get("confirmCourse") ?? "").trim();
+  const confirmed = !!confirmedFor && courseCodeKey(confirmedFor) === courseCodeKey(courseCode);
+
   try {
     await createOffering(actor, {
       semesterId,
-      courseCode: String(formData.get("courseCode") ?? ""),
+      courseCode,
       section: String(formData.get("section") ?? ""),
       // Blank instructor and capacity are left undefined rather than sent
       // as "" / NaN, so the service layer's documented defaults apply.
@@ -36,9 +84,29 @@ export async function createOfferingAction(formData: FormData): Promise<void> {
       room: String(formData.get("room") ?? ""),
       startTime: String(formData.get("startTime") ?? ""),
       endTime: String(formData.get("endTime") ?? ""),
+      newCourse:
+        newCourseFilled && confirmed
+          ? { departmentId: newDepartmentId, title: newTitle, creditHours: Number(newCreditHoursRaw) }
+          : undefined,
+      publish: String(formData.get("intent") ?? "") === "publish",
     });
   } catch (err) {
-    if (err instanceof AppError) errorRedirect(semesterId, err.message);
+    // An unknown code is not a refusal any more, it is the next question:
+    // come back with the form intact and either the panel to describe the
+    // course, or the confirmation of what is about to be created.
+    if (err instanceof UnknownCourseCodeError) {
+      const params = formStateParams(formData);
+      params.set("stage", newCourseFilled ? "confirm" : "course");
+      redirect(`/admin/offerings?${params.toString()}`);
+    }
+    if (err instanceof AppError) {
+      // Every other refusal keeps the form too. Losing eight filled fields
+      // over one bad end time is its own small cruelty.
+      const params = formStateParams(formData);
+      params.set("error", err.message);
+      if (newCourseFilled) params.set("stage", "course");
+      redirect(`/admin/offerings?${params.toString()}`);
+    }
     throw err;
   }
   redirect(`/admin/offerings?semesterId=${semesterId}`);
