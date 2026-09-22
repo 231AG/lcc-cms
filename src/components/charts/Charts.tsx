@@ -38,16 +38,18 @@ const STATUS_COLOR: Record<string, string> = {
   INACTIVE: "var(--fg-subtle)",
 };
 
-/** The tinted icon chips on the stat cards. Four tones so a row of four
- * reads as four different things at a glance, which is what the design
- * reference uses them for -- they carry no meaning of their own, so nothing
- * depends on telling them apart. The number and its label do all the work. */
-export type StatTone = "brand" | "accent" | "info" | "success";
+/** The tinted icon chips on the stat cards. Colour here says something or
+ * nothing: every tile wears the brand chip, and only a figure that IS a
+ * status takes that status's colour -- "Active" is green because ACTIVE is
+ * green on the status chart below it and on every badge in the app. There
+ * used to be four tones handed out one per tile purely so the row looked
+ * varied; a colour that means nothing teaches the reader to ignore colour,
+ * which is exactly what the status colours need them not to do. The icon
+ * and the label tell the tiles apart. */
+export type StatTone = "brand" | "success";
 
 const STAT_CHIP: Record<StatTone, string> = {
   brand: "bg-brand-subtle-strong text-brand-fg",
-  accent: "bg-accent-soft text-accent-soft-fg",
-  info: "bg-info-surface text-info-fg",
   success: "bg-success-surface text-success-fg",
 };
 
@@ -73,7 +75,7 @@ export function StatTile({
   tone?: StatTone;
 }) {
   return (
-    <div className="border-line bg-surface flex items-start gap-3.5 rounded-2xl border p-4 shadow-[0_1px_2px_rgb(16_12_32_/_0.04),0_8px_24px_-12px_rgb(16_12_32_/_0.12)] sm:p-5">
+    <div className="border-line bg-surface flex items-start gap-3.5 rounded-2xl border p-4 shadow-card sm:p-5">
       {icon && (
         <span
           className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", STAT_CHIP[tone])}
