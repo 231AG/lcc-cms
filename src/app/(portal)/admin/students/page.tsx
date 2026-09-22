@@ -6,8 +6,9 @@ import { getEnrolmentYears, searchStudents, STUDENT_STATUSES } from "@/lib/stude
 import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
 import { Label, Input, Select } from "@/components/ui/Form";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { Download, Printer } from "lucide-react";
 import { StudentsHeader } from "./AddStudentPanel";
 import { StudentsTable, type StudentRow } from "./StudentsTable";
@@ -229,9 +230,9 @@ export default async function StudentsPage({
             </div>
           )}
           {size !== DEFAULT_PAGE_SIZE && <input type="hidden" name="pageSize" value={size} />}
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Apply
-          </Button>
+          </SubmitButton>
           {hasFilters && (
             <Link href="/admin/students" className={buttonClasses("ghost", "md")}>
               Clear filters
@@ -285,9 +286,9 @@ export default async function StudentsPage({
                   </option>
                 ))}
               </Select>
-              <Button type="submit" variant="secondary" size="sm">
+              <SubmitButton variant="secondary" size="sm">
                 Set
-              </Button>
+              </SubmitButton>
             </form>
 
             <Pagination page={pageNum} totalPages={totalPages} hrefForPage={hrefForPage} label="Students pagination" />

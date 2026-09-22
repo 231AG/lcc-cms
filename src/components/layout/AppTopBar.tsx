@@ -3,6 +3,7 @@ import { KeyRound, LogOut, Menu, PanelLeft } from "lucide-react";
 import type { Actor } from "@/lib/auth/session";
 import { signOutAction } from "@/app/actions";
 import { ThemeToggle } from "./ThemeToggle";
+import { SubmitIconButton } from "@/components/ui/SubmitButton";
 
 const ROLE_LABEL: Record<Actor["role"], string> = {
   STUDENT: "Student",
@@ -69,9 +70,11 @@ export function AppTopBar({ actor }: { actor: Actor }) {
             <KeyRound className="h-5 w-5" aria-hidden="true" />
           </Link>
           <form action={signOutAction} className="flex">
-            <button type="submit" aria-label="Sign out" className={iconButton}>
-              <LogOut className="h-5 w-5" aria-hidden="true" />
-            </button>
+            <SubmitIconButton
+              aria-label="Sign out"
+              className={iconButton}
+              icon={<LogOut className="h-5 w-5" aria-hidden="true" />}
+            />
           </form>
 
           <span className="bg-line-subtle mx-1 hidden h-8 w-px sm:block" aria-hidden="true" />

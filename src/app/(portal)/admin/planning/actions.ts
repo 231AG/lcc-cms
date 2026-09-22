@@ -10,10 +10,33 @@ import {
   overrideScheduleConflict,
   rejectPlan,
   rejectPlanItem,
+  deletePlan,
 } from "@/lib/planning/planning";
 
 function errorRedirect(planId: string, message: string): never {
   redirect(`/admin/planning/${planId}?error=${encodeURIComponent(message)}`);
+}
+
+
+
+/**
+ * Deletes the plan and everything it produced.
+ *
+ * Redirects to the queue rather than back to the plan, because the plan
+ * this page was showing no longer exists -- landing on its own 404 is a
+ * worse answer than landing on the list it came from.
+ */
+export async function deletePlanAction(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const planId = String(formData.get("planId") ?? "");
+  let summary;
+  try {
+    summary = await deletePlan(actor, planId);
+  } catch (err) {
+    if (err instanceof AppError) errorRedirect(planId, err.message);
+    throw err;
+  }
+  redirect(`/admin/planning?deleted=${summary.coursesDeleted}`);
 }
 
 export async function approvePlanAction(formData: FormData): Promise<void> {

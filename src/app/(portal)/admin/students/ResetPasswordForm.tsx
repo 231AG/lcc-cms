@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { resetStudentPasswordAction, type ResetPasswordState } from "./actions";
 
 const initialState: ResetPasswordState = {};
@@ -28,9 +28,9 @@ export function ResetPasswordForm({ studentId }: { studentId: string }) {
       )}
       <form action={formAction}>
         <input type="hidden" name="studentId" value={studentId} />
-        <Button type="submit" variant="secondary" disabled={pending}>
+        <SubmitButton variant="secondary" disabled={pending}>
           {pending ? "Resetting..." : "Reset password"}
-        </Button>
+        </SubmitButton>
       </form>
     </div>
   );

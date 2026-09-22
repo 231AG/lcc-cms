@@ -302,6 +302,16 @@
   --sidebar-active: var(--orchid-500);
   --sidebar-fg-active: #ffffff;
 
+  /* --- Elevation --------------------------------------------------------- */
+  /* The raised-surface shadow every card-shaped container shares: Card,
+     the dashboard's stat tiles and the student profile's fact cards. It was
+     written out as the same arbitrary value in all three, which is how a
+     tweak to one quietly stops matching the others. Deliberately identical
+     under both themes -- on dark, elevation is carried by the layered
+     surface lightness of the surface tokens, and this stays a faint
+     grounding shadow. */
+  --elevation-card: 0 1px 2px rgb(16 12 32 / 0.04), 0 8px 24px -12px rgb(16 12 32 / 0.12);
+
   /* --- Chrome ------------------------------------------------------------ */
   /* The institutional seal is artwork with a light ground, so it keeps a
      near-white chip behind it under both themes (32px, not a "large fill"). */
@@ -444,6 +454,9 @@
   --color-info-line: var(--info-line);
   --color-info-fg: var(--info-fg);
   --color-info-solid: var(--info-solid);
+
+  /* Elevation */
+  --shadow-card: var(--elevation-card);
 
   /* Chrome */
   --color-seal-backdrop: var(--seal-backdrop);

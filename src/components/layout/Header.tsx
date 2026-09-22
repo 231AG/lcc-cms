@@ -5,6 +5,7 @@ import type { Actor } from "@/lib/auth/session";
 import { signOutAction } from "@/app/actions";
 import { navItem } from "./navStyles";
 import { ThemeToggle } from "./ThemeToggle";
+import { SubmitIconButton } from "@/components/ui/SubmitButton";
 
 const ROLE_LABEL: Record<Actor["role"], string> = {
   STUDENT: "Student",
@@ -63,10 +64,13 @@ export function Header({ actor }: { actor: Actor | null }) {
                       runs out of room. `aria-label` (not `title`) keeps the
                       accessible name at every width -- the visible text is
                       hidden, not removed, so nothing announces as "button". */}
-                  <button type="submit" aria-label="Sign out" className={`${navItem} flex items-center gap-1.5 px-2`}>
-                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                  <SubmitIconButton
+                    aria-label="Sign out"
+                    className={`${navItem} flex items-center gap-1.5 px-2`}
+                    icon={<LogOut className="h-4 w-4" aria-hidden="true" />}
+                  >
                     <span className="hidden sm:inline">Sign out</span>
-                  </button>
+                  </SubmitIconButton>
                 </form>
               </>
             )}

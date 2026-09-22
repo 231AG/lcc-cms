@@ -3,8 +3,8 @@
 import { useRef, useState } from "react";
 import { deriveLetterFromScore, type GradeScaleEntry } from "@/lib/gpa/engine";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { clearDraftGradeAction, saveClassDraftAction } from "./actions";
 
 export interface RosterRowProps {
@@ -144,7 +144,7 @@ export default function ClassEntryForm({
             </tbody>
           </Table>
         </Card>
-        <Button type="submit">Save draft</Button>
+        <SubmitButton>Save draft</SubmitButton>
       </form>
 
       {clearable.length > 0 && (
@@ -157,9 +157,9 @@ export default function ClassEntryForm({
                 <form action={clearDraftGradeAction}>
                   <input type="hidden" name="offeringId" value={offeringId} />
                   <input type="hidden" name="gradeRecordId" value={r.gradeId!} />
-                  <button type="submit" className="font-medium text-danger-fg hover:underline">
+                  <SubmitTextButton className="font-medium text-danger-fg hover:underline">
                     Clear
-                  </button>
+                  </SubmitTextButton>
                 </form>
               </li>
             ))}

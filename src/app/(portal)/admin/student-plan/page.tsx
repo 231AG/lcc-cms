@@ -17,7 +17,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
@@ -143,9 +143,9 @@ export default async function StudentPlanEntryPage({
             ))}
           </Select>
         </div>
-        <Button type="submit" variant="secondary">
+        <SubmitButton variant="secondary">
           Select
-        </Button>
+        </SubmitButton>
       </form>
 
       {semesterId && !isPlanningOpen(semesterState as SemesterState) && (
@@ -280,9 +280,9 @@ async function StudentChooser({
           <div className="w-56">
             <Input id="sq" name="sq" defaultValue={sq ?? ""} placeholder="Student ID or name" />
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Search
-          </Button>
+          </SubmitButton>
           {sq && (
             <Link href={`/admin/student-plan${semesterId ? `?semesterId=${semesterId}` : ""}`} className="text-xs font-medium text-brand-fg hover:underline">
               Clear
@@ -559,9 +559,9 @@ async function StudentPlanEditor({
                         <input key={name} type="hidden" name={name} value={value} />
                       ))}
                       <input type="hidden" name="planId" value={plan.id} />
-                      <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
+                      <SubmitTextButton className="text-xs font-medium text-danger-fg hover:underline">
                         Delete draft
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   )}
                 </div>

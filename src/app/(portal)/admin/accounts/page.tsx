@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { SubmitTextButton } from "@/components/ui/SubmitButton";
 import { CreateAccountForm } from "./CreateAccountForm";
 import { disableAccountAction, enableAccountAction } from "./actions";
 
@@ -87,16 +88,16 @@ export default async function AdminAccountsPage({
                   {row.status === "ACTIVE" ? (
                     <form action={disableAccountAction}>
                       <input type="hidden" name="targetUserId" value={row.id} />
-                      <button type="submit" className="font-medium text-danger-fg hover:underline">
+                      <SubmitTextButton className="font-medium text-danger-fg hover:underline">
                         Disable
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   ) : (
                     <form action={enableAccountAction}>
                       <input type="hidden" name="targetUserId" value={row.id} />
-                      <button type="submit" className="font-medium text-success-fg hover:underline">
+                      <SubmitTextButton className="font-medium text-success-fg hover:underline">
                         Enable
-                      </button>
+                      </SubmitTextButton>
                     </form>
                   )}
                 </Td>

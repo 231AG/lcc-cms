@@ -45,11 +45,13 @@ import { ClipboardList, Printer } from "lucide-react";
 
 export const metadata: Metadata = { title: "Home" };
 
+/** Same rule as the dashboard's stat tiles: a fact wears the brand chip, and
+ *  only the Status fact takes a status colour -- the same one as the status
+ *  badge beside the student's name, so the two can never disagree. */
 const FACT_CHIP = {
   brand: "bg-brand-subtle-strong text-brand-fg",
-  accent: "bg-accent-soft text-accent-soft-fg",
-  info: "bg-info-surface text-info-fg",
   success: "bg-success-surface text-success-fg",
+  neutral: "bg-surface-subtle text-fg-secondary",
 } as const;
 
 
@@ -73,7 +75,7 @@ function FactCard({
   value: React.ReactNode;
 }) {
   return (
-    <div className="border-line bg-surface flex items-start gap-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgb(16_12_32_/_0.04),0_8px_24px_-12px_rgb(16_12_32_/_0.12)]">
+    <div className="border-line bg-surface flex items-start gap-3 rounded-2xl border p-4 shadow-card">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${FACT_CHIP[tone]}`} aria-hidden="true">
         {icon}
       </span>
@@ -145,6 +147,9 @@ export default async function PortalPage({
     };
     const semesterSummaryFor = (semesterId: string) => semesterSummaries.find((s) => s.semesterId === semesterId);
     const isProvisional = cumulative?.isProvisional ?? record.historicalImportStatus !== "COMPLETE";
+    // The status badge by the name and the Status fact card say the same
+    // thing, so they take their colour from one place.
+    const statusTone = record.status === "ACTIVE" ? "success" : "neutral";
 
     // S-03 (plan Section 20.3): "current semester and its state" -- the
     // most recently started semester that is not DRAFT or CLOSED, if any.
@@ -310,7 +315,7 @@ export default async function PortalPage({
               title={
                 <span className="inline-flex flex-wrap items-center gap-3">
                   {fullName(record)}
-                  <Badge tone={record.status === "ACTIVE" ? "success" : "neutral"}>{record.status}</Badge>
+                  <Badge tone={statusTone}>{record.status}</Badge>
                 </span>
               }
               description={`Student ID ${record.studentNumber}`}
@@ -328,10 +333,10 @@ export default async function PortalPage({
             these are term/value pairs and the markup should keep saying so. */}
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <FactCard icon={<School className="h-5 w-5" />} tone="brand" term="Department" value={department ? department.name : "—"} />
-          <FactCard icon={<CalendarDays className="h-5 w-5" />} tone="accent" term="Enrolment year" value={record.enrolmentYear} />
+          <FactCard icon={<CalendarDays className="h-5 w-5" />} tone="brand" term="Enrolment year" value={record.enrolmentYear} />
           <FactCard
             icon={<GraduationCap className="h-5 w-5" />}
-            tone="info"
+            tone="brand"
             term="Current semester"
             value={
               currentSemesterLabel
@@ -339,7 +344,7 @@ export default async function PortalPage({
                 : "No semester is currently open."
             }
           />
-          <FactCard icon={<UserCheck className="h-5 w-5" />} tone="success" term="Status" value={record.status} />
+          <FactCard icon={<UserCheck className="h-5 w-5" />} tone={statusTone} term="Status" value={record.status} />
         </div>
 
         {/* Guidance for the screen, not part of the record: a printed copy
@@ -684,14 +689,14 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
           value={stats.byCollege.length}
           hint="With at least one student"
           icon={<Building2 className="h-5 w-5" />}
-          tone="info"
+          tone="brand"
         />
         <StatTile
           label={semesterCount === undefined ? "Enrolment years" : "Semesters"}
           value={semesterCount ?? stats.byEnrolmentYear.length}
           hint={semesterCount === undefined ? "Represented in the roll" : "On the academic calendar"}
           icon={<CalendarDays className="h-5 w-5" />}
-          tone="accent"
+          tone="brand"
         />
       </div>
 

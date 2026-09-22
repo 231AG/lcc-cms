@@ -5,8 +5,9 @@ import { can } from "@/lib/permissions/kernel";
 import { getGradeSheet } from "@/lib/gradesheet/gradeSheet";
 import { NotFoundError } from "@/lib/errors";
 import { Alert } from "@/components/ui/Alert";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { GradeSheetDocument } from "@/components/gradesheet/GradeSheetDocument";
 import { PrintGradeSheetButton } from "./PrintGradeSheetButton";
 import { updateSignatoriesAction } from "./actions";
@@ -136,7 +137,7 @@ export default async function GradeSheetPage({
               <Input id="approvedTitle" name="approvedTitle" required defaultValue={data.signatories.approvedTitle} />
             </div>
             <div className="sm:col-span-2">
-              <Button type="submit">Save signature block</Button>
+              <SubmitButton>Save signature block</SubmitButton>
             </div>
           </form>
         </details>

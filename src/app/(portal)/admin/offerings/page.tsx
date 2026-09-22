@@ -23,14 +23,16 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td, SortableTh, type SortDirection } from "@/components/ui/Table";
 import { Pagination } from "@/components/ui/Pagination";
+import { SubmitButton, SubmitIconButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import {
   addMeetingAction,
   cancelOfferingAction,
   createOfferingAction,
+  deleteOfferingAction,
   publishOfferingAction,
   reinstateOfferingAction,
   rescheduleMeetingsAction,
@@ -182,10 +184,14 @@ export default async function OfferingsPage({
     instructorName?: string;
     capacity?: string;
     days?: string | string[];
+    newCourseCode?: string;
     newTitle?: string;
     newCreditHours?: string;
     newDepartmentId?: string;
     error?: string;
+    confirmDelete?: string;
+    editOffering?: string;
+    deleted?: string;
     q?: string;
     collegeId?: string;
     page?: string;
@@ -200,6 +206,9 @@ export default async function OfferingsPage({
   const {
     semesterId: requestedSemesterId,
     error,
+    confirmDelete,
+    editOffering,
+    deleted,
     q,
     collegeId,
     page,
@@ -216,6 +225,7 @@ export default async function OfferingsPage({
     instructorName: draftInstructor,
     capacity: draftCapacity,
     days: draftDays,
+    newCourseCode: draftNewCourseCode,
     newTitle: draftNewTitle,
     newCreditHours: draftNewCreditHours,
     newDepartmentId: draftNewDepartmentId,
@@ -315,6 +325,17 @@ export default async function OfferingsPage({
     }
   });
 
+  // Resolved from every row in the semester, not just the page on screen:
+  // the confirmation must survive a click that happens to be the last row
+  // of page three.
+  const confirmDeleteRow = confirmDelete ? allRows.find((r) => r.offeringId === confirmDelete) : undefined;
+
+  // The offering being edited, and every timetable slot it has. allRows
+  // holds one entry per slot, so the first carries the offering's own
+  // details and the whole group is its timetable.
+  const editSlots = editOffering ? allRows.filter((r) => r.offeringId === editOffering) : [];
+  const editRow = editSlots[0];
+
   const queryParams = (extra: Record<string, string | undefined> = {}) => {
     const sp = new URLSearchParams();
     if (semesterId) sp.set("semesterId", semesterId);
@@ -356,6 +377,255 @@ export default async function OfferingsPage({
         </Alert>
       )}
 
+      {deleted && (
+        <Alert tone="success" className="mb-4">
+          {formatCourseCode(deleted)} has been removed from this semester.
+        </Alert>
+      )}
+
+      {/* EDITING HAPPENS HERE, above the table, not in the row that asked.
+          It used to be a 288px popover inside the row holding four
+          separate forms with no labels on any of them -- and because `cn`
+          has no tailwind-merge, the w-36 and w-24 those fields passed lost
+          to the w-full in the field base, so every one of them rendered
+          full width and the box became a column of identical boxes. The
+          Save at the top belonged only to instructor and capacity, so
+          editing a time below it and pressing Save did nothing at all,
+          which is precisely what "the save button doesn't work" looks
+          like. Full width, labelled, and one heading per thing it
+          changes. */}
+      {editRow && (
+        <Card className="mb-6">
+          <div className="border-line-subtle flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4 sm:px-5">
+            <div>
+              <h2 className="text-fg text-sm font-semibold">
+                Editing {formatCourseCode(editRow.code)} — {editRow.title}
+              </h2>
+              <p className="text-fg-muted mt-0.5 text-xs">
+                Section {editRow.section} · {selectedSemester?.name ?? "this semester"} · {editRow.status}
+              </p>
+            </div>
+            <Link href={`/admin/offerings?${queryParams()}`} className={buttonClasses("ghost", "sm")}>
+              Done
+            </Link>
+          </div>
+
+          {!canManage ? (
+            <div className="px-4 py-4 sm:px-5">
+              <Alert tone="info">
+                Schedules are frozen once teaching starts, and this semester is {selectedSemester?.state ?? "not open"}.
+                Nothing here can be changed.
+              </Alert>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6 px-4 py-5 sm:px-5">
+              <section>
+                <h3 className="text-fg mb-2 text-xs font-semibold tracking-wide uppercase">Details</h3>
+                <form action={updateOfferingAction} className="flex flex-wrap items-end gap-3">
+                  <input type="hidden" name="semesterId" value={semesterId} />
+                  <input type="hidden" name="offeringId" value={editRow.offeringId} />
+                  <div className="w-full sm:w-64">
+                    <Label htmlFor="edit-instructor" className="text-xs">
+                      Instructor
+                    </Label>
+                    <Input id="edit-instructor" name="instructorName" defaultValue={editRow.instructor ?? ""} placeholder="STAFF" />
+                  </div>
+                  <div className="w-full sm:w-32">
+                    <Label htmlFor="edit-capacity" className="text-xs">
+                      Capacity
+                    </Label>
+                    <Input id="edit-capacity" name="capacity" type="number" min={1} defaultValue={editRow.capacity ?? ""} placeholder="None" />
+                  </div>
+                  <SubmitButton variant="secondary" pendingLabel="Saving…">
+                    Save details
+                  </SubmitButton>
+                </form>
+              </section>
+
+              <section>
+                <h3 className="text-fg mb-2 text-xs font-semibold tracking-wide uppercase">Timetable</h3>
+                {editSlots.filter((slot) => slot.meetingIds).length === 0 ? (
+                  <p className="text-fg-muted text-sm">This offering has no timetable slot yet.</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {editSlots
+                      .filter((slot) => slot.meetingIds)
+                      .map((slot) => (
+                        <div key={slot.meetingIds} className="border-line-subtle flex flex-wrap items-end gap-3 rounded-xl border p-3">
+                          {/* The days are changed by adding and removing
+                              slots below, not here: this moves WHEN the
+                              class meets, keeping WHICH DAYS it meets on. */}
+                          <div className="w-full sm:w-auto">
+                            <span className="text-fg-muted mb-1.5 block text-xs font-semibold">Days</span>
+                            <span className="text-fg inline-block py-2.5 text-sm font-medium" title={expandDays(slot.day)}>
+                              {slot.day}
+                            </span>
+                          </div>
+                          <form action={rescheduleMeetingsAction} className="flex flex-wrap items-end gap-3">
+                            <input type="hidden" name="semesterId" value={semesterId} />
+                            <input type="hidden" name="meetingIds" value={slot.meetingIds} />
+                            <div className="w-32">
+                              <Label htmlFor={`start-${slot.meetingIds}`} className="text-xs">
+                                Start
+                              </Label>
+                              <Input id={`start-${slot.meetingIds}`} name="startTime" type="time" required defaultValue={slot.startTime} />
+                            </div>
+                            <div className="w-32">
+                              <Label htmlFor={`end-${slot.meetingIds}`} className="text-xs">
+                                End
+                              </Label>
+                              <Input id={`end-${slot.meetingIds}`} name="endTime" type="time" required defaultValue={slot.endTime} />
+                            </div>
+                            <div className="w-36">
+                              <Label htmlFor={`room-${slot.meetingIds}`} className="text-xs">
+                                Room
+                              </Label>
+                              <Select id={`room-${slot.meetingIds}`} name="room" required defaultValue={slot.room}>
+                                {ROOMS.map((r) => (
+                                  <option key={r} value={r}>
+                                    {r}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                            <SubmitButton variant="secondary" pendingLabel="Changing…">
+                              Change time
+                            </SubmitButton>
+                          </form>
+                          <form action={removeMeetingAction}>
+                            <input type="hidden" name="semesterId" value={semesterId} />
+                            <input type="hidden" name="meetingIds" value={slot.meetingIds} />
+                            <SubmitIconButton
+                              title={`Remove the ${expandDays(slot.day)} slot`}
+                              aria-label={`Remove the ${expandDays(slot.day)} ${slot.startTime} to ${slot.endTime} slot`}
+                              className={`${iconDanger} mb-1`}
+                              icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                            />
+                          </form>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <h3 className="text-fg mb-2 text-xs font-semibold tracking-wide uppercase">Add a day</h3>
+                <form action={addMeetingAction} className="flex flex-wrap items-end gap-3">
+                  <input type="hidden" name="semesterId" value={semesterId} />
+                  <input type="hidden" name="offeringId" value={editRow.offeringId} />
+                  <div className="w-28">
+                    <Label htmlFor="add-day" className="text-xs">
+                      Day
+                    </Label>
+                    <Select id="add-day" name="dayOfWeek" required>
+                      {DAY_LETTER.slice(1).map((letter, index) => (
+                        <option key={letter} value={index + 1}>
+                          {expandDays(letter)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="w-32">
+                    <Label htmlFor="add-start" className="text-xs">
+                      Start
+                    </Label>
+                    <Input id="add-start" name="startTime" type="time" required />
+                  </div>
+                  <div className="w-32">
+                    <Label htmlFor="add-end" className="text-xs">
+                      End
+                    </Label>
+                    <Input id="add-end" name="endTime" type="time" required />
+                  </div>
+                  <div className="w-36">
+                    <Label htmlFor="add-room" className="text-xs">
+                      Room
+                    </Label>
+                    {/* Same fixed list as the create form -- a free-text
+                        room here is how "PAPE 1" and "Pape1" end up in the
+                        same timetable. */}
+                    <Select id="add-room" name="room" required defaultValue="">
+                      <option value="" disabled>
+                        Choose…
+                      </option>
+                      {ROOMS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <SubmitButton variant="secondary" pendingLabel="Adding…">
+                    Add day
+                  </SubmitButton>
+                </form>
+              </section>
+
+              <section className="border-line-subtle flex flex-wrap items-center gap-4 border-t pt-4">
+                {editRow.status === "DRAFT" && (
+                  <form action={publishOfferingAction}>
+                    <input type="hidden" name="semesterId" value={semesterId} />
+                    <input type="hidden" name="offeringId" value={editRow.offeringId} />
+                    <SubmitButton variant="secondary" pendingLabel="Publishing…">
+                      Publish
+                    </SubmitButton>
+                  </form>
+                )}
+                {editRow.status === "CANCELLED" && (
+                  <form action={reinstateOfferingAction}>
+                    <input type="hidden" name="semesterId" value={semesterId} />
+                    <input type="hidden" name="offeringId" value={editRow.offeringId} />
+                    <SubmitButton variant="secondary" pendingLabel="Reinstating…">
+                      Reinstate as draft
+                    </SubmitButton>
+                  </form>
+                )}
+                {editRow.status !== "CANCELLED" && (
+                  <form action={cancelOfferingAction}>
+                    <input type="hidden" name="semesterId" value={semesterId} />
+                    <input type="hidden" name="offeringId" value={editRow.offeringId} />
+                    <SubmitTextButton className="text-danger-fg text-sm font-medium hover:underline">
+                      Cancel this offering
+                    </SubmitTextButton>
+                  </form>
+                )}
+              </section>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* The confirmation lives HERE, above the table, rather than in the
+          row that asked for it. A row's popover is inside the table's
+          scroll wrapper, which carries `contain: paint` and clips anything
+          drawn over it -- so a confirmation opened on a lower row is cut
+          off, taking its buttons with it. Above the table it is always
+          whole, and always in the same place. */}
+      {confirmDeleteRow && (
+        <Alert tone="danger" className="mb-4">
+          <p className="font-semibold">
+            Delete {formatCourseCode(confirmDeleteRow.code)} section {confirmDeleteRow.section}?
+          </p>
+          <p className="mt-1 text-sm">
+            This removes the offering and its timetable from {selectedSemester?.name ?? "this semester"} for good. The
+            course itself stays in the catalogue.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <form action={deleteOfferingAction}>
+              <input type="hidden" name="semesterId" value={semesterId} />
+              <input type="hidden" name="offeringId" value={confirmDeleteRow.offeringId} />
+              <SubmitButton variant="danger" size="sm" pendingLabel="Deleting…">
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                Yes, delete it
+              </SubmitButton>
+            </form>
+            <Link href={`/admin/offerings?semesterId=${semesterId}`} className={buttonClasses("ghost", "sm")}>
+              Cancel
+            </Link>
+          </div>
+        </Alert>
+      )}
+
       {/* Search first, then the narrowing filters -- the same order as the
           Students listing, so the two screens are learned once. */}
       <Card className="mb-6 overflow-hidden">
@@ -394,9 +664,9 @@ export default async function OfferingsPage({
               ))}
             </Select>
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Search
-          </Button>
+          </SubmitButton>
           {hasFilters && (
             <Link href={`/admin/offerings?semesterId=${semesterId ?? ""}`} className={buttonClasses("ghost", "md")}>
               Clear filters
@@ -449,7 +719,10 @@ export default async function OfferingsPage({
                       </datalist>
                     </div>
                     <div>
-                      {/* Sections are numbered, not lettered. */}
+                      {/* Sections are numbered, not lettered, and the
+                          College teaches one section of a course per
+                          semester -- so 1 is the answer nearly every time
+                          and the field starts there (0030). */}
                       <Label htmlFor="section" className="text-xs">
                         Section
                         <Required />
@@ -459,7 +732,7 @@ export default async function OfferingsPage({
                         name="section"
                         required
                         inputMode="numeric"
-                        defaultValue={draftSection ?? ""}
+                        defaultValue={draftSection ?? "1"}
                         placeholder="1"
                       />
                     </div>
@@ -560,7 +833,28 @@ export default async function OfferingsPage({
                       <span className="text-brand-fg">+</span> Course not on record yet? Add it here
                     </summary>
                     <div className="border-line-subtle border-t px-4 py-4">
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                          {/* The panel used to describe a course without
+                              naming it -- three details about a code kept
+                              in the Course box above, which reads as a
+                              form somebody forgot to finish. It arrives
+                              pre-filled with whatever was typed up there,
+                              and where it differs it is the one that
+                              counts: it is the more specific statement of
+                              intent, and the confirmation step prints the
+                              exact code before anything is written. */}
+                          <Label htmlFor="newCourseCode" className="text-xs">
+                            Course code
+                          </Label>
+                          <Input
+                            id="newCourseCode"
+                            name="newCourseCode"
+                            autoComplete="off"
+                            defaultValue={draftNewCourseCode ?? draftCourseCode ?? ""}
+                            placeholder="ACCT 301"
+                          />
+                        </div>
                         <div className="sm:col-span-2 lg:col-span-1">
                           <Label htmlFor="newTitle" className="text-xs">
                             Course title
@@ -606,8 +900,10 @@ export default async function OfferingsPage({
                         </div>
                       </div>
                       <p className="text-fg-muted mt-3 text-xs">
-                        All three are needed. The credit hours are copied onto this offering permanently, so a wrong number
-                        here follows the course onto every grade sheet. If the department is missing too, add it on{" "}
+                        All four are needed. The code is taken from the Course box above — change it here and this
+                        offering uses the new one. The credit hours are copied onto this offering permanently, so a wrong
+                        number here follows the course onto every grade sheet. If the department is missing too, add it
+                        on{" "}
                         <Link href="/admin/structure#courses" className="text-brand-fg font-medium hover:underline">
                           Academic structure
                         </Link>{" "}
@@ -637,13 +933,13 @@ export default async function OfferingsPage({
                         -- a Draft offering is invisible to students and
                         gives no clue why -- so it leads, and the second
                         trip to the table to publish is gone. */}
-                    <Button type="submit" name="intent" value="publish">
+                    <SubmitButton name="intent" value="publish">
                       <Check className="h-4 w-4" aria-hidden="true" />
                       {stage === "confirm" ? "Create course, offering and publish" : "Create and publish"}
-                    </Button>
-                    <Button type="submit" name="intent" value="draft" variant="secondary">
+                    </SubmitButton>
+                    <SubmitButton name="intent" value="draft" variant="secondary">
                       Save as draft
-                    </Button>
+                    </SubmitButton>
                     <p className="text-fg-muted text-xs">
                       Blank instructor becomes &ldquo;{DEFAULT_INSTRUCTOR}&rdquo;; blank capacity becomes {DEFAULT_CAPACITY}.
                     </p>
@@ -778,159 +1074,32 @@ export default async function OfferingsPage({
                         <Td className="px-2 sm:px-3">
                           <span className="flex items-center justify-end gap-1">
                             {firstRowOfOffering.has(i) && (
-                              <details className="relative">
-                                <summary
-                                  title={`Edit ${row.code} section ${row.section}`}
-                                  aria-label={`Edit ${row.code} section ${row.section}`}
-                                  className={`${iconAction} inline-flex cursor-pointer list-none`}
-                                >
-                                  <Pencil className="h-4 w-4" aria-hidden="true" />
-                                </summary>
-                                <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-line bg-surface-raised p-3 text-left shadow-lg">
-                                  {canManage ? (
-                                    <div className="flex flex-col gap-3">
-                                      <form action={updateOfferingAction} className="flex flex-wrap items-end gap-2">
-                                        <input type="hidden" name="semesterId" value={semesterId} />
-                                        <input type="hidden" name="offeringId" value={row.offeringId} />
-                                        <Input name="instructorName" defaultValue={row.instructor} placeholder="Instructor" className="w-36 py-1 text-xs" />
-                                        <Input name="capacity" type="number" min={1} defaultValue={row.capacity} placeholder="Capacity" className="w-20 py-1 text-xs" />
-                                        <Button type="submit" variant="secondary" size="sm">
-                                          Save
-                                        </Button>
-                                      </form>
-
-                                      {/* CHANGE this slot, as against adding
-                                          another. Without it the only way to
-                                          move a class from 11:00 to 12:00 was
-                                          to add a second slot and delete the
-                                          first -- and stopping half way
-                                          leaves the offering on the timetable
-                                          twice, which reads as the system
-                                          having duplicated it. Days are not
-                                          editable here: changing WHEN a class
-                                          meets is this, changing WHICH DAYS
-                                          is the add and remove below. */}
-                                      {row.meetingIds && (
-                                        <form action={rescheduleMeetingsAction} className="flex flex-wrap items-end gap-2">
-                                          <input type="hidden" name="semesterId" value={semesterId} />
-                                          <input type="hidden" name="meetingIds" value={row.meetingIds} />
-                                          <span className="py-1 text-xs text-fg-muted" title={expandDays(row.day)}>
-                                            Move {row.day}
-                                          </span>
-                                          <Input
-                                            name="startTime"
-                                            type="time"
-                                            required
-                                            defaultValue={row.startTime}
-                                            className="w-24 py-1 text-xs"
-                                            aria-label="New start time"
-                                          />
-                                          <Input
-                                            name="endTime"
-                                            type="time"
-                                            required
-                                            defaultValue={row.endTime}
-                                            className="w-24 py-1 text-xs"
-                                            aria-label="New end time"
-                                          />
-                                          <Select
-                                            name="room"
-                                            required
-                                            defaultValue={row.room}
-                                            className="w-24 py-1 text-xs"
-                                            aria-label="New room"
-                                          >
-                                            {ROOMS.map((r) => (
-                                              <option key={r} value={r}>
-                                                {r}
-                                              </option>
-                                            ))}
-                                          </Select>
-                                          <Button type="submit" variant="secondary" size="sm">
-                                            Change time
-                                          </Button>
-                                        </form>
-                                      )}
-
-                                      <form action={addMeetingAction} className="flex flex-wrap items-end gap-2">
-                                        <input type="hidden" name="semesterId" value={semesterId} />
-                                        <input type="hidden" name="offeringId" value={row.offeringId} />
-                                        <Select name="dayOfWeek" required className="w-16 py-1 text-xs">
-                                          {DAY_LETTER.slice(1).map((letter, index) => (
-                                            <option key={letter} value={index + 1}>
-                                              {letter}
-                                            </option>
-                                          ))}
-                                        </Select>
-                                        <Input name="startTime" type="time" required className="w-24 py-1 text-xs" />
-                                        <Input name="endTime" type="time" required className="w-24 py-1 text-xs" />
-                                        {/* Same fixed list as the create
-                                            form -- a free-text room here is
-                                            how "PAPE 1" and "Pape1" end up
-                                            in the same timetable. */}
-                                        <Select name="room" required defaultValue="" className="w-24 py-1 text-xs">
-                                          <option value="" disabled>
-                                            Room
-                                          </option>
-                                          {ROOMS.map((r) => (
-                                            <option key={r} value={r}>
-                                              {r}
-                                            </option>
-                                          ))}
-                                        </Select>
-                                        <Button type="submit" variant="secondary" size="sm">
-                                          Add another day
-                                        </Button>
-                                      </form>
-
-                                      {/* The lifecycle, and a way back from
-                                          every state. Cancelling used to be
-                                          a one-way door: Publish only ever
-                                          showed for a DRAFT, so a cancelled
-                                          offering could not be brought back
-                                          and the class had to be recreated
-                                          under another section number. */}
-                                      <div className="flex flex-wrap items-center gap-3">
-                                        {row.status === "DRAFT" && (
-                                          <form action={publishOfferingAction}>
-                                            <input type="hidden" name="semesterId" value={semesterId} />
-                                            <input type="hidden" name="offeringId" value={row.offeringId} />
-                                            <button type="submit" className="text-xs font-medium text-brand-fg hover:underline">
-                                              Publish
-                                            </button>
-                                          </form>
-                                        )}
-                                        {row.status === "CANCELLED" && (
-                                          <form action={reinstateOfferingAction}>
-                                            <input type="hidden" name="semesterId" value={semesterId} />
-                                            <input type="hidden" name="offeringId" value={row.offeringId} />
-                                            <button
-                                              type="submit"
-                                              title="Bring this offering back as a draft, then publish it"
-                                              className="text-xs font-medium text-brand-fg hover:underline"
-                                            >
-                                              Reinstate as draft
-                                            </button>
-                                          </form>
-                                        )}
-                                        {row.status !== "CANCELLED" && (
-                                          <form action={cancelOfferingAction}>
-                                            <input type="hidden" name="semesterId" value={semesterId} />
-                                            <input type="hidden" name="offeringId" value={row.offeringId} />
-                                            <button type="submit" className="text-xs font-medium text-danger-fg hover:underline">
-                                              Cancel offering
-                                            </button>
-                                          </form>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <p className="text-xs text-fg-muted">
-                                      Schedules are frozen once teaching starts — this semester is no longer editable.
-                                    </p>
-                                  )}
-                                </div>
-                              </details>
+                              <Link
+                                href={`/admin/offerings?${queryParams({ editOffering: row.offeringId })}`}
+                                className={iconAction}
+                                title={`Edit ${row.code} section ${row.section}`}
+                                aria-label={`Edit ${row.code} section ${row.section}`}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden="true" />
+                              </Link>
+                            )}
+                            {/* Removes the OFFERING, as against the slot
+                                below. Cancelled, published or draft: the
+                                rule is whether anything still points at it,
+                                not what colour its badge is. A link rather
+                                than a form, because the confirmation it
+                                arms is drawn above the table -- a
+                                confirmation inside this cell would be
+                                clipped by the table's scroll wrapper. */}
+                            {canManage && firstRowOfOffering.has(i) && (
+                              <Link
+                                href={`/admin/offerings?${queryParams({ confirmDelete: row.offeringId })}`}
+                                className={iconDanger}
+                                title={`Delete ${row.code} section ${row.section} from this semester`}
+                                aria-label={`Delete ${row.code} section ${row.section} from this semester`}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </Link>
                             )}
                             {/* Deletes the whole slot this row shows, every
                                 day of it -- see removeMeetingAction. */}
@@ -938,14 +1107,12 @@ export default async function OfferingsPage({
                               <form action={removeMeetingAction}>
                                 <input type="hidden" name="semesterId" value={semesterId} />
                                 <input type="hidden" name="meetingIds" value={row.meetingIds} />
-                                <button
-                                  type="submit"
+                                <SubmitIconButton
                                   title={`Delete the ${row.day} ${row.startTime}–${row.endTime} meeting`}
                                   aria-label={`Delete the ${expandDays(row.day)} ${row.startTime} to ${row.endTime} meeting for ${row.code} section ${row.section}`}
                                   className={iconDanger}
-                                >
-                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                </button>
+                                  icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                                />
                               </form>
                             )}
                           </span>
@@ -984,9 +1151,9 @@ export default async function OfferingsPage({
                         </option>
                       ))}
                     </Select>
-                    <Button type="submit" variant="secondary" size="sm">
+                    <SubmitButton variant="secondary" size="sm">
                       Set
-                    </Button>
+                    </SubmitButton>
                   </form>
                   <Pagination page={pageNum} totalPages={totalPages} hrefForPage={hrefForPage} label="Offerings pagination" />
                 </div>

@@ -1,4 +1,5 @@
-import { Check, CalendarClock, ShieldAlert, X } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Check, CalendarClock, Printer, ShieldAlert, Trash2, X } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { fullName } from "@/lib/students/name";
 import { asUser } from "@/lib/db/asUser";
@@ -7,8 +8,8 @@ import { getPlan, getPlanItems, getPlanValidation } from "@/lib/planning/plannin
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Form";
+import { SubmitButton, SubmitIconButton } from "@/components/ui/SubmitButton";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { TableCard } from "@/components/ui/TableCard";
 import { expandDays, formatDays } from "@/lib/offerings/offeringRows";
@@ -19,6 +20,7 @@ import {
   overrideScheduleConflictAction,
   rejectPlanAction,
   rejectPlanItemAction,
+  deletePlanAction,
 } from "../actions";
 
 /** Every icon control carries the same treatment: a tooltip on hover, and
@@ -28,6 +30,14 @@ import {
  *  you go near it. */
 const iconAction =
   "inline-flex rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-brand-fg " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+
+/** The one control here that destroys something, so the only one that is
+ *  red at rest rather than on hover. It fills on hover like the decide
+ *  buttons do, so the thing about to happen stops being a suggestion. */
+const deleteAction =
+  "inline-flex cursor-pointer list-none rounded-md border border-danger-line bg-danger-surface p-1.5 " +
+  "text-danger-fg transition-colors hover:border-danger-solid hover:bg-danger-solid hover:text-on-solid " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
 /**
@@ -211,6 +221,43 @@ export default async function PlanDetailPage({
         count={items.length}
         countLabel="course"
         id="planned-courses"
+        actions={
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/admin/planning/${plan.id}/control-sheet`}
+              className={iconAction}
+              title="Print the Control Sheet"
+              aria-label="Print the Control Sheet"
+            >
+              <Printer className="h-4 w-4" aria-hidden="true" />
+            </Link>
+            {/* Red, because it is the only control on this page that
+                destroys something. The others change a status; this one
+                leaves nothing behind. */}
+            <details className="relative">
+              <summary
+                className={deleteAction}
+                title="Delete this plan"
+                aria-label="Delete this plan"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </summary>
+              <div className="border-danger-line bg-surface absolute right-0 z-10 mt-2 w-64 rounded-xl border p-3 shadow-lg">
+                <p className="text-danger-fg flex items-center gap-2 text-sm font-semibold">
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Are you sure you want to delete?
+                </p>
+                <form action={deletePlanAction} className="mt-3">
+                  <input type="hidden" name="planId" value={plan.id} />
+                  <SubmitButton variant="danger" size="sm" className="w-full" pendingLabel="Deleting…">
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    Yes, delete this plan
+                  </SubmitButton>
+                </form>
+              </div>
+            </details>
+          </div>
+        }
       >
         <Table>
           <Thead>
@@ -276,15 +323,14 @@ export default async function PlanDetailPage({
                           <form action={approvePlanItemAction}>
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
-                            <button
-                              type="submit"
+                            <SubmitIconButton
                               title={`Approve ${c?.code ?? "this course"}`}
                               aria-label={`Approve ${c?.code ?? "this course"}`}
                               className={approveAction}
+                              icon={<Check className="h-3.5 w-3.5" aria-hidden="true" />}
                             >
-                              <Check className="h-3.5 w-3.5" aria-hidden="true" />
                               Approve
-                            </button>
+                            </SubmitIconButton>
                           </form>
                           {/* Reject needs a reason -- the database refuses a
                               rejection without one -- so the icon opens the
@@ -305,9 +351,9 @@ export default async function PlanDetailPage({
                               <input type="hidden" name="planId" value={planId} />
                               <input type="hidden" name="planItemId" value={i.id} />
                               <Input name="reason" required placeholder="Reason for rejection" className="py-1 text-xs" />
-                              <Button type="submit" variant="danger" size="sm">
+                              <SubmitButton variant="danger" size="sm" pendingLabel="Rejecting…">
                                 Reject course
-                              </Button>
+                              </SubmitButton>
                             </form>
                           </details>
                         </>
@@ -333,9 +379,9 @@ export default async function PlanDetailPage({
                               <input type="hidden" name="planId" value={planId} />
                               <input type="hidden" name="planItemId" value={i.id} />
                               <Input name="reason" required placeholder="Why is the overlap acceptable?" className="py-1 text-xs" />
-                              <Button type="submit" variant="secondary" size="sm">
+                              <SubmitButton variant="secondary" size="sm" pendingLabel="Accepting…">
                                 Accept clash
-                              </Button>
+                              </SubmitButton>
                             </form>
                           </details>
                         )}
@@ -355,13 +401,15 @@ export default async function PlanDetailPage({
                             <input type="hidden" name="planId" value={planId} />
                             <input type="hidden" name="planItemId" value={i.id} />
                             <Input name="reason" required placeholder="Reason for override" className="py-1 text-xs" />
-                            <Button type="submit" variant="secondary" size="sm">
+                            <SubmitButton variant="secondary" size="sm" pendingLabel="Overriding…">
                               Override prerequisite
-                            </Button>
+                            </SubmitButton>
                           </form>
                         </details>
                       )}
-                      {!decidable && i.status !== "PENDING" && <span className="text-xs text-fg-muted">Decided</span>}
+                      {!decidable && i.status !== "PENDING" && (
+                        <span className="text-fg-muted text-xs">Decided</span>
+                      )}
                     </span>
                   </Td>
                 </Tr>
@@ -382,10 +430,10 @@ export default async function PlanDetailPage({
             <div className="flex flex-wrap items-end justify-between gap-4">
               <form action={approvePlanAction}>
                 <input type="hidden" name="planId" value={planId} />
-                <Button type="submit">
+                <SubmitButton pendingLabel="Approving…">
                   <Check className="h-4 w-4" aria-hidden="true" />
                   Approve all
-                </Button>
+                </SubmitButton>
               </form>
               <form action={rejectPlanAction} className="flex items-end gap-2">
                 <input type="hidden" name="planId" value={planId} />
@@ -395,10 +443,10 @@ export default async function PlanDetailPage({
                   </Label>
                   <Input id="bulk-reason" name="reason" required placeholder="Why the whole plan is turned down" className="w-56 sm:w-72" />
                 </div>
-                <Button type="submit" variant="danger" className="shrink-0">
+                <SubmitButton variant="danger" className="shrink-0" pendingLabel="Rejecting…">
                   <X className="h-4 w-4" aria-hidden="true" />
                   Reject all
-                </Button>
+                </SubmitButton>
               </form>
             </div>
             <p className="text-fg-muted mt-3 text-xs">

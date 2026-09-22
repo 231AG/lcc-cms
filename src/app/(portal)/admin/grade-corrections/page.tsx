@@ -6,8 +6,8 @@ import { getCorrectionQueue } from "@/lib/grades/grades";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Select } from "@/components/ui/Form";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { decideCorrectionAction, requestCorrectionAction } from "./actions";
 
 export const metadata: Metadata = { title: "Grade corrections" };
@@ -109,9 +109,9 @@ async function AdminRequestSection({
             ))}
           </Select>
         </div>
-        <Button type="submit" variant="secondary">
+        <SubmitButton variant="secondary">
           Select
-        </Button>
+        </SubmitButton>
       </form>
 
       {semesterId && (
@@ -128,9 +128,9 @@ async function AdminRequestSection({
               ))}
             </Select>
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Select
-          </Button>
+          </SubmitButton>
         </form>
       )}
 
@@ -163,9 +163,9 @@ async function AdminRequestSection({
                         <input type="checkbox" name="isIncomplete" className="h-3.5 w-3.5 rounded border-line-strong" /> Incomplete
                       </label>
                       <input name="reason" required placeholder="Reason" className="w-64 rounded-md border border-line-strong px-2 py-1 text-xs" />
-                      <Button type="submit" variant="secondary" size="sm">
+                      <SubmitButton variant="secondary" size="sm">
                         Request
-                      </Button>
+                      </SubmitButton>
                     </form>
                   </details>
                 </Card>
@@ -199,17 +199,17 @@ async function SuperAdminDecideSection({ actor }: { actor: NonNullable<Awaited<R
                 <form action={decideCorrectionAction}>
                   <input type="hidden" name="correctionRequestId" value={r.id} />
                   <input type="hidden" name="decision" value="APPROVE" />
-                  <Button type="submit" size="sm">
+                  <SubmitButton size="sm">
                     Approve
-                  </Button>
+                  </SubmitButton>
                 </form>
                 <form action={decideCorrectionAction} className="flex items-end gap-2">
                   <input type="hidden" name="correctionRequestId" value={r.id} />
                   <input type="hidden" name="decision" value="REJECT" />
                   <input name="note" placeholder="Note" className="w-48 rounded-md border border-line-strong px-2 py-1 text-xs" />
-                  <Button type="submit" variant="danger" size="sm">
+                  <SubmitButton variant="danger" size="sm">
                     Reject
-                  </Button>
+                  </SubmitButton>
                 </form>
               </div>
             </Card>

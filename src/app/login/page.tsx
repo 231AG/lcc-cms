@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FocusedScreen } from "@/components/layout/FocusedScreen";
 import { loginAction } from "./actions";
 
@@ -145,14 +145,14 @@ export default async function LoginPage({
                 fight (cn is a plain joiner with no tailwind-merge) and the
                 solid brand colour is still what shows if the gradient ever
                 fails to resolve. */}
-            <Button type="submit" className="bg-gradient-brand mt-1 h-11 w-full shadow-sm">
+            <SubmitButton className="bg-gradient-brand mt-1 h-11 w-full shadow-sm">
               <svg className="submit-spinner h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
                 <path d="M14.5 8A6.5 6.5 0 0 0 8 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <LogIn className="h-4 w-4" aria-hidden="true" />
               Sign in
-            </Button>
+            </SubmitButton>
           </form>
         </div>
 

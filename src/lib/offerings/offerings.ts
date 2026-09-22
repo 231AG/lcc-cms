@@ -2,7 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { courseCodeKey } from "@/lib/courses/courseCode";
 import { db } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
-import { course, courseOffering, offeringMeeting, registration, semester } from "@/lib/db/schema";
+import { course, courseOffering, coursePlanItem, offeringMeeting, registration, semester } from "@/lib/db/schema";
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
@@ -438,6 +438,88 @@ export async function reinstateOffering(actor: Actor, offeringId: string) {
       newValue: { status: "DRAFT" },
     });
     return row;
+  });
+}
+
+/**
+ * Removing an offering from the record entirely.
+ *
+ * Until this existed, an offering could be created, published, cancelled
+ * and reinstated -- but never removed. Cancelling was as close as it came,
+ * and a cancelled row then sat on the Course Offerings page forever with
+ * nothing that would shift it. (The bin already in that row deletes a
+ * TIMETABLE SLOT, not the offering, which is the other half of why it
+ * looked stuck: the trash icon "worked" and the row stayed.)
+ *
+ * THE RULE IS DEPENDENCY, NOT STATUS. Cancelled, published or draft, an
+ * offering can go if nothing points at it: no registration, and no course
+ * plan that has listed it. Those are the things that would lose meaning,
+ * and both are ON DELETE RESTRICT, so the database would refuse anyway --
+ * this checks first so the answer is a sentence rather than a constraint
+ * violation.
+ *
+ * Deliberately NOT gated on the semester being editable, unlike every
+ * other write here. The whole point is to clear something that cannot be
+ * cleared, and a frozen semester is exactly when somebody discovers they
+ * are stuck. Nothing depends on the row by the time this runs, so there is
+ * no schedule left to freeze.
+ */
+export async function deleteOffering(actor: Actor, offeringId: string) {
+  await assertCan(actor, "offering.manage");
+
+  const existing = await db.query.courseOffering.findFirst({ where: eq(courseOffering.id, offeringId) });
+  if (!existing) throw new ValidationError("Offering not found.");
+
+  const registrations = await db.query.registration.findMany({
+    where: eq(registration.offeringId, offeringId),
+  });
+  if (registrations.length > 0) {
+    const live = registrations.filter((r) => r.status === "REGISTERED").length;
+    throw new ValidationError(
+      live > 0
+        ? `Cannot delete: ${live} student(s) are registered for this offering. Drop them first.`
+        : `Cannot delete: ${registrations.length} past registration(s) still refer to this offering. ` +
+          "Deleting it would erase a record of who was enrolled.",
+    );
+  }
+
+  const planned = await db.query.coursePlanItem.findMany({
+    where: eq(coursePlanItem.offeringId, offeringId),
+  });
+  if (planned.length > 0) {
+    throw new ValidationError(
+      `Cannot delete: ${planned.length} student course plan(s) list this offering. ` +
+        "Cancel it instead, which leaves those plans readable.",
+    );
+  }
+
+  const course_ = await db.query.course.findFirst({ where: eq(course.id, existing.courseId) });
+  const meetings = await db.query.offeringMeeting.findMany({
+    where: eq(offeringMeeting.offeringId, offeringId),
+  });
+
+  return asUser(actor.userId, async (tx) => {
+    // Written first: afterwards there is no row left to describe.
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "OFFERING_DELETED",
+      entityType: "course_offering",
+      entityId: offeringId,
+      oldValue: {
+        code: course_?.code ?? existing.courseId,
+        section: existing.section,
+        status: existing.status,
+        semesterId: existing.semesterId,
+        instructorName: existing.instructorName,
+        meetings: meetings.map((m) => ({ day: m.dayOfWeek, start: m.startTime, end: m.endTime, room: m.room })),
+      },
+    });
+
+    await tx.delete(offeringMeeting).where(eq(offeringMeeting.offeringId, offeringId));
+    await tx.delete(courseOffering).where(eq(courseOffering.id, offeringId));
+
+    return { code: course_?.code ?? "", section: existing.section, meetingsDeleted: meetings.length };
   });
 }
 

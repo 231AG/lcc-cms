@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { KeyRound } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { passwordPolicyFor } from "@/lib/identity/passwordPolicy";
 import { changePasswordAction } from "./actions";
 
@@ -97,9 +97,9 @@ export default async function ChangePasswordPage({
               <Label htmlFor="confirmPassword">Confirm new password</Label>
               <Input id="confirmPassword" name="confirmPassword" type="password" required minLength={policy.minLength} autoComplete="new-password" />
             </div>
-            <Button type="submit" className="mt-2 w-full">
+            <SubmitButton className="mt-2 w-full">
               Set password
-            </Button>
+            </SubmitButton>
           </form>
         </div>
       </div>

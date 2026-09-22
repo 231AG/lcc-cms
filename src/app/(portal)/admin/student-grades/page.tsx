@@ -18,9 +18,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { requestCorrectionFromStudentGradesAction } from "./actions";
 
 export const metadata: Metadata = { title: "Student grades" };
@@ -155,9 +156,9 @@ async function StudentPicker({ actor, sq, sp }: { actor: Actor; sq?: string; sp?
           <div className="w-56">
             <Input id="sq" name="sq" defaultValue={sq ?? ""} placeholder="Student ID or name" />
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Search
-          </Button>
+          </SubmitButton>
           {sq && (
             <Link href="/admin/student-grades" className="text-xs font-medium text-brand-fg hover:underline">
               Clear
@@ -554,9 +555,9 @@ function CorrectionForm({ row, studentId, sq }: { row: StudentGradeRow; studentI
           </Label>
           <Input id={`reason-${row.gradeRecordId}`} name="reason" required placeholder="Why this is being changed" className="py-1 text-xs" />
         </div>
-        <Button type="submit" size="sm">
+        <SubmitButton size="sm">
           Request correction
-        </Button>
+        </SubmitButton>
       </form>
     </details>
   );

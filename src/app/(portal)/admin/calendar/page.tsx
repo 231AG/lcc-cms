@@ -13,10 +13,10 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { SemesterStateBadge } from "@/components/ui/SemesterStateBadge";
-import { Button } from "@/components/ui/Button";
 import { Label, Input, Select, Required as RequiredMark } from "@/components/ui/Form";
 import { TableCard } from "@/components/ui/TableCard";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { createAcademicYearAction, createSemesterAction, deleteSemesterAction, transitionSemesterAction } from "./actions";
 
 export const metadata: Metadata = { title: "Academic calendar" };
@@ -99,7 +99,7 @@ export default async function CalendarPage({
               </Label>
               <Input id="year-end" name="endDate" type="date" required />
             </div>
-            <Button type="submit">Add academic year</Button>
+            <SubmitButton>Add academic year</SubmitButton>
           </form>
         )}
 
@@ -175,7 +175,7 @@ export default async function CalendarPage({
               </Label>
               <Input id="sem-end" name="endDate" type="date" required />
             </div>
-            <Button type="submit">Add semester</Button>
+            <SubmitButton>Add semester</SubmitButton>
           </form>
         )}
 
@@ -271,9 +271,9 @@ export default async function CalendarPage({
                               className="w-full max-w-56 py-1 text-xs"
                             />
                           </div>
-                          <Button type="submit" variant={isReopen ? "secondary" : "primary"} size="sm" className="w-fit">
+                          <SubmitButton variant={isReopen ? "secondary" : "primary"} size="sm" className="w-fit">
                             {isReopen ? "Reopen semester" : "Change state"}
-                          </Button>
+                          </SubmitButton>
                         </form>
                       )}
 
@@ -290,9 +290,9 @@ export default async function CalendarPage({
                             <p className="max-w-56 text-xs text-fg-muted">
                               A Draft has no plans, registrations or grades, so nothing is lost. This cannot be undone.
                             </p>
-                            <Button type="submit" variant="danger" size="sm" className="w-fit">
+                            <SubmitButton variant="danger" size="sm" className="w-fit">
                               Delete this semester
-                            </Button>
+                            </SubmitButton>
                           </form>
                         </details>
                       )}

@@ -34,6 +34,9 @@ export const AUDIT_ACTIONS = [
   "OFFERING_CANCELLED",
   "OFFERING_REINSTATED",
   "OFFERING_UPDATED",
+  // An offering removed from the record. Carries its code, section, status
+  // and timetable, because afterwards there is no row left to describe.
+  "OFFERING_DELETED",
   "OFFERING_MEETING_CHANGED",
 
   // Academic structure (Stage 3)
@@ -80,6 +83,11 @@ export const AUDIT_ACTIONS = [
   // the other is "I changed the plan". An Admin whose queue item vanished
   // needs to be able to tell which.
   "COURSE_PLAN_REOPENED",
+  // A plan thrown away from the review screen, because a decision on it
+  // was wrong. The entry carries what was destroyed -- the courses, the
+  // registration count, the status it was in -- because once the delete
+  // has run this log is the only place any of that still exists.
+  "COURSE_PLAN_DELETED",
   "COURSE_PLAN_ITEM_APPROVED",
   "COURSE_PLAN_ITEM_REJECTED",
   "PREREQUISITE_OVERRIDDEN",

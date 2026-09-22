@@ -743,6 +743,109 @@ export async function revisePlan(actor: Actor, planId: string) {
   });
 }
 
+/**
+ * Deleting a plan outright, from the review screen.
+ *
+ * The College's answer to "a decision was made in error": throw the plan
+ * away and let it be entered again. That is a blunter instrument than
+ * putting the decision back, and it is a deliberate choice -- so the
+ * things it destroys are listed in the audit log BEFORE they go, because
+ * afterwards the log is the only place any of it still exists.
+ *
+ * No reason is asked for. The confirmation on screen is a plain "are you
+ * sure", by decision, so the log records who deleted it, when, and what
+ * was in it, but not why.
+ *
+ * WHAT GOES. The plan, every course on it, and every registration those
+ * courses created. A registration made directly by an Admin
+ * (source ADMIN_DIRECT) carries no plan item and is therefore untouched:
+ * it did not come from this plan and does not leave with it.
+ *
+ * WHAT STOPS IT. A published grade, the same hard stop dropRegistration
+ * enforces. Once a student has a grade for a course, the registration
+ * behind it is a record of what they were taught, and no correction on
+ * this screen is worth deleting that.
+ *
+ * Any status, not only SUBMITTED. Restricting this to a plan still under
+ * review would recreate exactly the gap that made the old undo useless:
+ * an Admin deciding course by course leaves the plan SUBMITTED the whole
+ * way, but a plan that has finished rolling up to APPROVED is precisely
+ * the one somebody needs to take back.
+ */
+export interface DeletedPlanSummary {
+  courseCodes: string[];
+  coursesDeleted: number;
+  registrationsDeleted: number;
+  previousStatus: string;
+}
+
+export async function deletePlan(actor: Actor, planId: string): Promise<DeletedPlanSummary> {
+  await assertCan(actor, "planning.reviewPlan");
+
+  return db.transaction(async (tx) => {
+    const plan = await tx.query.coursePlan.findFirst({ where: eq(coursePlan.id, planId) });
+    if (!plan) throw new ValidationError("Plan not found.");
+
+    const items = await tx.query.coursePlanItem.findMany({ where: eq(coursePlanItem.planId, planId) });
+    const itemIds = items.map((i) => i.id);
+
+    const regs = itemIds.length
+      ? await tx.query.registration.findMany({ where: inArray(registration.planItemId, itemIds) })
+      : [];
+
+    if (regs.some((r) => r.status === "REGISTERED")) {
+      const graded = await tx.query.academicRecord.findFirst({
+        where: and(eq(academicRecord.studentId, plan.studentId), eq(academicRecord.isVoid, false)),
+      });
+      if (graded?.gradeRecordId) {
+        throw new StateError("A grade has been published for this student, so this plan can no longer be deleted.");
+      }
+    }
+
+    // What was here, recorded while it still exists. Codes rather than
+    // ids: an auditor reading this next year cannot look up a course row
+    // that was never deleted but a plan item that was.
+    const courseRows = items.length
+      ? await tx.query.course.findMany({ where: inArray(course.id, items.map((i) => i.courseId)) })
+      : [];
+    const courseCodes = items
+      .map((i) => courseRows.find((c) => c.id === i.courseId)?.code ?? i.courseId)
+      .sort();
+
+    await auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "COURSE_PLAN_DELETED",
+      entityType: "course_plan",
+      entityId: planId,
+      studentId: plan.studentId,
+      oldValue: {
+        status: plan.status,
+        semesterId: plan.semesterId,
+        totalCredits: plan.totalCredits,
+        courses: courseCodes,
+        registrationsDeleted: regs.length,
+      },
+    });
+
+    // Order matters: registration -> plan item -> plan. Both foreign keys
+    // are ON DELETE RESTRICT, so the database refuses any other order --
+    // which is the behaviour we want, not an obstacle to work around.
+    if (itemIds.length) {
+      await tx.delete(registration).where(inArray(registration.planItemId, itemIds));
+      await tx.delete(coursePlanItem).where(eq(coursePlanItem.planId, planId));
+    }
+    await tx.delete(coursePlan).where(eq(coursePlan.id, planId));
+
+    return {
+      courseCodes,
+      coursesDeleted: items.length,
+      registrationsDeleted: regs.length,
+      previousStatus: plan.status,
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Admin: review, override, approve, reject (Section 14.5, REQ-P10/P11)
 // ---------------------------------------------------------------------------

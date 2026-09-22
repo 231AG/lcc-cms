@@ -6,9 +6,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { approveSubmissionAction, rejectSubmissionAction } from "../actions";
 
 /**
@@ -143,12 +143,12 @@ export default async function GradeReviewDetailPage({
             <Label className="text-xs">Reason (required to reject)</Label>
             <input name="reason" placeholder="Reason for rejection" className="w-64 rounded-md border border-line-strong px-3 py-2 text-sm" />
           </div>
-          <Button type="submit" formAction={approveSubmissionAction}>
+          <SubmitButton formAction={approveSubmissionAction}>
             Approve checked (or all, if none checked)
-          </Button>
-          <Button type="submit" formAction={rejectSubmissionAction} variant="danger">
+          </SubmitButton>
+          <SubmitButton formAction={rejectSubmissionAction} variant="danger">
             Reject checked (or all, if none checked)
-          </Button>
+          </SubmitButton>
         </form>
       )}
     </main>

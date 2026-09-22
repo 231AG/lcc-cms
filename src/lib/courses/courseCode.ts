@@ -39,3 +39,20 @@ export function formatCourseCode(code: string): string {
 export function courseCodeKey(code: string): string {
   return code.replace(/\s+/g, "").toLowerCase();
 }
+
+/**
+ * Which code the Add-an-offering form is actually talking about.
+ *
+ * There are two boxes that can carry one: the Course box at the top, and
+ * the code inside the "not on record yet" panel. The panel's is
+ * pre-filled from the Course box, so they normally agree -- but when they
+ * do not, the panel wins. It is the more specific statement of intent
+ * (somebody opened the panel and typed a code into it), and nothing is
+ * written until the confirmation step prints the exact code back.
+ *
+ * Blank does not win. A panel left empty falls through to the Course box
+ * rather than blanking the code, which is what makes the panel optional.
+ */
+export function effectiveCourseCode(formCode: string, panelCode: string): string {
+  return panelCode.trim() || formCode;
+}

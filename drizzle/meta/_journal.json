@@ -211,6 +211,13 @@
       "when": 1788900000000,
       "tag": "0029_numeric_sections",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788986400000,
+      "tag": "0030_single_section_per_offering",
+      "breakpoints": true
     }
   ]
 }

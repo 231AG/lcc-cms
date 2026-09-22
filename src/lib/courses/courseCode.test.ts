@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { courseCodeKey, formatCourseCode } from "@/lib/courses/courseCode";
+import { courseCodeKey, effectiveCourseCode, formatCourseCode } from "@/lib/courses/courseCode";
 
 describe("formatCourseCode", () => {
   it("inserts the space", () => {
@@ -40,5 +40,25 @@ describe("courseCodeKey", () => {
   it("round-trips with the displayed form", () => {
     // What a reader sees can always be typed back in.
     expect(courseCodeKey(formatCourseCode("CECS201"))).toBe(courseCodeKey("CECS201"));
+  });
+});
+
+describe("which code the offering form means", () => {
+  it("uses the Course box when the panel is closed or empty", () => {
+    expect(effectiveCourseCode("ACCT301", "")).toBe("ACCT301");
+    expect(effectiveCourseCode("ACCT301", "   ")).toBe("ACCT301");
+  });
+
+  it("lets the panel's code win, because that is where somebody just typed", () => {
+    expect(effectiveCourseCode("ACCT301", "ACCT302")).toBe("ACCT302");
+  });
+
+  it("does not let the panel blank the code out", () => {
+    // The panel is optional; an empty one means "no opinion", not "no code".
+    expect(effectiveCourseCode("ACCT301", "")).not.toBe("");
+  });
+
+  it("agrees with itself when both boxes say the same thing", () => {
+    expect(courseCodeKey(effectiveCourseCode("ACCT 301", "ACCT301"))).toBe(courseCodeKey("ACCT 301"));
   });
 });

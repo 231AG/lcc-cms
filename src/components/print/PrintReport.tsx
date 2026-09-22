@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
+
+export type Orientation = "landscape" | "portrait";
 
 /**
  * The shell every printable listing shares: the College letterhead, a title
@@ -26,7 +28,10 @@ import type { ReactNode } from "react";
  * that fits on one sheet is a list nobody can read.
  */
 
-const CSS = `
+/** A4 landscape and portrait, minus the @page margins below. */
+const PAGE_WIDTH = { landscape: "273mm", portrait: "186mm" } as const;
+
+const cssFor = (orientation: Orientation) => `
 .pr {
   --pr-purple: #5e2b8c;
   --pr-purple-dark: #3f1d63;
@@ -36,8 +41,7 @@ const CSS = `
   --pr-text: #2a2135;
   --pr-muted: #6b5a7d;
 
-  /* A4 landscape minus the @page margins below. */
-  max-width: 273mm;
+  max-width: ${PAGE_WIDTH[orientation]};
   margin: 0 auto;
   color: var(--pr-text);
   font-family: "DejaVu Sans", "Segoe UI", system-ui, sans-serif;
@@ -84,10 +88,19 @@ const CSS = `
 .pr-table tbody tr:nth-child(even) { background: var(--pr-tint); }
 .pr-empty { text-align: center; font-style: italic; color: var(--pr-muted); padding: 8mm; }
 
+/* The who-this-is-about block: label and value pairs under the masthead,
+   for a sheet that is about one person rather than a filtered list. Two
+   columns on a wide sheet, one on a narrow one, so a portrait control
+   sheet does not strand a label on its own line. */
+.pr-meta { margin: 4mm auto 0; width: 100%; border-collapse: collapse; }
+.pr-meta td { padding: 1mm 2mm; font-size: 9pt; border: none; }
+.pr-meta .pr-meta-label { color: var(--pr-muted); white-space: nowrap; width: 1%; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.02em; }
+.pr-meta .pr-meta-value { font-weight: 700; padding-right: 8mm; }
+
 .pr-foot { margin-top: 4mm; font-size: 7.5pt; color: var(--pr-muted); display: flex; justify-content: space-between; gap: 6mm; }
 
 @media print {
-  @page { size: A4 landscape; margin: 12mm; }
+  @page { size: A4 ${orientation}; margin: 12mm; }
   /* The whole point of this component: column headers repeat on every
      printed page, and no row is cut in half by a page break. */
   .pr-table thead { display: table-header-group; }
@@ -99,23 +112,36 @@ const CSS = `
 export function PrintReport({
   title,
   subtitle,
+  meta,
   columns,
   rows,
   emptyMessage = "Nothing matches these filters.",
   footNote,
+  rowNoun = "row",
   sealSrc = "/lcc-logo.png",
+  orientation = "landscape",
 }: {
   title: string;
   subtitle?: string;
+  /** Label/value pairs about the subject of the sheet, printed between the
+   *  masthead and the table. Omitted by the filtered listings, which are
+   *  about a query rather than about a person. */
+  meta?: ReadonlyArray<{ label: string; value: ReactNode }>;
   columns: ReadonlyArray<{ key: string; header: string; nowrap?: boolean }>;
   rows: Array<Record<string, ReactNode>>;
   emptyMessage?: string;
   footNote?: string;
+  /** Singular; pluralised with an "s". "4 rows" is the right word on a
+   *  filtered listing and the wrong one on a document about courses. */
+  rowNoun?: string;
   sealSrc?: string;
+  /** Landscape by default: the listings this was built for are ten or more
+   *  columns wide. A narrow sheet passes "portrait". */
+  orientation?: Orientation;
 }) {
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: cssFor(orientation) }} />
       <article className="pr">
         <header className="pr-head">
           {/* eslint-disable-next-line @next/next/no-img-element -- fixed
@@ -131,6 +157,32 @@ export function PrintReport({
           {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
           <img className="pr-seal" src={sealSrc} alt="" aria-hidden="true" />
         </header>
+
+        {meta && meta.length > 0 && (
+          <table className="pr-meta">
+            <tbody>
+              {/* Two pairs per row, so the block stays compact rather than
+                  running down the page one field at a time. */}
+              {Array.from({ length: Math.ceil(meta.length / 2) }, (_, i) => (
+                <tr key={i}>
+                  {[meta[i * 2], meta[i * 2 + 1]].map((cell, j) =>
+                    cell ? (
+                      <Fragment key={j}>
+                        <td className="pr-meta-label">{cell.label}</td>
+                        <td className="pr-meta-value">{cell.value}</td>
+                      </Fragment>
+                    ) : (
+                      <Fragment key={j}>
+                        <td />
+                        <td />
+                      </Fragment>
+                    ),
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
         <table className="pr-table">
           <thead>
@@ -165,7 +217,7 @@ export function PrintReport({
 
         <div className="pr-foot">
           <span>
-            {rows.length} row{rows.length === 1 ? "" : "s"}
+            {rows.length} {rowNoun}{rows.length === 1 ? "" : "s"}
             {footNote ? ` · ${footNote}` : ""}
           </span>
           <span>Liberia Christian College E-Portal</span>

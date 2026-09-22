@@ -11,10 +11,11 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { ArrowRight, ClipboardCheck } from "lucide-react";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Label, Select, Input } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { TableCard } from "@/components/ui/TableCard";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import { findPlanAction } from "./actions";
 
 export const metadata: Metadata = { title: "Course plan review" };
@@ -132,9 +133,9 @@ export default async function PlanningQueuePage({
             ))}
           </Select>
         </div>
-        <Button type="submit" variant="secondary">
+        <SubmitButton variant="secondary">
           Select
-        </Button>
+        </SubmitButton>
       </form>
 
       {/* The lookup sits ABOVE the queue. Someone arriving with a
@@ -172,9 +173,9 @@ export default async function PlanningQueuePage({
                 </Select>
               </div>
             </div>
-            <Button type="submit" variant="secondary">
+            <SubmitButton variant="secondary">
               Find plan
-            </Button>
+            </SubmitButton>
           </form>
         </CardBody>
       </Card>
@@ -193,9 +194,9 @@ export default async function PlanningQueuePage({
               <div className="w-56">
                 <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Student ID or name" />
               </div>
-              <Button type="submit" variant="secondary">
+              <SubmitButton variant="secondary">
                 Search
-              </Button>
+              </SubmitButton>
               {q && (
                 <Link href={`/admin/planning?semesterId=${semesterId}`} className="text-brand-fg text-xs font-medium hover:underline">
                   Clear

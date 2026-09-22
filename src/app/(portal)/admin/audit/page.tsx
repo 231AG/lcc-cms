@@ -5,10 +5,11 @@ import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { Pagination } from "@/components/ui/Pagination";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import Link from "next/link";
 
 export const metadata: Metadata = { title: "Audit log" };
@@ -131,9 +132,9 @@ export default async function AuditLogPage({
             </Label>
             <Input id="to" type="date" name="to" defaultValue={params.to} />
           </div>
-          <Button type="submit" variant="secondary">
+          <SubmitButton variant="secondary">
             Apply
-          </Button>
+          </SubmitButton>
           {hasFilters && (
             <Link href="/admin/audit" className={buttonClasses("ghost", "md")}>
               Clear filters

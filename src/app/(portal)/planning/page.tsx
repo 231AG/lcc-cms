@@ -11,7 +11,6 @@ import { getMyPlan, getMyPlans, getPlanItems, getRegistrationsForStudent } from 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { Label, Select } from "@/components/ui/Form";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { ClipboardList, Lock, Send, Trash2 } from "lucide-react";
@@ -234,9 +233,9 @@ export default async function PlanningPage({
               ))}
             </Select>
           </div>
-          <Button type="submit" variant="ghost" className="mb-px">
+          <SubmitButton variant="ghost" className="mb-px">
             Show
-          </Button>
+          </SubmitButton>
         </form>
       )}
 
@@ -368,9 +367,9 @@ export default async function PlanningPage({
                   <form action={deleteDraftPlanAction} className="ml-auto">
                     <input type="hidden" name="semesterId" value={semesterId} />
                     <input type="hidden" name="planId" value={plan.id} />
-                    <button type="submit" className="text-danger-fg text-xs font-medium hover:underline">
+                    <SubmitTextButton className="text-danger-fg text-xs font-medium hover:underline">
                       Delete plan
-                    </button>
+                    </SubmitTextButton>
                   </form>
                 )}
               </div>
