@@ -46,7 +46,9 @@ export default async function LoginPage({
       backdrop={
         <>
           {/* Decorative: the building is named in the caption below, so the
-              image itself stays out of the accessibility tree. */}
+              image itself stays out of the accessibility tree. Softly blurred
+              so it reads as a setting behind the card rather than competing
+              with it; scaled up slightly so the blur has no pale edge. */}
           <Image
             src={campus}
             alt=""
@@ -54,7 +56,7 @@ export default async function LoginPage({
             priority
             placeholder="blur"
             sizes="100vw"
-            className="object-cover object-[50%_35%]"
+            className="scale-105 object-cover object-[50%_35%] blur-[3px]"
           />
           {/* Darkens the photo evenly, and more at the foot, so the card and
               the caption read against it in either theme. */}
@@ -84,8 +86,12 @@ export default async function LoginPage({
         </div>
 
         <div className="border-line-subtle mt-6 border-t pt-6">
-          <h1 className="text-fg text-lg font-bold tracking-tight">Sign in</h1>
-          <p className="text-fg-secondary mt-1 text-sm">Use your Student ID or staff username, and your password.</p>
+          <div className="flex items-center gap-3">
+            <span className="bg-gradient-brand text-on-primary flex h-9 w-9 items-center justify-center rounded-lg shadow-sm">
+              <LogIn className="h-[18px] w-[18px]" aria-hidden="true" />
+            </span>
+            <h1 className="text-fg text-base font-bold">Sign In</h1>
+          </div>
 
           <div className="mt-6">
             {error === "disabled" && (

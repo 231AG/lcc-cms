@@ -338,9 +338,9 @@
      dark so the photo never becomes the brightest thing on a dark screen. */
   --photo-scrim: linear-gradient(
     to bottom,
-    light-dark(rgb(29 11 46 / 0.35), rgb(13 6 22 / 0.65)) 0%,
-    light-dark(rgb(29 11 46 / 0.25), rgb(13 6 22 / 0.55)) 50%,
-    light-dark(rgb(29 11 46 / 0.7), rgb(13 6 22 / 0.88)) 100%
+    light-dark(rgb(29 11 46 / 0.55), rgb(13 6 22 / 0.74)) 0%,
+    light-dark(rgb(29 11 46 / 0.45), rgb(13 6 22 / 0.68)) 50%,
+    light-dark(rgb(29 11 46 / 0.8), rgb(13 6 22 / 0.9)) 100%
   );
   /* A card floating over a photograph needs a deeper shadow than one on the
      plain page to separate from what is behind it. */
