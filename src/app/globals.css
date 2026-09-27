@@ -333,6 +333,19 @@
       transparent 68%
     );
 
+  /* The sign-in screen's campus photograph sits under this: an even orchid-
+     black dim, heavier at the foot where the caption is, and heavier again on
+     dark so the photo never becomes the brightest thing on a dark screen. */
+  --photo-scrim: linear-gradient(
+    to bottom,
+    light-dark(rgb(29 11 46 / 0.35), rgb(13 6 22 / 0.65)) 0%,
+    light-dark(rgb(29 11 46 / 0.25), rgb(13 6 22 / 0.55)) 50%,
+    light-dark(rgb(29 11 46 / 0.7), rgb(13 6 22 / 0.88)) 100%
+  );
+  /* A card floating over a photograph needs a deeper shadow than one on the
+     plain page to separate from what is behind it. */
+  --elevation-float: 0 24px 60px -20px rgb(15 5 30 / 0.55);
+
   /* Deep Orchid -> Lavender Haze. Reserved for hero/major brand moments; kept
      deliberately more contained (and darker) on dark so no large saturated
      purple area dominates the interface. */
@@ -457,6 +470,7 @@
 
   /* Elevation */
   --shadow-card: var(--elevation-card);
+  --shadow-float: var(--elevation-float);
 
   /* Chrome */
   --color-seal-backdrop: var(--seal-backdrop);
@@ -722,6 +736,10 @@ html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
    this is a plain class rather than a Tailwind colour utility. */
 .screen-glow {
   background-image: var(--screen-glow);
+}
+
+.photo-scrim {
+  background-image: var(--photo-scrim);
 }
 
 /* ===========================================================================

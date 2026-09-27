@@ -6,6 +6,7 @@ import { Label, Input } from "@/components/ui/Form";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FocusedScreen } from "@/components/layout/FocusedScreen";
 import { loginAction } from "./actions";
+import campus from "./lcc-campus.webp";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -28,8 +29,8 @@ export const metadata: Metadata = { title: "Sign in" };
  * screen still asks for a Student ID rather than the email address the
  * design reference shows. There are no email logins in this system.
  *
- * The layout is two panels: the College's identity, then the form. The
- * identity panel is presentation only -- the form is byte-for-byte the same
+ * The College's own building fills the screen behind a single sign-in card.
+ * The photograph is presentation only -- the form is byte-for-byte the same
  * fields, names and action as before.
  */
 export default async function LoginPage({
@@ -40,56 +41,53 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <FocusedScreen className="max-w-[58rem]">
-      {/* Two panels, unequal on purpose: the College on the left in the same
-          orchid as the app's own sidebar, so signing in already looks like
-          the portal it opens onto; the form on the right, where the work is.
-          Below md the identity collapses to a short band above the form. */}
-      <div className="border-line bg-surface shadow-card grid overflow-hidden rounded-2xl border md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-        <section
-          aria-label="Liberia Christian College"
-          className="bg-sidebar text-sidebar-fg flex flex-col gap-6 p-6 sm:p-8 md:justify-between md:gap-10 md:p-10"
-        >
-          <div className="flex items-center gap-4 md:flex-col md:items-start md:gap-6">
-            <span className="bg-seal-backdrop flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl p-1.5 md:h-20 md:w-20 md:p-2">
-              <Image
-                src="/lcc-logo.png"
-                alt="Liberia Christian College seal"
-                width={200}
-                height={227}
-                className="h-full w-auto"
-                priority
-              />
-            </span>
-            <div className="min-w-0">
-              <p className="text-lg leading-tight font-extrabold tracking-tight md:text-[1.7rem]">
-                Liberia Christian College
-              </p>
-              <p className="text-sidebar-fg-muted mt-1 text-[11px] font-semibold tracking-[0.14em] uppercase">
-                E-Portal
-              </p>
-            </div>
-          </div>
-
-          <div className="hidden md:block">
-            <p className="border-accent inline-block border-b-2 pb-1 text-sm font-semibold">
-              Building Character &middot; Shaping Tomorrow
-            </p>
-            <p className="text-sidebar-fg-muted mt-4 max-w-xs text-sm leading-relaxed">
-              Course planning, registration and results, for the College&rsquo;s students and staff.
-            </p>
-          </div>
-
-          <p className="text-sidebar-fg-muted hidden border-t border-white/10 pt-4 text-[10px] tracking-[0.08em] uppercase md:block">
-            Excellence &middot; Faith &middot; Service
+    <FocusedScreen
+      className="max-w-[27rem]"
+      backdrop={
+        <>
+          {/* Decorative: the building is named in the caption below, so the
+              image itself stays out of the accessibility tree. */}
+          <Image
+            src={campus}
+            alt=""
+            fill
+            priority
+            placeholder="blur"
+            sizes="100vw"
+            className="object-cover object-[50%_35%]"
+          />
+          {/* Darkens the photo evenly, and more at the foot, so the card and
+              the caption read against it in either theme. */}
+          <div className="photo-scrim absolute inset-0" />
+          <p className="absolute bottom-4 left-5 text-xs font-medium text-white/85 sm:bottom-6 sm:left-6">
+            Patrick Pieters Building, Liberia Christian College
           </p>
-        </section>
+        </>
+      }
+    >
+      <div className="border-line bg-surface/95 rounded-2xl border p-6 shadow-float backdrop-blur-sm sm:p-8">
+        <div className="flex flex-col items-center text-center">
+          <span className="bg-seal-backdrop flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl p-1.5">
+            <Image
+              src="/lcc-logo.png"
+              alt="Liberia Christian College seal"
+              width={200}
+              height={227}
+              className="h-full w-auto"
+              priority
+            />
+          </span>
+          <p className="text-brand-fg mt-4 text-xl leading-tight font-extrabold tracking-tight">
+            Liberia Christian College
+          </p>
+          <p className="text-fg-muted mt-1 text-[11px] font-semibold tracking-[0.14em] uppercase">E-Portal</p>
+        </div>
 
-        <div className="p-6 sm:p-8 md:p-10">
-          <h1 className="text-fg text-2xl font-extrabold tracking-tight">Sign in</h1>
-          <p className="text-fg-secondary mt-1.5 text-sm">Use your Student ID or staff username, and your password.</p>
+        <div className="border-line-subtle mt-6 border-t pt-6">
+          <h1 className="text-fg text-lg font-bold tracking-tight">Sign in</h1>
+          <p className="text-fg-secondary mt-1 text-sm">Use your Student ID or staff username, and your password.</p>
 
-          <div className="mt-7">
+          <div className="mt-6">
             {error === "disabled" && (
               <Alert tone="danger" className="mb-5">
                 This account has been disabled. Contact the Admin office.
