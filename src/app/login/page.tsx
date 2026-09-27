@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Label, Input } from "@/components/ui/Form";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FocusedScreen } from "@/components/layout/FocusedScreen";
 import { loginAction } from "./actions";
+import campus from "./lcc-campus.webp";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -28,9 +29,9 @@ export const metadata: Metadata = { title: "Sign in" };
  * screen still asks for a Student ID rather than the email address the
  * design reference shows. There are no email logins in this system.
  *
- * The layout is the reference's three bands: who this is, a welcome, and
- * the form itself. Everything above the card is presentation -- the form
- * below it is byte-for-byte the same fields, names and action as before.
+ * The College's own building fills the screen behind a single sign-in card.
+ * The photograph is presentation only -- the form is byte-for-byte the same
+ * fields, names and action as before.
  */
 export default async function LoginPage({
   searchParams,
@@ -40,128 +41,132 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <FocusedScreen className="max-w-[30rem]">
-      {/* Identity row. Small and left-aligned: the seal had been a 7rem hero
-          tile, which on a phone pushed the actual form below the fold. */}
-      <div className="mb-6 flex items-center gap-3">
-        <span className="bg-gradient-brand flex h-11 w-11 shrink-0 items-center justify-center rounded-xl p-[2px] shadow-sm">
-          <span className="bg-seal-backdrop flex h-full w-full items-center justify-center overflow-hidden rounded-[0.6rem]">
+    <FocusedScreen
+      className="max-w-[27rem]"
+      backdrop={
+        <>
+          {/* Decorative: the building is named in the caption below, so the
+              image itself stays out of the accessibility tree. Softly blurred
+              so it reads as a setting behind the card rather than competing
+              with it; scaled up slightly so the blur has no pale edge. */}
+          <Image
+            src={campus}
+            alt=""
+            fill
+            priority
+            placeholder="blur"
+            sizes="100vw"
+            className="scale-105 object-cover object-[50%_35%] blur-[3px]"
+          />
+          {/* Darkens the photo evenly, and more at the foot, so the card and
+              the caption read against it in either theme. */}
+          <div className="photo-scrim absolute inset-0" />
+          <p className="absolute bottom-4 left-5 text-xs font-medium text-white/85 sm:bottom-6 sm:left-6">
+            Patrick Pieters Building, Liberia Christian College
+          </p>
+        </>
+      }
+    >
+      <div className="border-line bg-surface/95 rounded-2xl border p-6 shadow-float backdrop-blur-sm sm:p-8">
+        <div className="flex flex-col items-center text-center">
+          <span className="bg-seal-backdrop flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl p-1.5">
             <Image
               src="/lcc-logo.png"
               alt="Liberia Christian College seal"
               width={200}
               height={227}
-              className="h-[85%] w-auto"
+              className="h-full w-auto"
               priority
             />
           </span>
-        </span>
-        <span className="min-w-0">
-          <span className="text-fg block text-sm leading-tight font-bold">Liberia Christian College</span>
-          <span className="text-fg-muted block text-[11px] leading-tight">E-Portal</span>
-        </span>
-      </div>
-
-      {/* The welcome band. A tint rather than a fill, so the heading keeps
-          full text contrast against it under both themes. */}
-      <div className="bg-gradient-welcome mb-6 rounded-2xl px-6 py-8 text-center">
-        <span className="bg-surface/80 text-brand-fg mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.06em] uppercase shadow-sm">
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-          Secure login
-        </span>
-        <h1 className="text-fg text-2xl font-bold tracking-tight text-balance sm:text-[1.75rem]">Welcome back</h1>
-        <p className="text-fg-secondary mt-2 text-sm">
-          Sign in to your <span className="font-semibold">Liberia Christian College</span> account
-        </p>
-      </div>
-
-      <div className="border-line bg-surface overflow-hidden rounded-xl border shadow-sm">
-        <div className="border-line-subtle flex items-center gap-3 border-b px-6 py-4">
-          <span className="bg-gradient-brand text-on-primary flex h-9 w-9 items-center justify-center rounded-lg shadow-sm">
-            <LogIn className="h-[18px] w-[18px]" aria-hidden="true" />
-          </span>
-          <h2 className="text-fg text-base font-bold">Sign In</h2>
+          <p className="text-brand-fg mt-4 text-xl leading-tight font-extrabold tracking-tight">
+            Liberia Christian College
+          </p>
+          <p className="text-fg-muted mt-1 text-[11px] font-semibold tracking-[0.14em] uppercase">E-Portal</p>
         </div>
 
-        <div className="p-6 sm:p-7">
-          {error === "disabled" && (
-            <Alert tone="danger" className="mb-5">
-              This account has been disabled. Contact the Admin office.
-            </Alert>
-          )}
-          {error === "1" && (
-            <Alert tone="danger" className="mb-5">
-              Student ID/username or password is incorrect.
-            </Alert>
-          )}
+        <div className="border-line-subtle mt-6 border-t pt-6">
+          <div className="flex items-center gap-3">
+            <span className="bg-gradient-brand text-on-primary flex h-9 w-9 items-center justify-center rounded-lg shadow-sm">
+              <LogIn className="h-[18px] w-[18px]" aria-hidden="true" />
+            </span>
+            <h1 className="text-fg text-base font-bold">Sign In</h1>
+          </div>
 
-          <form action={loginAction} data-submit-feedback className="flex flex-col gap-5">
-            <div>
-              <Label htmlFor="identifier" className="mb-1.5">
-                Student ID or Username
-                <RequiredMark />
-              </Label>
-              <Input
-                id="identifier"
-                name="identifier"
-                type="text"
-                required
-                autoComplete="username"
-                placeholder="Enter your Student ID or username"
-                className="h-11"
-              />
-            </div>
+          <div className="mt-6">
+            {error === "disabled" && (
+              <Alert tone="danger" className="mb-5">
+                This account has been disabled. Contact the Admin office.
+              </Alert>
+            )}
+            {error === "1" && (
+              <Alert tone="danger" className="mb-5">
+                Student ID/username or password is incorrect.
+              </Alert>
+            )}
 
-            <div>
-              <Label htmlFor="password" className="mb-1.5">
-                Password
-                <RequiredMark />
-              </Label>
-              <div className="relative">
+            <form action={loginAction} data-submit-feedback className="flex flex-col gap-5">
+              <div>
+                <Label htmlFor="identifier" className="mb-1.5">
+                  Student ID or Username
+                  <RequiredMark />
+                </Label>
                 <Input
-                  id="password"
-                  name="password"
-                  type="password"
+                  id="identifier"
+                  name="identifier"
+                  type="text"
                   required
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  className="h-11 pr-11"
+                  autoComplete="username"
+                  placeholder="Enter your Student ID or username"
+                  className="h-11"
                 />
-                <button
-                  type="button"
-                  data-password-toggle="password"
-                  aria-label="Show password"
-                  aria-pressed="false"
-                  className="enhance-only text-fg-muted hover:text-brand-fg focus-visible:outline-focus-ring absolute inset-y-0 right-0 items-center rounded-r-md px-3 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                >
-                  <Eye className="h-4 w-4" data-when="hidden" aria-hidden="true" />
-                  <EyeOff className="h-4 w-4" data-when="shown" aria-hidden="true" />
-                </button>
               </div>
-            </div>
 
-            {/* bg-gradient-brand over the primary variant: a background-IMAGE
-                on top of the variant's background-colour, so the two do not
-                fight (cn is a plain joiner with no tailwind-merge) and the
-                solid brand colour is still what shows if the gradient ever
-                fails to resolve. */}
-            <SubmitButton className="bg-gradient-brand mt-1 h-11 w-full shadow-sm">
-              <svg className="submit-spinner h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
-                <path d="M14.5 8A6.5 6.5 0 0 0 8 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              <LogIn className="h-4 w-4" aria-hidden="true" />
-              Sign in
-            </SubmitButton>
-          </form>
+              <div>
+                <Label htmlFor="password" className="mb-1.5">
+                  Password
+                  <RequiredMark />
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    className="h-11 pr-11"
+                  />
+                  <button
+                    type="button"
+                    data-password-toggle="password"
+                    aria-label="Show password"
+                    aria-pressed="false"
+                    className="enhance-only text-fg-muted hover:text-brand-fg focus-visible:outline-focus-ring absolute inset-y-0 right-0 items-center rounded-r-md px-3 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                  >
+                    <Eye className="h-4 w-4" data-when="hidden" aria-hidden="true" />
+                    <EyeOff className="h-4 w-4" data-when="shown" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <SubmitButton className="mt-1 h-11 w-full">
+                <svg className="submit-spinner h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+                  <path d="M14.5 8A6.5 6.5 0 0 0 8 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <LogIn className="h-4 w-4" aria-hidden="true" />
+                Sign in
+              </SubmitButton>
+            </form>
+
+            {/* Accounts are created and reset by the Admin office -- there is
+                no self-service recovery flow, so this points at the real one. */}
+            <p className="text-fg-muted mt-6 text-sm">
+              Forgot your password? Contact the Admin office to have it reset.
+            </p>
+          </div>
         </div>
-
-        {/* Accounts are created and reset by the Admin office -- there is no
-            self-service recovery flow, so this points at the real one rather
-            than the reference's "Reset?" link to a page that doesn't exist. */}
-        <p className="border-line-subtle bg-surface-subtle text-fg-muted border-t px-6 py-4 text-center text-sm">
-          Forgot your password? Contact the Admin office to have it reset.
-        </p>
       </div>
     </FocusedScreen>
   );

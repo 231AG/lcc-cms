@@ -14,15 +14,33 @@ import { ThemeToggle } from "./ThemeToggle";
  * the only screens with progressive-enhancement controls, and it is what
  * reveals them (see `.enhance-only` in globals.css). Deferred, so it never
  * blocks the first paint the way the theme script must.
+ *
+ * `backdrop` replaces the default glow with a full-bleed layer of the
+ * caller's own (the sign-in screen's campus photograph). The toggle then
+ * sits on a solid chip, since it can no longer rely on a plain page behind it.
  */
-export function FocusedScreen({ children, className }: { children: ReactNode; className?: string }) {
+export function FocusedScreen({
+  children,
+  className,
+  backdrop,
+}: {
+  children: ReactNode;
+  className?: string;
+  backdrop?: ReactNode;
+}) {
   return (
     <main
       id="main-content"
       tabIndex={-1}
-      className="screen-glow relative flex min-h-dvh flex-1 flex-col items-center justify-center px-5 py-16 outline-none sm:px-6"
+      className={cn(
+        "relative isolate flex min-h-dvh flex-1 flex-col items-center justify-center px-5 py-16 outline-none sm:px-6",
+        backdrop ? "overflow-hidden" : "screen-glow",
+      )}
     >
-      <ThemeToggle className="absolute top-4 right-4 sm:top-6 sm:right-6" />
+      {backdrop && <div className="absolute inset-0 -z-10">{backdrop}</div>}
+      <ThemeToggle
+        className={cn("absolute top-4 right-4 sm:top-6 sm:right-6", backdrop ? "bg-surface shadow-card" : undefined)}
+      />
       <div className={cn("w-full", className)}>{children}</div>
       <script defer src="/enhance.js" />
     </main>
