@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Check, Download, Pencil, Printer, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, Download, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
 import { semesterFullLabel } from "@/lib/academic/semesterName";
 import { asUser } from "@/lib/db/asUser";
@@ -200,6 +200,8 @@ export default async function OfferingsPage({
     pageSize?: string;
     /** `?debug=1` adds the technical detail to the error card below. */
     debug?: string;
+    /** `?add=1` opens the Add-an-offering panel. */
+    add?: string;
   }>;
 }) {
   const actor = await getCurrentActor();
@@ -216,6 +218,7 @@ export default async function OfferingsPage({
     dir,
     pageSize,
     debug,
+    add,
     stage,
     courseCode: draftCourseCode,
     section: draftSection,
@@ -366,10 +369,34 @@ export default async function OfferingsPage({
   const exportHref = `/admin/offerings/export?${queryParams()}`;
   const printHref = `/admin/offerings/print?${queryParams()}`;
   const hasFilters = Boolean(q || collegeId);
+  // The Add-an-offering panel stays closed until asked for, like Add Student
+  // on the Student Listing. It is a link rather than client state so the
+  // page keeps working without JavaScript, and it re-opens by itself when
+  // createOfferingAction sends a half-filled form back (the draft fields
+  // below), so a refused submission never hides what was typed.
+  const hasDraft = Boolean(
+    stage || draftCourseCode || draftSection || draftRoom || draftStartTime || draftEndTime || draftInstructor || draftCapacity,
+  );
+  const addOpen = canManage && (add === "1" || hasDraft);
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
-      <PageHeader title="Course offerings" />
+      <PageHeader
+        title="Course offerings"
+        actions={
+          canManage ? (
+            <Link
+              href={`/admin/offerings?${queryParams(addOpen ? {} : { add: "1" })}`}
+              aria-expanded={addOpen}
+              aria-controls={addOpen ? "add-offering-panel" : undefined}
+              className={buttonClasses("primary")}
+            >
+              {addOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+              {addOpen ? "Close" : "Add Course Offering"}
+            </Link>
+          ) : undefined
+        }
+      />
 
       {error && (
         <Alert tone="danger" className="mb-4">
@@ -679,8 +706,8 @@ export default async function OfferingsPage({
         <p className="text-sm text-fg-muted">Choose a semester to see its offerings.</p>
       ) : (
         <>
-          {canManage && (
-            <Card className="mb-6">
+          {addOpen && (
+            <Card id="add-offering-panel" className="mb-6">
               <CardBody>
                 <h2 className="mb-3 font-medium text-fg">Add an offering</h2>
                 <form action={createOfferingAction}>

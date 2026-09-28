@@ -1,8 +1,9 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import type { Actor } from "@/lib/auth/session";
+import { signOutAction } from "@/app/actions";
 import { cn } from "@/components/ui/cn";
 import { navGroupsForRole } from "./navLinks";
 import { SidebarLink } from "./SidebarLink";
@@ -120,15 +121,24 @@ export function AppSidebar({ actor }: { actor: Actor }) {
         ))}
       </nav>
 
-      {/* The College's own line, at the foot of the rail. Hidden when the
-          rail is collapsed, where there is no room for it to read as
-          anything but noise. Left-aligned like everything above it, and
-          ruled off so it reads as the end of the rail rather than as a
-          stray caption floating in the gradient. */}
-      <div className="shrink-0 px-4 pb-5">
-        <p className="sidebar-full-only text-sidebar-fg-muted border-t border-white/10 pt-4 text-[10px] leading-tight tracking-[0.08em] uppercase">
-          Excellence &middot; Faith &middot; Service
-        </p>
+      {/* The foot of the rail: signing out.
+          Log out is a form button rather than a link because signing out
+          is an action, and it is styled apart from the nav items above --
+          outlined, not filled on hover -- so it never reads as one more
+          page to visit. Collapsed, it becomes an icon square like the rest
+          of the rail (the :is(a, button) rule in globals.css). */}
+      <div className="shrink-0 border-t border-white/10 px-3 py-3">
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            aria-label="Log out"
+            title="Log out"
+            className="sidebar-rail-center text-sidebar-fg focus-visible:outline-focus-ring flex w-full items-center gap-3 rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-sm font-semibold transition-colors hover:border-white/40 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+            <span className="sidebar-full-only">Log out</span>
+          </button>
+        </form>
       </div>
     </aside>
   );

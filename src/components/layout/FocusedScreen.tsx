@@ -38,9 +38,9 @@ export function FocusedScreen({
       )}
     >
       {backdrop && <div className="absolute inset-0 -z-10">{backdrop}</div>}
-      <ThemeToggle
-        className={cn("absolute top-4 right-4 sm:top-6 sm:right-6", backdrop ? "bg-surface shadow-card" : undefined)}
-      />
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+        <ThemeToggle className={backdrop ? "bg-surface shadow-card" : undefined} />
+      </div>
       <div className={cn("w-full", className)}>{children}</div>
       <script defer src="/enhance.js" />
     </main>

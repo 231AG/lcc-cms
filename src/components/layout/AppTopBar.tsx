@@ -4,6 +4,7 @@ import type { Actor } from "@/lib/auth/session";
 import { signOutAction } from "@/app/actions";
 import { ThemeToggle } from "./ThemeToggle";
 import { SubmitIconButton } from "@/components/ui/SubmitButton";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const ROLE_LABEL: Record<Actor["role"], string> = {
   STUDENT: "Student",
@@ -43,39 +44,47 @@ export function AppTopBar({ actor }: { actor: Actor }) {
         {/* Two controls, one per breakpoint: the drawer below lg, the rail
             collapse above it. Both carry aria-expanded, which theme.js keeps
             in step when it flips the attribute on <html>. */}
-        <button
-          type="button"
-          data-drawer-toggle=""
-          aria-controls="app-sidebar"
-          aria-expanded="false"
-          aria-label="Open menu"
-          className={`${iconButton} lg:hidden`}
-        >
-          <Menu className="h-5 w-5" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          data-sidebar-toggle=""
-          aria-controls="app-sidebar"
-          aria-expanded="true"
-          aria-label="Collapse or expand the sidebar"
-          className={`${iconButton} hidden lg:flex`}
-        >
-          <PanelLeft className="h-5 w-5" aria-hidden="true" />
-        </button>
+        <Tooltip label="Menu" align="start" className="inline-flex lg:hidden">
+          <button
+            type="button"
+            data-drawer-toggle=""
+            aria-controls="app-sidebar"
+            aria-expanded="false"
+            aria-label="Open menu"
+            className={`${iconButton} lg:hidden`}
+          >
+            <Menu className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </Tooltip>
+        <Tooltip label="Collapse or expand the sidebar" align="start" className="hidden lg:inline-flex">
+          <button
+            type="button"
+            data-sidebar-toggle=""
+            aria-controls="app-sidebar"
+            aria-expanded="true"
+            aria-label="Collapse or expand the sidebar"
+            className={`${iconButton} hidden lg:flex`}
+          >
+            <PanelLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </Tooltip>
 
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <ThemeToggle className="rounded-lg p-2" />
-          <Link href="/change-password" aria-label="Change password" className={iconButton}>
-            <KeyRound className="h-5 w-5" aria-hidden="true" />
-          </Link>
-          <form action={signOutAction} className="flex">
-            <SubmitIconButton
-              aria-label="Sign out"
-              className={iconButton}
-              icon={<LogOut className="h-5 w-5" aria-hidden="true" />}
-            />
-          </form>
+          <Tooltip label="Change password" align="end">
+            <Link href="/change-password" aria-label="Change password" className={iconButton}>
+              <KeyRound className="h-5 w-5" aria-hidden="true" />
+            </Link>
+          </Tooltip>
+          <Tooltip label="Sign out" align="end">
+            <form action={signOutAction} className="flex">
+              <SubmitIconButton
+                aria-label="Sign out"
+                className={iconButton}
+                icon={<LogOut className="h-5 w-5" aria-hidden="true" />}
+              />
+            </form>
+          </Tooltip>
 
           <span className="bg-line-subtle mx-1 hidden h-8 w-px sm:block" aria-hidden="true" />
 

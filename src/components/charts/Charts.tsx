@@ -234,3 +234,139 @@ export function ColumnChart({ data, className }: { data: CountByLabel[]; classNa
     </div>
   );
 }
+
+/** Gender is identity, not status, so it takes categorical colours rather
+ *  than the status tokens: orange and orchid, validated as a pair for
+ *  colour-vision separation on both the light and the dark card surface.
+ *  "Not recorded" is missing data rather than a third group, so it stays
+ *  neutral grey -- the same reason INACTIVE is grey on the status chart. */
+const GENDER_COLOR: Record<string, string> = {
+  Female: "var(--chart-female)",
+  Male: "var(--chart-male)",
+};
+
+/**
+ * A ring of parts adding up to a whole, the total in its centre and a
+ * legend beside it carrying every name, count and share.
+ *
+ * Right for a few parts only -- here three -- where "how is the whole
+ * split" is the question. The legend is the relief for colour: each part is
+ * named and numbered in text, so the ring never has to be decoded by hue
+ * alone, and it doubles as the table view. Every segment also carries a
+ * native hover title.
+ *
+ * Plain SVG, server-rendered: a circle per segment drawn with a dash of its
+ * share of the circumference, a surface-coloured gap between neighbours,
+ * rounded ends like the bars above.
+ */
+export function DonutChart({
+  data,
+  colorFor,
+  totalLabel = "Total",
+  emptyMessage = "No data yet.",
+}: {
+  data: CountByLabel[];
+  colorFor: (label: string) => string;
+  totalLabel?: string;
+  emptyMessage?: string;
+}) {
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  if (total === 0) return <p className="text-sm text-fg-muted">{emptyMessage}</p>;
+
+  const SIZE = 176;
+  const STROKE = 16;
+  const r = (SIZE - STROKE) / 2;
+  const circumference = 2 * Math.PI * r;
+  // The visible space between two segments. Round caps reach half a stroke
+  // past each end of a dash, so the dash is shortened by a full stroke on
+  // top of the gap to keep that space clear.
+  const GAP = 6;
+  const parts = data.filter((d) => d.count > 0);
+  const single = parts.length === 1;
+
+  const lengths = parts.map((d) => (d.count / total) * circumference);
+  const segments = parts.map((d, i) => {
+    const before = lengths.slice(0, i).reduce((a, b) => a + b, 0);
+    const dash = single ? circumference : Math.max(lengths[i] - GAP - STROKE, 0.001);
+    const start = single ? 0 : before + (GAP + STROKE) / 2;
+    return { ...d, dash, start };
+  });
+  // Whole percentages that add up to exactly 100: round each share down,
+  // then hand the leftover points to the largest remainders. Rounding each
+  // share on its own can print 46% + 42% + 13% = 101% beside one total.
+  const floors = data.map((d) => Math.floor((d.count / total) * 100));
+  let leftover = 100 - floors.reduce((a, b) => a + b, 0);
+  const byRemainder = data
+    .map((d, i) => ({ i, rem: (d.count / total) * 100 - floors[i] }))
+    .sort((a, b) => b.rem - a.rem);
+  for (const { i } of byRemainder) {
+    if (leftover <= 0) break;
+    floors[i] += 1;
+    leftover -= 1;
+  }
+  const share = new Map(data.map((d, i) => [d.label, floors[i]]));
+  const percent = (count: number, label: string) => `${share.get(label) ?? Math.round((count / total) * 100)}%`;
+
+  return (
+    <div className="flex flex-col items-center gap-6 sm:flex-row sm:gap-8">
+      <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
+        <svg
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          width={SIZE}
+          height={SIZE}
+          role="img"
+          aria-label={`${totalLabel} ${total}: ${data.map((d) => `${d.label} ${d.count}`).join(", ")}`}
+          className="-rotate-90"
+        >
+          <circle cx={SIZE / 2} cy={SIZE / 2} r={r} fill="none" stroke="var(--surface-subtle)" strokeWidth={STROKE} />
+          {segments.map((s) => (
+            <circle
+              key={s.label}
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={r}
+              fill="none"
+              stroke={colorFor(s.label)}
+              strokeWidth={STROKE}
+              strokeLinecap={single ? "butt" : "round"}
+              strokeDasharray={`${s.dash} ${circumference}`}
+              strokeDashoffset={-s.start}
+            >
+              <title>{`${s.label}: ${s.count} (${percent(s.count, s.label)})`}</title>
+            </circle>
+          ))}
+        </svg>
+        {/* The total, on a soft raised disc like the reference's centre. */}
+        <div className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
+          <div className="bg-surface shadow-card border-line-subtle flex h-[7.25rem] w-[7.25rem] flex-col items-center justify-center rounded-full border">
+            <span className="text-fg-muted text-xs">{totalLabel}</span>
+            <span className="text-fg text-2xl font-extrabold tabular-nums">{total}</span>
+          </div>
+        </div>
+      </div>
+
+      <ul className="flex w-full min-w-0 flex-col gap-3 sm:w-auto sm:flex-1">
+        {data.map((d) => (
+          <li key={d.label} className="flex items-center gap-3">
+            <span className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: colorFor(d.label) }} aria-hidden="true" />
+            <span className="text-fg-secondary min-w-0 flex-1 truncate text-sm">{d.label}</span>
+            <span className="text-fg text-sm font-semibold tabular-nums">{d.count}</span>
+            <span className="text-fg-muted w-10 text-right text-xs tabular-nums">{percent(d.count, d.label)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The gender split as a ring. */
+export function GenderDonut({ data }: { data: CountByLabel[] }) {
+  return (
+    <DonutChart
+      data={data}
+      colorFor={(label) => GENDER_COLOR[label] ?? "var(--fg-subtle)"}
+      totalLabel="Total"
+      emptyMessage="No students are enrolled yet."
+    />
+  );
+}
