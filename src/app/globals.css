@@ -333,6 +333,13 @@
       transparent 68%
     );
 
+  /* Categorical chart colours for gender (identity, not status). The pair
+     was run through the dataviz validator on both card surfaces: light
+     #eb6834 / #5f2ac4 on white, dark #d95926 / #8b5cf6 on ink-800 -- CVD
+     separation ~31 dE, every check passing. */
+  --chart-female: light-dark(#eb6834, #d95926);
+  --chart-male: light-dark(var(--orchid-600), var(--orchid-400));
+
   /* The sign-in screen's campus photograph sits under this: an even orchid-
      black dim, heavier at the foot where the caption is, and heavier again on
      dark so the photo never becomes the brightest thing on a dark screen. */

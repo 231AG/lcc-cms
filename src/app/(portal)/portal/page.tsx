@@ -32,7 +32,7 @@ import {
   Users,
 } from "lucide-react";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
-import { BarList, ColumnChart, StatTile, StatusBarList } from "@/components/charts/Charts";
+import { BarList, ColumnChart, GenderDonut, StatTile, StatusBarList } from "@/components/charts/Charts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { RecordPanel } from "@/components/ui/RecordPanel";
@@ -716,11 +716,11 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
             <CardTitle icon={<Users className="h-4 w-4" aria-hidden="true" />}>Students by gender</CardTitle>
           </CardHeader>
           <CardBody>
-            {/* "Not recorded" is a row here rather than an omission: gender
-                was added after most of these students were enrolled, so for
-                a while it is the largest bar, and a chart that hid it would
-                add up to less than the total beside it. */}
-            <BarList data={stats.byGender} emptyMessage="No students are enrolled yet." />
+            {/* "Not recorded" is a segment here rather than an omission:
+                gender was added after most of these students were enrolled,
+                so for a while it is the largest part, and a ring that hid it
+                would add up to less than the total in its centre. */}
+            <GenderDonut data={stats.byGender} />
           </CardBody>
         </Card>
       </div>
