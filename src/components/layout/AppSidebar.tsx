@@ -4,7 +4,6 @@ import Image from "next/image";
 import { LogOut, X } from "lucide-react";
 import type { Actor } from "@/lib/auth/session";
 import { signOutAction } from "@/app/actions";
-import { COLLEGE_MOTTO } from "@/lib/college";
 import { cn } from "@/components/ui/cn";
 import { navGroupsForRole } from "./navLinks";
 import { SidebarLink } from "./SidebarLink";
@@ -122,13 +121,13 @@ export function AppSidebar({ actor }: { actor: Actor }) {
         ))}
       </nav>
 
-      {/* The foot of the rail: signing out, then the College's motto.
+      {/* The foot of the rail: signing out.
           Log out is a form button rather than a link because signing out
           is an action, and it is styled apart from the nav items above --
           outlined, not filled on hover -- so it never reads as one more
           page to visit. Collapsed, it becomes an icon square like the rest
           of the rail (the :is(a, button) rule in globals.css). */}
-      <div className="shrink-0 border-t border-white/10 px-3 pt-3 pb-5">
+      <div className="shrink-0 border-t border-white/10 px-3 py-3">
         <form action={signOutAction}>
           <button
             type="submit"
@@ -140,7 +139,6 @@ export function AppSidebar({ actor }: { actor: Actor }) {
             <span className="sidebar-full-only">Log out</span>
           </button>
         </form>
-        <p className="sidebar-full-only text-sidebar-fg-muted mt-4 px-1 text-[11px] leading-snug">{COLLEGE_MOTTO}</p>
       </div>
     </aside>
   );
