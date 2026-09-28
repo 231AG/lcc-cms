@@ -1,30 +1,26 @@
 import { NextResponse } from "next/server";
 import { requireActor } from "@/lib/auth/session";
-import { runCourseGradesExport } from "@/lib/export/academicExport";
-import { courseGradesCsv } from "@/lib/export/semesterExportRows";
+import { runSemesterResultsExport } from "@/lib/export/academicExport";
+import { semesterResultsCsv } from "@/lib/export/semesterExportRows";
 import { AppError, ForbiddenError, ValidationError } from "@/lib/errors";
 
 /**
- * The course-grades file: one row per student per course.
- *
- * The request-scoped download of Section 8.4's "no scheduled processing"
- * model: a plain GET, not a Server Action, because a Server Action can't
- * hand back a file with its own Content-Type/Content-Disposition headers.
- * The response body is small enough at Phase 1's scale (ASM-03) to build in
- * memory rather than a true chunked stream.
+ * The semester-results file: one row per student -- semester GPA, CGPA as
+ * at the end of the semester, credits and standing. A plain GET for the
+ * same reason as the course-grades route beside it.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ semesterId: string }> }) {
   const { semesterId } = await params;
 
   try {
     const actor = await requireActor();
-    const { context, rows } = await runCourseGradesExport(actor, semesterId);
+    const { context, rows } = await runSemesterResultsExport(actor, semesterId, "CSV");
 
-    return new NextResponse(courseGradesCsv(rows), {
+    return new NextResponse(semesterResultsCsv(rows), {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="course-grades-${context.fileSlug}.csv"`,
+        "Content-Disposition": `attachment; filename="semester-results-${context.fileSlug}.csv"`,
         "Cache-Control": "no-store",
       },
     });
