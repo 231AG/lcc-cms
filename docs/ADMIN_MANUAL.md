@@ -54,7 +54,7 @@ around by typing a different URL.
   spreadsheet program. Every download is logged. If some students in that semester still have no published
   grade, you'll see a warning before you download.
 - **Grading policy** (`/grading-policy`): read-only view of the active grade scale and institution
-  settings — useful for checking what a letter grade converts to, or what the current credit ceiling is.
+  settings — useful for checking what a letter grade converts to.
 
 ## Super Admin workflows
 

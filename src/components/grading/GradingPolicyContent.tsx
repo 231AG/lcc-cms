@@ -22,12 +22,15 @@ type Setting = GradingPolicyView["settings"][number];
 const STANDING_KEYS = ["academic_standing_probation_below", "academic_standing_honours_at_or_above"];
 const RULE_KEYS = [
   "passing_grade_point",
-  "max_credits_per_semester",
   "credits_to_graduate",
   "incomplete_resolution_semesters",
   "gpa_decimal_places",
 ];
 const STUDENT_FACING = new Set([...STANDING_KEYS, ...RULE_KEYS]);
+/** Settings still stored but no longer applied anywhere, so shown to no
+ *  one: there is no per-semester credit ceiling any more (plans of any size
+ *  go to the Admin to approve or reject). */
+const RETIRED_KEYS = new Set(["max_credits_per_semester"]);
 
 /** Plain-English names for the marks that carry no score range. */
 const MARK_NAMES: Record<string, string> = {
@@ -127,13 +130,6 @@ export function GradingPolicyContent({
       note: failing.length ? `Anything below it is ${failing.join(" or ")}, a fail.` : "Anything below it is a fail.",
     });
   }
-  const maxCredits = num("max_credits_per_semester");
-  if (maxCredits !== null)
-    rules.push({
-      term: "Most credits in one semester",
-      value: plural(maxCredits, "credit hour", "credit hours"),
-      note: "A department may set a lower limit for its own students, never a higher one.",
-    });
   const toGraduate = num("credits_to_graduate");
   if (toGraduate !== null)
     rules.push({
@@ -170,7 +166,7 @@ export function GradingPolicyContent({
         }
       : null;
 
-  const configuration = policy.settings.filter((s) => !STUDENT_FACING.has(s.key));
+  const configuration = policy.settings.filter((s) => !STUDENT_FACING.has(s.key) && !RETIRED_KEYS.has(s.key));
 
   return (
     <>

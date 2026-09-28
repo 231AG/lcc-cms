@@ -9,7 +9,6 @@ import {
   coursePlanItem,
   courseOffering,
   coursePrerequisite,
-  department,
   institutionSetting,
   offeringMeeting,
   registration,
@@ -125,16 +124,13 @@ async function validatePlan(
     seenCourseIds.add(item.courseId);
   }
 
-  // V2 -- credit-hour ceiling (REQ-P05/REQ-C12). Institution default 21,
-  // a department may set the ceiling lower for its own students, never
-  // higher (CR-04). No credit-limit override exists in Phase 1 (DEC-36).
-  const institutionMax = (await getSetting<number>(tx, "max_credits_per_semester")) ?? 21;
-  const studentDept = await tx.query.department.findFirst({ where: eq(department.id, studentRow.departmentId) });
-  const effectiveMax = studentDept?.maxCreditsOverride != null ? Math.min(institutionMax, studentDept.maxCreditsOverride) : institutionMax;
-  const totalCredits = items.reduce((sum, i) => sum + (offeringById.get(i.offeringId)?.frozenCreditHours ?? 0), 0);
-  if (totalCredits > effectiveMax) {
-    blocking.push({ code: "V2", courseCode: "", message: `This plan totals ${totalCredits} credit hours; the maximum is ${effectiveMax}.` });
-  }
+  // No credit-hour ceiling. A plan of any size may be submitted; the
+  // Admin reviewing it sees its total and approves or rejects it. The
+  // ceiling that used to block submission here (institution default 21,
+  // lowered per department) was withdrawn at the College's request: it
+  // refused plans the office wanted to judge for itself, and a department
+  // override of 1 turned it into "the maximum is 1" for every student in
+  // that department. V2 now covers only the empty plan, above.
 
   // V5 -- availability. Offering must exist, belong to this semester, be
   // PUBLISHED, and (if capacity is set) have a remaining seat. This is a

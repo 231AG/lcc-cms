@@ -389,7 +389,8 @@ export default async function OfferingsPage({
               href={`/admin/offerings?${queryParams(addOpen ? {} : { add: "1" })}`}
               aria-expanded={addOpen}
               aria-controls={addOpen ? "add-offering-panel" : undefined}
-              className={buttonClasses("primary")}
+              title={addOpen ? "Close the Add Course Offering form" : "Add a course to this semester"}
+              className={buttonClasses(addOpen ? "close" : "primary")}
             >
               {addOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
               {addOpen ? "Close" : "Add Course Offering"}

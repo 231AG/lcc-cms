@@ -281,19 +281,16 @@ describe("V1 -- prerequisites", () => {
   });
 });
 
-describe("V2 -- credit-hour ceiling", () => {
-  it("blocks a plan totalling more than 21 credit hours", async () => {
+describe("V2 -- no credit-hour ceiling, only the empty plan", () => {
+  it("submits a plan of more than 21 credit hours for the Admin to judge", async () => {
     const { actor } = await enrollTestStudent();
     const plan = await getOrCreateDraftPlan(actor, registrationSemesterId);
     await addPlanItem(actor, plan.id, offeringB); // 19 credits
-    await addPlanItem(actor, plan.id, offeringD); // 3 credits -- 22 total, over the 21 ceiling
+    await addPlanItem(actor, plan.id, offeringD); // 3 credits -- 22 total
 
-    await expect(submitPlan(actor, plan.id)).rejects.toThrow(ValidationError);
-    try {
-      await submitPlan(actor, plan.id);
-    } catch (err) {
-      expect((err as ValidationError).message).toMatch(/credit hours/);
-    }
+    const result = await submitPlan(actor, plan.id);
+    expect(result.plan.status).toBe("SUBMITTED");
+    await rejectPlan(adminActor, plan.id, "cleanup");
   });
 
   it("refuses submitting an empty plan", async () => {
@@ -519,13 +516,9 @@ describe("admin-entered course plans (DEV-20)", () => {
     await rejectPlan(adminActor, plan.id, "cleanup");
   });
 
-  it("an admin-entered plan is validated by exactly the same rules -- the credit ceiling still blocks it", async () => {
+  it("an admin-entered plan is validated by exactly the same rules -- an empty one is still refused", async () => {
     const { id: studentId } = await enrollTestStudent();
     const plan = await getOrCreateDraftPlan(adminActor, registrationSemesterId, studentId);
-    // courseB is 19 credits; with courseA's 3 that exceeds the 21 ceiling,
-    // the same V2 failure a student would hit submitting this themselves.
-    await addPlanItem(adminActor, plan.id, offeringA);
-    await addPlanItem(adminActor, plan.id, offeringB);
     await expect(submitPlan(adminActor, plan.id)).rejects.toThrow(ValidationError);
   });
 

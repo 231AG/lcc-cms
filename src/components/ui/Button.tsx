@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "./cn";
 
-export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost" | "close";
 export type ButtonSize = "sm" | "md";
 
 // Disabled styling is a muted neutral surface + muted text rather than a
@@ -9,8 +9,10 @@ export type ButtonSize = "sm" | "md";
 // purple, which still looks clickable). `disabled:` utilities carry a
 // pseudo-class so they outrank the variant's own background regardless of the
 // order the classes are concatenated in.
+// `btn` carries no styling: it marks button-styled links as well as real
+// buttons for public/enhance.js, which gives each one a hover tooltip.
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors " +
+  "btn inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring " +
   "disabled:cursor-not-allowed disabled:border-disabled-line disabled:bg-disabled-surface disabled:text-disabled-fg";
 
@@ -23,6 +25,13 @@ const variants: Record<ButtonVariant, string> = {
     "hover:bg-secondary-surface-hover hover:border-secondary-line-hover active:bg-secondary-surface-active",
   danger: "bg-danger-solid text-on-solid hover:bg-danger-solid-hover active:bg-danger-solid-active",
   ghost: "bg-transparent text-brand-fg hover:bg-brand-subtle",
+  // For dismissing a panel the page opened (Add Student, Add Course
+  // Offering). Red says "this takes the form away" at a glance, but as an
+  // outline rather than a solid fill, because closing destroys nothing --
+  // the solid red stays reserved for Delete and Reject.
+  close:
+    "bg-surface text-danger-fg border border-danger-line " +
+    "hover:bg-danger-surface active:bg-danger-surface",
 };
 
 const sizes: Record<ButtonSize, string> = {
