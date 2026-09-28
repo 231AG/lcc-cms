@@ -34,6 +34,17 @@ const GRADE_SCALE_V1 = [
   { letter: "I", minScore: null, maxScore: null, gradePoint: null, isPassing: false, displayOrder: 10 },
 ] as const;
 
+/** The older plain letters on the College's grade sheets before the current
+ *  scale (decided 28 Sep 2026). Past records only -- see 0031 and
+ *  gradeScale.isLegacy. Here as well as in the migration so a freshly
+ *  migrated, empty database ends up with them too. */
+const LEGACY_LETTERS_V1 = [
+  { letter: "A", gradePoint: "4.00", displayOrder: 11 },
+  { letter: "B", gradePoint: "3.00", displayOrder: 12 },
+  { letter: "C", gradePoint: "2.00", displayOrder: 13 },
+  { letter: "D", gradePoint: "1.00", displayOrder: 14 },
+] as const;
+
 /**
  * The permission matrix as data (plan Section 11.3), grown one action at a
  * time as each stage's real services are built. Stage 2 adds only the
@@ -332,6 +343,24 @@ async function main() {
         countsInEarned: entry.isPassing,
         isPassing: entry.isPassing,
         displayOrder: entry.displayOrder,
+      })
+      .onConflictDoNothing();
+  }
+  for (const entry of LEGACY_LETTERS_V1) {
+    await db
+      .insert(schema.gradeScale)
+      .values({
+        policyVersion: 1,
+        letter: entry.letter,
+        minScore: null,
+        maxScore: null,
+        gradePoint: entry.gradePoint,
+        countsInGpa: true,
+        countsInAttempted: true,
+        countsInEarned: true,
+        isPassing: true,
+        displayOrder: entry.displayOrder,
+        isLegacy: true,
       })
       .onConflictDoNothing();
   }

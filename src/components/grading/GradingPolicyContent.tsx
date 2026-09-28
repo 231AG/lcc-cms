@@ -109,7 +109,8 @@ export function GradingPolicyContent({
   };
 
   const scored = policy.scale.filter((r) => r.minScore !== null && r.maxScore !== null);
-  const unscored = policy.scale.filter((r) => r.minScore === null || r.maxScore === null);
+  const unscored = policy.scale.filter((r) => (r.minScore === null || r.maxScore === null) && !r.isLegacy);
+  const legacy = policy.scale.filter((r) => r.isLegacy);
 
   // The pass mark is read off the scale itself: the lowest score that still
   // lands on a passing letter.
@@ -239,6 +240,24 @@ export function GradingPolicyContent({
                           ? ` It must be resolved within ${plural(incompleteWithin, "semester", "semesters")}.`
                           : null}
                       </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
+            {legacy.length > 0 && (
+              <div className="border-line-subtle mt-6 border-t pt-5">
+                <h3 className="text-fg text-sm font-bold">Older grades</h3>
+                <p className="text-fg-secondary mt-1 text-sm leading-relaxed">
+                  Grade sheets issued before this scale used plain letters. They are kept exactly as issued on past
+                  records and count toward GPA at these values. New grades always use the scale above.
+                </p>
+                <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
+                  {legacy.map((row) => (
+                    <div key={row.letter} className="flex items-baseline gap-2">
+                      <dt className="text-fg text-xl leading-none font-extrabold">{row.letter}</dt>
+                      <dd className="text-fg-secondary text-sm tabular-nums">{row.gradePoint}</dd>
                     </div>
                   ))}
                 </dl>

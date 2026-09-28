@@ -218,6 +218,13 @@
       "when": 1788986400000,
       "tag": "0030_single_section_per_offering",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789080000000,
+      "tag": "0031_legacy_letter_grades",
+      "breakpoints": true
     }
   ]
 }

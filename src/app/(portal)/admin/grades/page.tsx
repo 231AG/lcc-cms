@@ -51,7 +51,8 @@ export default async function GradesPage({
     ]),
   );
   const activeVersion = scale.length > 0 ? Math.max(...scale.map((s) => s.policyVersion)) : 0;
-  const activeScale = scale.filter((s) => s.policyVersion === activeVersion);
+  // Older letters (plain A-D) are for past records only, never for a class.
+  const activeScale = scale.filter((s) => s.policyVersion === activeVersion && !s.isLegacy);
 
   const yearLabel = (semId: string) => {
     const sem = semesters.find((s) => s.id === semId);

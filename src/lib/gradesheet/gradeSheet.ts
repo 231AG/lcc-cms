@@ -188,7 +188,10 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
       // component stays pure presentation and the screen table that reads
       // this same function cannot disagree with the printed sheet.
       code: formatCourseCode(r.courseCodeSnapshot),
-      creditHours: new Decimal(r.creditHours).toFixed(0),
+      // As recorded, without forcing whole numbers: past sheets carry
+      // half-hour courses (Christian Service, 0.5), which toFixed(0) printed
+      // as 1. Decimal's toString drops the stored trailing ".0" of 3.0.
+      creditHours: new Decimal(r.creditHours).toString(),
       letter: r.letter,
       gradePoint: r.gradePoint === null ? null : roundHalfUp(r.gradePoint, 2),
       gradePoints: points === null ? null : roundHalfUp(points, 2),
@@ -232,8 +235,11 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
         ? `Cumulative GPA ${cumulative.cgpa ?? "—"}`
         : "Not available until this student's record is complete.",
     },
+    // An older letter (plain A-D) appears in the key only on a sheet that
+    // actually carries one, so a current sheet prints the current scale and
+    // a past sheet still explains every letter on it.
     gradingScale: scaleRows
-      .filter((r) => r.policyVersion === activeVersion)
+      .filter((r) => r.policyVersion === activeVersion && (!r.isLegacy || records.some((rec) => rec.letter === r.letter)))
       .map((r) => ({
         letter: r.letter,
         range: formatRange(r.minScore, r.maxScore),
