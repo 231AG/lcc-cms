@@ -39,6 +39,8 @@ export function StudentsHeader({
           canEnrol ? (
             <Button
               type="button"
+              variant={open ? "close" : "primary"}
+              title={open ? "Close the Add Student form" : "Enrol a new student"}
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
               aria-controls="enrol-student-panel"

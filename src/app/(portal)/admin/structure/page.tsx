@@ -252,12 +252,6 @@ export default async function AcademicStructurePage({
             </Label>
             <Input id="dept-name" name="name" required />
           </div>
-          <div>
-            <Label className="text-xs" htmlFor="dept-max">
-              Credit ceiling (optional)
-            </Label>
-            <Input id="dept-max" name="maxCreditsOverride" type="number" min={1} max={21} className="w-24" />
-          </div>
           <SubmitButton pendingLabel="Adding…">Add department</SubmitButton>
         </form>
         <TableCard

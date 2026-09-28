@@ -29,7 +29,7 @@ export function Tooltip({
   className?: string;
 }) {
   return (
-    <span className={cn("group/tip relative", className ?? "inline-flex")}>
+    <span data-tooltip-wrap="" className={cn("group/tip relative", className ?? "inline-flex")}>
       {children}
       <span
         aria-hidden="true"

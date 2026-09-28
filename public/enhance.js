@@ -51,6 +51,26 @@
     }
   });
 
+  // --- Button tooltips -------------------------------------------------------
+  // Every button, and every link styled as one (the `btn` marker class from
+  // Button.tsx), gets a small native tooltip naming what it does: its
+  // aria-label, else its visible text. Set at the moment of hover rather
+  // than once at load, so a button whose label changes (Add Student / Close)
+  // always shows the current one. A title the markup set on purpose is
+  // left alone, and so is anything inside the styled Tooltip component,
+  // which already draws its own.
+  document.addEventListener("mouseover", function (event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    var el = target.closest("button, .btn, [role='button']");
+    if (!el || el.closest("[data-tooltip-wrap]")) return;
+    if (el.hasAttribute("title") && !el.hasAttribute("data-auto-title")) return;
+    var label = (el.getAttribute("aria-label") || el.textContent || "").replace(/\s+/g, " ").trim();
+    if (!label) return;
+    el.setAttribute("title", label);
+    el.setAttribute("data-auto-title", "");
+  });
+
   // --- Auto-submitting filters -----------------------------------------------
   // A filter <select> marked `data-auto-submit` applies as soon as you choose
   // a value, instead of making you find an Apply button afterwards. The button

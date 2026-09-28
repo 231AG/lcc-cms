@@ -498,6 +498,28 @@ body {
   font-family: var(--font-body), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* A hand over everything that does something when clicked. Tailwind's reset
+   leaves buttons on the default arrow, which reads as "not clickable".
+   Layered as base so a utility such as disabled:cursor-not-allowed still
+   wins where a control is switched off. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* One family across headings and body, as the design reference does. The
    rule stays here rather than on every component so a page's own <h2>/<h3>
    is covered without being touched. Headings carry their weight and
