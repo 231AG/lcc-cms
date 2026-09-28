@@ -621,7 +621,7 @@ html[data-sidebar="collapsed"] .sidebar-rail-only {
 
 /* Collapsed, a nav item becomes a square centred in the rail rather than a
    full-width pill with an icon pushed to one end of it. */
-html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
+html[data-sidebar="collapsed"] .app-sidebar :is(a, button).sidebar-rail-center {
   width: 2.75rem;
   margin-inline: auto;
   padding-inline: 0;
@@ -679,7 +679,7 @@ html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
     display: none;
   }
 
-  html[data-sidebar="collapsed"] .app-sidebar a.sidebar-rail-center {
+  html[data-sidebar="collapsed"] .app-sidebar :is(a, button).sidebar-rail-center {
     width: auto;
     margin-inline: 0;
     padding-inline: 0.75rem;

@@ -42,6 +42,7 @@ import { SemesterResultsPicker, SemesterResultsTable } from "@/components/grades
 import { buttonClasses } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ClipboardList, Printer } from "lucide-react";
+import { COLLEGE_MOTTO } from "@/lib/college";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -320,8 +321,8 @@ export default async function PortalPage({
               }
               description={`Student ID ${record.studentNumber}`}
               actions={
-                <p className="text-brand-fg border-accent hidden border-b-2 pb-1 text-sm font-semibold italic sm:block">
-                  Building Character &middot; Shaping Tomorrow
+                <p className="text-brand-fg border-accent hidden max-w-[17rem] border-b-2 pb-1 text-right text-sm leading-snug font-semibold sm:block">
+                  {COLLEGE_MOTTO}
                 </p>
               }
             />

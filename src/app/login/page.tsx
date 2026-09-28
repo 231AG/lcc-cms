@@ -45,7 +45,7 @@ export default async function LoginPage({
       className="max-w-[27rem]"
       backdrop={
         <>
-          {/* Decorative: the building is named in the caption below, so the
+          {/* Decorative: the campus is named in the caption below, so the
               image itself stays out of the accessibility tree. Softly blurred
               so it reads as a setting behind the card rather than competing
               with it; scaled up slightly so the blur has no pale edge. */}
@@ -62,7 +62,7 @@ export default async function LoginPage({
               the caption read against it in either theme. */}
           <div className="photo-scrim absolute inset-0" />
           <p className="absolute bottom-4 left-5 text-xs font-medium text-white/85 sm:bottom-6 sm:left-6">
-            Patrick Pieters Building, Liberia Christian College
+            Liberia Christian College &middot; Main Campus, 5th Street
           </p>
         </>
       }
