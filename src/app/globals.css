@@ -971,3 +971,13 @@ html[data-sidebar="collapsed"] .app-sidebar :is(a, button).sidebar-rail-center {
     margin: 0 !important;
   }
 }
+
+/* Login slips: portrait A4, slips kept whole across page breaks. */
+@media print {
+  .login-slips {
+    max-width: none;
+  }
+  .login-slip {
+    break-inside: avoid;
+  }
+}

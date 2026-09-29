@@ -36,9 +36,9 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reason?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, reason } = await searchParams;
 
   return (
     <FocusedScreen
@@ -94,6 +94,11 @@ export default async function LoginPage({
           </div>
 
           <div className="mt-6">
+            {reason === "idle" && !error && (
+              <Alert tone="info" className="mb-5">
+                You were signed out after an hour without activity. Sign in again to continue.
+              </Alert>
+            )}
             {error === "disabled" && (
               <Alert tone="danger" className="mb-5">
                 This account has been disabled. Contact the Admin office.

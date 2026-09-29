@@ -12,6 +12,7 @@ import {
   GraduationCap,
   History,
   Hourglass,
+  KeyRound,
   FileUp,
   Network,
   Scale,
@@ -83,6 +84,7 @@ export const ADMIN_GROUPS: NavGroup[] = [
       { href: "/admin/students", label: "Student Listing", icon: Users },
       { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
       { href: "/admin/historical/import", label: "Import past grades", icon: FileUp },
+      { href: "/admin/login-slips", label: "Login slips", icon: KeyRound },
     ],
   },
   {
