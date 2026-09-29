@@ -24,6 +24,7 @@ const RULE_KEYS = [
   "passing_grade_point",
   "credits_to_graduate",
   "incomplete_resolution_semesters",
+  "no_grade_resolution_semesters",
   "gpa_decimal_places",
 ];
 const STUDENT_FACING = new Set([...STANDING_KEYS, ...RULE_KEYS]);
@@ -35,6 +36,7 @@ const RETIRED_KEYS = new Set(["max_credits_per_semester"]);
 /** Plain-English names for the marks that carry no score range. */
 const MARK_NAMES: Record<string, string> = {
   I: "Incomplete",
+  NG: "No Grade",
   W: "Withdrawn",
   AU: "Audit",
   P: "Pass",
@@ -145,6 +147,13 @@ export function GradingPolicyContent({
       value: `Within ${plural(incompleteWithin, "semester", "semesters")}`,
       note: "An I must be replaced by a final grade within this time.",
     });
+  const noGradeWithin = num("no_grade_resolution_semesters");
+  if (noGradeWithin !== null)
+    rules.push({
+      term: "Settling a No Grade",
+      value: `Within ${plural(noGradeWithin, "semester", "semesters")}`,
+      note: "An NG not settled within this time is recorded as F.",
+    });
   const places = num("gpa_decimal_places");
   if (places !== null)
     rules.push({
@@ -239,6 +248,9 @@ export function GradingPolicyContent({
                         {row.letter === "I" && incompleteWithin !== null
                           ? ` It must be resolved within ${plural(incompleteWithin, "semester", "semesters")}.`
                           : null}
+                        {row.letter === "NG" && noGradeWithin !== null
+                          ? ` It must be settled within ${plural(noGradeWithin, "semester", "semesters")}; after that it is recorded as F.`
+                          : null}
                       </dd>
                     </div>
                   ))}
@@ -251,7 +263,8 @@ export function GradingPolicyContent({
                 <h3 className="text-fg text-sm font-bold">Older grades</h3>
                 <p className="text-fg-secondary mt-1 text-sm leading-relaxed">
                   Grade sheets issued before this scale used plain letters. They are kept exactly as issued on past
-                  records and count toward GPA at these values. New grades always use the scale above.
+                  records and count toward GPA at these values. A plain D in the student&rsquo;s own department must be
+                  repeated, the same as D+ and D-. New grades always use the scale above.
                 </p>
                 <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
                   {legacy.map((row) => (

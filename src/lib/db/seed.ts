@@ -45,6 +45,10 @@ const LEGACY_LETTERS_V1 = [
   { letter: "D", gradePoint: "1.00", displayOrder: 14 },
 ] as const;
 
+/** NG, No Grade (decided 29 Sep 2026): not counted anywhere, settled within
+ *  two semesters or recorded as F. See 0032. */
+const NO_GRADE_V1 = { letter: "NG", displayOrder: 15 } as const;
+
 /**
  * The permission matrix as data (plan Section 11.3), grown one action at a
  * time as each stage's real services are built. Stage 2 adds only the
@@ -301,6 +305,7 @@ const INSTITUTION_SETTINGS: Array<{ key: string; value: unknown; description: st
   { key: "gpa_decimal_places", value: 3, description: "REQ-C10, CR-03. Half-up, applied once at presentation." },
   { key: "passing_grade_point", value: "0.70", description: "REQ-C11, CR-05. Minimum passing grade is D- (0.70)." },
   { key: "incomplete_resolution_semesters", value: 1, description: "REQ-C14, CR-13. An Incomplete must be resolved within one semester." },
+  { key: "no_grade_resolution_semesters", value: 2, description: "Decided 29 Sep 2026. An NG (No Grade) must be settled within two semesters; after that it is recorded as F." },
   { key: "academic_standing_probation_below", value: "2.000", description: "REQ-C15, CR-14." },
   { key: "academic_standing_honours_at_or_above", value: "3.500", description: "REQ-C15, CR-14." },
   { key: "institution_display_timezone", value: "Africa/Monrovia", description: "DER-27." },
@@ -364,6 +369,22 @@ async function main() {
       })
       .onConflictDoNothing();
   }
+
+  await db
+    .insert(schema.gradeScale)
+    .values({
+      policyVersion: 1,
+      letter: NO_GRADE_V1.letter,
+      minScore: null,
+      maxScore: null,
+      gradePoint: null,
+      countsInGpa: false,
+      countsInAttempted: false,
+      countsInEarned: false,
+      isPassing: false,
+      displayOrder: NO_GRADE_V1.displayOrder,
+    })
+    .onConflictDoNothing();
 
   console.log("Seeding permission (Stage 2 + 3 + 4 + 5 + 6 + 8 + 9 + 10 + 11 actions)...");
   for (const row of [...PERMISSIONS_STAGE_2, ...PERMISSIONS_STAGE_3, ...PERMISSIONS_STAGE_4, ...PERMISSIONS_STAGE_5, ...PERMISSIONS_STAGE_6, ...PERMISSIONS_STAGE_8, ...PERMISSIONS_STAGE_9, ...PERMISSIONS_STAGE_10, ...PERMISSIONS_STAGE_11]) {

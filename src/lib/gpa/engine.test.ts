@@ -302,6 +302,16 @@ describe("B.4 Mandatory repeat obligations", () => {
     expect(deriveMandatoryRepeatObligations(records, resolveRepeats(records))).toHaveLength(1);
   });
 
+  it("an older plain D in the student's own department must be repeated too; in another department it need not", () => {
+    const d = (major: boolean) => ({ ...rec("X", 3, "D-", { major }), letter: "D", gradePoint: "1.00" });
+    const inMajor = [d(true)];
+    expect(deriveMandatoryRepeatObligations(inMajor, resolveRepeats(inMajor))).toEqual([
+      { recordId: inMajor[0].id, courseCodeKey: "X", reason: "D_MAJOR" },
+    ]);
+    const outside = [d(false)];
+    expect(deriveMandatoryRepeatObligations(outside, resolveRepeats(outside))).toHaveLength(0);
+  });
+
   it("F-21: D+ in another department creates no obligation; credit is earned", () => {
     const records = [rec("X", 3, "D+", { major: false })];
     expect(records[0].countsInEarned).toBe(true);

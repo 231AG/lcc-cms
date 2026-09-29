@@ -10,9 +10,20 @@ import { courseCodeKey } from "@/lib/courses/courseCode";
  * The standard is "nothing wrong goes in". A sheet is imported whole or
  * not at all, and only when every check passes -- a problem anywhere on a
  * sheet holds the whole sheet back, because a student's semester with one
- * course missing is a wrong record, not a partial one. Nothing is guessed
- * or corrected here: a value that doesn't check out is reported with the
- * CSV line it came from, for someone to settle against the paper sheet.
+ * course missing is a wrong record, not a partial one. Grades are never
+ * guessed or corrected here: a value that doesn't check out is reported
+ * with the CSV line it came from, for someone to settle against the paper
+ * sheet.
+ *
+ * Two things ARE settled here, both as the College decided (29 Sep 2026)
+ * and both shown on the preview before anything is saved:
+ *  - The student's ID. The IDs held in the system are the right ones. When
+ *    a student appears in the file under more than one ID and a sheet's ID
+ *    is blank or not in the system, the sheet goes to the one record in the
+ *    system that both carries the student's name and is one of the IDs the
+ *    file itself uses for them. Anything less certain is held back.
+ *  - A past semester missing from the Academic calendar is created, with
+ *    dates copied from the calendar's own pattern for that semester.
  */
 
 // ---------------------------------------------------------------------------
@@ -78,10 +89,12 @@ export const REQUIRED_COLUMNS = [
  *  ("Freshman English II") the catalogue can't be matched on. */
 export const OPTIONAL_COLUMNS = ["course_code", "flags", "notes"] as const;
 
-/** Extraction flags this importer re-checks for itself; every other flag
- *  still on a row means the extraction was unsure, so the row is held
- *  until someone has checked it and cleared the flag. */
-const RECHECKED_FLAGS = new Set(["GPA_MISMATCH", "LETTER_NOT_STANDARD"]);
+/** Extraction flags this importer re-checks for itself -- the GPA, the
+ *  letter, the points, a blank ID, a course twice, a sheet with no
+ *  courses. Every other flag still on a row (UNREADABLE, SEMESTER_UNCLEAR,
+ *  or one added by hand to hold a row back) means someone must look at
+ *  the paper first, so the row is held until the flag is cleared. */
+const RECHECKED_FLAGS = new Set(["GPA_MISMATCH", "LETTER_NOT_STANDARD", "POINTS_MISMATCH", "MISSING_ID", "DUPLICATE_COURSE", "NO_COURSES"]);
 
 // ---------------------------------------------------------------------------
 // Context supplied by the database layer
@@ -121,6 +134,15 @@ export interface ExistingRecord {
   letter: string;
 }
 
+/** An academic year in the calendar, for copying its dates to a year or
+ *  semester that isn't there yet. Dates are "YYYY-MM-DD". */
+export interface CalendarYear {
+  label: string;
+  startDate: string;
+  endDate: string;
+  semesters: Array<{ sequence: number; startDate: string; endDate: string }>;
+}
+
 export interface ImportContext {
   letters: Map<string, ScaleLetter>;
   /** By Student ID, trimmed. */
@@ -130,6 +152,10 @@ export interface ImportContext {
   courses: ContextCourse[];
   /** Non-void records already on file, by student id. */
   existing: Map<string, ExistingRecord[]>;
+  /** The Academic calendar, for creating a missing past semester. */
+  calendar: CalendarYear[];
+  /** "Now", passed in so the analysis stays pure. */
+  today: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,16 +173,40 @@ export interface ImportCourse {
   repeatOf: string | null;
 }
 
+/** A past semester (and, if needed, its academic year) the import will
+ *  create in the Academic calendar before it imports into it. */
+export interface PlannedSemester {
+  /** `${yearLabel}|${sequence}` -- the same key as ImportContext.semesters. */
+  key: string;
+  yearLabel: string;
+  /** Set when the academic year itself must be created too. */
+  newYear: { startDate: string; endDate: string } | null;
+  sequence: 1 | 2;
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface ImportSheet {
   key: string;
   sourceFile: string;
   page: string;
   sheetNo: string;
   lines: string;
+  /** The Student ID the sheet goes in under -- the system's, when it was
+   *  settled from the file (see `idNote`). */
   studentNumber: string;
+  /** The Student ID as printed on the sheet. */
+  printedStudentNumber: string;
+  /** Why `studentNumber` differs from the printed ID; null when it doesn't. */
+  idNote: string | null;
   nameOnSheet: string;
+  /** "2024/2025 — Semester II", as the sheet's header reads, whether or not
+   *  the semester exists -- so a held-back sheet still says which one. */
+  semesterWanted: string;
   student: { id: string; name: string } | null;
-  semester: { id: string; label: string; sortKey: number } | null;
+  /** `id` is null until a planned semester is created at import. */
+  semester: { id: string | null; label: string; sortKey: number; create: PlannedSemester | null } | null;
   printedGpa: string;
   computedGpa: string | null;
   courses: ImportCourse[];
@@ -271,6 +321,58 @@ export function academicYearFor(sheetYear: string, sequence: number): { label: s
   return { problem: `Year "${y || "(blank)"}" is not a year.` };
 }
 
+/** "2025-02-03" moved by whole years; 29 February becomes the 28th. */
+function shiftYears(date: string, years: number): string {
+  const [y, m, d] = date.slice(0, 10).split("-").map(Number);
+  const year = y + years;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const day = m === 2 && d === 29 && !leap ? 28 : d;
+  return `${year}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+const yearStartOf = (label: string) => Number(label.slice(0, 4));
+
+/**
+ * The dates for a past semester the calendar doesn't hold yet, copied from
+ * the nearest academic year that does hold that semester, moved by whole
+ * years -- the College's own calendar pattern, not a guess. A missing
+ * academic year is copied the same way. Refused when no year has that
+ * semester to copy, when the copy would not fit an academic year that
+ * already exists, or when it would not have ended yet.
+ */
+export function planPastSemester(
+  yearLabel: string,
+  sequence: 1 | 2,
+  calendar: CalendarYear[],
+  today: Date,
+): { plan: PlannedSemester } | { problem: string } {
+  const name = `Semester ${sequence === 1 ? "I" : "II"}`;
+  const full = `${yearLabel} — ${name}`;
+  const target = yearStartOf(yearLabel);
+  const templates = calendar
+    .filter((y) => /^\d{4}\/\d{4}$/.test(y.label) && y.semesters.some((x) => x.sequence === sequence))
+    .sort((a, b) => Math.abs(yearStartOf(a.label) - target) - Math.abs(yearStartOf(b.label) - target) || yearStartOf(b.label) - yearStartOf(a.label));
+  const template = templates[0];
+  if (!template)
+    return { problem: `${full} does not exist in the Academic calendar, and no other year has a ${name} to copy its dates from. Create it in the Academic calendar first.` };
+
+  const shift = target - yearStartOf(template.label);
+  const tSem = template.semesters.find((x) => x.sequence === sequence)!;
+  const startDate = shiftYears(tSem.startDate, shift);
+  const endDate = shiftYears(tSem.endDate, shift);
+  const existingYear = calendar.find((y) => y.label === yearLabel);
+  const newYear = existingYear ? null : { startDate: shiftYears(template.startDate, shift), endDate: shiftYears(template.endDate, shift) };
+  const yearStart = existingYear?.startDate ?? newYear!.startDate;
+  const yearEnd = existingYear?.endDate ?? newYear!.endDate;
+  if (startDate < yearStart.slice(0, 10) || endDate > yearEnd.slice(0, 10))
+    return {
+      problem: `${full} does not exist in the Academic calendar, and the dates copied from ${template.label} (${startDate} to ${endDate}) fall outside ${yearLabel}. Create it in the Academic calendar first.`,
+    };
+  if (new Date(endDate) >= today)
+    return { problem: `${full} does not exist in the Academic calendar, and copied from ${template.label} it would end on ${endDate}, which has not passed yet.` };
+  return { plan: { key: `${yearLabel}|${sequence}`, yearLabel, newYear, sequence, name, startDate, endDate } };
+}
+
 function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(4)));
 }
@@ -305,6 +407,11 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
 
   const catalogueByKey = new Map(ctx.courses.map((c) => [courseCodeKey(c.code), c]));
 
+  // Every sheet's printed ID and name, for settling a student's ID from the
+  // other sheets the file has for them.
+  const heads = [...groups].map(([key, rs]) => ({ key, id: rs[0].student_id, name: rs[0].student_name }));
+  const fullName = (st: ContextStudent) => [st.firstName, st.middleName, st.lastName].filter(Boolean).join(" ");
+
   const sheets: ImportSheet[] = [];
   for (const [key, rs] of groups) {
     const h = rs[0];
@@ -317,19 +424,48 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
       if (values.size > 1) problems.push(`The rows of this sheet disagree on ${col}: ${[...values].map((v) => `"${v}"`).join(", ")}.`);
     }
 
-    // Student.
-    const studentNumber = h.student_id;
-    const record = studentNumber ? ctx.students.get(studentNumber) : undefined;
+    // Student. The ID printed on the sheet, unless it is blank or not in
+    // the system and the file settles it: this student's name is also on
+    // other sheets, under an ID that IS in the system with this name --
+    // exactly one such ID, or nothing is settled.
+    const printedStudentNumber = h.student_id;
+    let studentNumber = printedStudentNumber;
+    let record = studentNumber ? ctx.students.get(studentNumber) : undefined;
+    let idNote: string | null = null;
+    let idUnsettled = false;
+    if (!record && h.student_name) {
+      const fileIds = new Set(
+        heads.filter((o) => o.key !== key && o.id && o.id !== printedStudentNumber && mayBeSamePerson(o.name, h.student_name)).map((o) => o.id),
+      );
+      const inSystem = [...fileIds].filter((id) => {
+        const st = ctx.students.get(id);
+        return st && namesMatch(st, h.student_name);
+      });
+      if (inSystem.length === 1) {
+        studentNumber = inSystem[0];
+        record = ctx.students.get(studentNumber);
+        idNote = printedStudentNumber
+          ? `The sheet says ID ${printedStudentNumber}, which is not in the system. This student's other sheets use ${studentNumber}, the system's ID for ${fullName(record!)}, so it goes in under ${studentNumber}.`
+          : `The sheet has no Student ID. This student's other sheets use ${studentNumber}, the system's ID for ${fullName(record!)}, so it goes in under ${studentNumber}.`;
+      } else if (inSystem.length > 1) {
+        idUnsettled = true;
+        problems.push(`This student's sheets use IDs ${inSystem.join(" and ")}, and the system has "${h.student_name}" under each. Confirm which record is this student's.`);
+      }
+    }
     let student: ImportSheet["student"] = null;
-    if (!studentNumber) problems.push("No Student ID on this sheet.");
+    if (idUnsettled) {
+      // Already explained above.
+    } else if (!studentNumber) problems.push("No Student ID on this sheet, and no other sheet in the file settles it.");
     else if (!record) problems.push(`No student with ID ${studentNumber} exists in the system.`);
     else {
-      const recordName = [record.firstName, record.middleName, record.lastName].filter(Boolean).join(" ");
+      const recordName = fullName(record);
       student = { id: record.id, name: recordName };
       if (!h.student_name) problems.push(`No name on this sheet to confirm ID ${studentNumber} belongs to ${recordName}.`);
-      else if (!namesMatch(record, h.student_name))
+      else if (!namesMatch(record, h.student_name)) {
         problems.push(`ID ${studentNumber} belongs to ${recordName}, but this sheet is for "${h.student_name}". The ID or the name is wrong.`);
-      else {
+        // Not this student's sheet: nothing below may treat it as theirs.
+        student = null;
+      } else {
         // Another record the same name also fits: the student may have been
         // enrolled twice, and these grades must land on the right one.
         const others = [...ctx.students.entries()].filter(([num, s]) => num !== studentNumber && s.id !== record.id && namesMatch(s, h.student_name));
@@ -340,8 +476,9 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
       }
     }
 
-    // Semester.
+    // Semester: the one in the calendar, or a past one to be created.
     let semester: ImportSheet["semester"] = null;
+    let semesterWanted = [h.sheet_year && `Year ${h.sheet_year}`, h.semester_number && `Semester ${h.semester_number}`].filter(Boolean).join(", ");
     const seq = Number(h.semester_number);
     if (seq !== 1 && seq !== 2) problems.push(`Semester "${h.semester_number || "(blank)"}" is not 1 or 2.`);
     else {
@@ -350,13 +487,22 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
       else {
         const sem = ctx.semesters.get(`${year.label}|${seq}`);
         const name = `${year.label} — Semester ${seq === 1 ? "I" : "II"}`;
-        if (!sem) problems.push(`${name} does not exist in the Academic calendar. Create it as a past semester first.`);
-        else {
-          semester = { id: sem.id, label: sem.label, sortKey: sem.sortKey };
+        semesterWanted = name;
+        let startYear: number | null = null;
+        if (sem) {
+          semester = { id: sem.id, label: sem.label, sortKey: sem.sortKey, create: null };
+          startYear = sem.startYear;
           if (!sem.hasEnded) problems.push(`${name} has not ended yet, so it cannot take past records.`);
-          if (record && sem.startYear < record.enrolmentYear)
-            problems.push(`${name} is before this student's enrolment year (${record.enrolmentYear}).`);
+        } else {
+          const planned = planPastSemester(year.label, seq, ctx.calendar, ctx.today);
+          if ("problem" in planned) problems.push(planned.problem);
+          else {
+            semester = { id: null, label: name, sortKey: yearStartOf(year.label) * 10 + seq, create: planned.plan };
+            startYear = Number(planned.plan.startDate.slice(0, 4));
+          }
         }
+        if (record && startYear !== null && startYear < record.enrolmentYear)
+          problems.push(`${name} is before this student's enrolment year (${record.enrolmentYear}).`);
       }
     }
 
@@ -374,7 +520,7 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
         .map((f) => f.trim())
         .filter((f) => f && !RECHECKED_FLAGS.has(f));
       if (heldFlags.length)
-        problems.push(`${label}: still flagged ${heldFlags.join(", ")} by the extraction${r.notes ? ` (${r.notes})` : ""}. Check it against the paper sheet and clear the flag.`);
+        problems.push(`${label}: flagged ${heldFlags.join(", ")}${r.notes ? ` (${r.notes})` : ""}. It is held until someone has checked it against the paper sheet and cleared the flag.`);
 
       // Which catalogue course.
       let code: string | null = null;
@@ -459,7 +605,10 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
       sheetNo: h.sheet_no,
       lines: rs.length > 1 ? `${rs[0]._line}–${rs[rs.length - 1]._line}` : rs[0]._line,
       studentNumber,
+      printedStudentNumber,
+      idNote,
       nameOnSheet: h.student_name,
+      semesterWanted,
       student,
       semester,
       printedGpa: h.sheet_gpa,
@@ -470,17 +619,38 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
     });
   }
 
-  // The same person under different Student IDs in this file: at most one
-  // of those IDs is right, so none of their sheets goes in until it is
-  // settled.
-  const named = sheets.filter((s) => s.studentNumber && s.nameOnSheet);
-  for (const s of named) {
-    const others = named.filter((o) => o.studentNumber !== s.studentNumber && mayBeSamePerson(o.nameOnSheet, s.nameOnSheet));
+  // One Student ID printed for two different people in the same semester:
+  // neither sheet can be trusted to be that ID's, so neither goes in for
+  // that semester (decided 29 Sep 2026).
+  const byPrintedId = new Map<string, ImportSheet[]>();
+  for (const s of sheets)
+    if (s.printedStudentNumber) {
+      const k = `${s.printedStudentNumber}|${s.semesterWanted}`;
+      byPrintedId.set(k, [...(byPrintedId.get(k) ?? []), s]);
+    }
+  for (const group of byPrintedId.values()) {
+    const people = group.filter((s, i) => group.findIndex((o) => mayBeSamePerson(o.nameOnSheet, s.nameOnSheet) || o.nameOnSheet === s.nameOnSheet) === i);
+    if (people.length > 1)
+      for (const s of group)
+        s.problems.push(
+          `Student ID ${s.printedStudentNumber} is printed for ${people.map((o) => `"${o.nameOnSheet}"`).join(" and ")} in ${s.semesterWanted} (${group
+            .filter((o) => o !== s)
+            .map((o) => `${o.sourceFile} sheet ${o.sheetNo}`)
+            .join("; ")}). Neither is imported for this semester.`,
+        );
+  }
+
+  // The same person landing on two different student records: a sheet was
+  // matched to one record and another sheet of theirs to a different one.
+  // One student has one record, so none of their sheets goes in.
+  const placed = sheets.filter((s) => s.student && s.nameOnSheet);
+  for (const s of placed) {
+    const others = placed.filter((o) => o.student!.id !== s.student!.id && mayBeSamePerson(o.nameOnSheet, s.nameOnSheet));
     if (others.length)
       s.problems.push(
         `"${s.nameOnSheet}" (ID ${s.studentNumber}) looks like the same student as ${others
           .map((o) => `"${o.nameOnSheet}" (ID ${o.studentNumber}, ${o.sourceFile} sheet ${o.sheetNo})`)
-          .join("; ")}. One student has one Student ID: confirm the right one.`,
+          .join("; ")}, who is a different student in the system. Confirm which record is theirs.`,
       );
   }
 
@@ -489,7 +659,7 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
   const bySemester = new Map<string, ImportSheet[]>();
   for (const s of sheets)
     if (s.student && s.semester) {
-      const k = `${s.student.id}|${s.semester.id}`;
+      const k = `${s.student.id}|${s.semester.id ?? s.semester.create!.key}`;
       bySemester.set(k, [...(bySemester.get(k) ?? []), s]);
     }
   for (const group of bySemester.values())

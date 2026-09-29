@@ -21,8 +21,9 @@ import type { Actor } from "@/lib/permissions/kernel";
 /**
  * The grade-sheet import against a real database: the older plain letters
  * are in the scale, a clean sheet goes in whole through the same service
- * as a hand-typed record, half-hours survive, and the same file imported
- * a second time is refused rather than doubled.
+ * as a hand-typed record, half-hours survive, the same file imported
+ * a second time is refused rather than doubled, and a past semester the
+ * calendar lacks is created -- with an NG that counts nowhere.
  *
  * Direct inserts with synthetic ids, like enrolmentCounts.integration.test.ts,
  * so this runs in CI without a Supabase project.
@@ -42,6 +43,10 @@ const YEAR_LABEL = `${Y0}/${Y0 + 1}`;
 const SURNAME = `Coleman${Array.from({ length: 5 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("")}`;
 const MATH = `Q${tag}102`;
 const CECS = `Z${tag}102`;
+const PREV_A = `Y${tag}201`;
+const PREV_B = `Y${tag}202`;
+// The year before, which the calendar doesn't hold: the import creates it.
+const PREV_LABEL = `${Y0 - 1}/${Y0}`;
 const admin = { userId: ADMIN, role: "ADMIN", displayName: "t", mustChangePassword: false } as unknown as Actor;
 
 const HEADER =
@@ -52,6 +57,12 @@ const CSV = [
   HEADER,
   `sheets.pdf,1,1,${STUDENT_NO},Abraham B ${SURNAME},,,,,${YEAR_LABEL},Two,2,${MATH.replace(/\d+$/, "")},102,1,B,3,9,3.00,,`,
   `sheets.pdf,1,1,${STUDENT_NO},Abraham B ${SURNAME},,,,,${YEAR_LABEL},Two,2,Christian Service,102,1,B,0.5,1.5,3.00,,`,
+].join("\n");
+
+const CSV_PREV = [
+  HEADER,
+  `sheets.pdf,2,2,${STUDENT_NO},Abraham B ${SURNAME},,,,,${PREV_LABEL},Two,2,${PREV_A.replace(/\d+$/, "")},201,1,B,3,9,3.00,,`,
+  `sheets.pdf,2,2,${STUDENT_NO},Abraham B ${SURNAME},,,,,${PREV_LABEL},Two,2,${PREV_B.replace(/\d+$/, "")},202,1,NG,2,-,3.00,,`,
 ].join("\n");
 
 describe("grade sheet import", () => {
@@ -71,6 +82,8 @@ describe("grade sheet import", () => {
     await db.insert(course).values([
       { id: id(), departmentId: DEPT, code: MATH, title: "College Mathematics II", creditHours: 3, isActive: true },
       { id: id(), departmentId: DEPT, code: CECS, title: "Christian Service", creditHours: 1, isActive: true },
+      { id: id(), departmentId: DEPT, code: PREV_A, title: "Earlier Course A", creditHours: 3, isActive: true },
+      { id: id(), departmentId: DEPT, code: PREV_B, title: "Earlier Course B", creditHours: 2, isActive: true },
     ]);
   });
 
@@ -79,9 +92,14 @@ describe("grade sheet import", () => {
     await quiet(db.delete(studentSemesterSummary).where(eq(studentSemesterSummary.studentId, STU)));
     await quiet(db.delete(studentCumulativeSummary).where(eq(studentCumulativeSummary.studentId, STU)));
     await quiet(db.delete(academicRecord).where(eq(academicRecord.studentId, STU)));
-    await quiet(db.delete(course).where(inArray(course.code, [MATH, CECS])));
+    await quiet(db.delete(course).where(inArray(course.code, [MATH, CECS, PREV_A, PREV_B])));
     await quiet(db.delete(semester).where(eq(semester.id, SEM)));
     await quiet(db.delete(academicYear).where(eq(academicYear.id, YEAR)));
+    const prev = await db.query.academicYear.findFirst({ where: eq(academicYear.label, PREV_LABEL) });
+    if (prev) {
+      await quiet(db.delete(semester).where(eq(semester.academicYearId, prev.id)));
+      await quiet(db.delete(academicYear).where(eq(academicYear.id, prev.id)));
+    }
     // The student, department, college and users stay: the audit rows the
     // import writes hold RESTRICT keys to them. Harmless synthetic rows.
   });
@@ -126,5 +144,26 @@ describe("grade sheet import", () => {
     expect(r.imported).toEqual([]);
     const records = await db.query.academicRecord.findMany({ where: eq(academicRecord.studentId, STU) });
     expect(records).toHaveLength(2);
+  });
+
+  it("creates a past semester the calendar lacks, and keeps an NG out of the GPA", async () => {
+    const a = await previewGradeSheetImport(admin, CSV_PREV);
+    const s = a.sheets[0];
+    expect(s.problems).toEqual([]);
+    expect(s.semester).toMatchObject({ id: null, create: { yearLabel: PREV_LABEL, sequence: 2, newYear: { startDate: `${Y0 - 1}-09-01` } } });
+
+    const r = await commitGradeSheetImport(admin, { text: CSV_PREV, fileName: "prev.csv", confirmRepeats: false });
+    expect(r.failed).toEqual([]);
+    expect(r.created).toHaveLength(1);
+    const year = await db.query.academicYear.findFirst({ where: eq(academicYear.label, PREV_LABEL) });
+    const sem = await db.query.semester.findFirst({ where: eq(semester.academicYearId, year!.id) });
+    expect(sem).toMatchObject({ sequence: 2, state: "CLOSED", startDate: `${Y0}-02-01`, endDate: `${Y0}-06-20` });
+
+    const ng = await db.query.academicRecord.findFirst({ where: and(eq(academicRecord.studentId, STU), eq(academicRecord.letter, "NG")) });
+    expect(ng).toMatchObject({ gradePoint: null, countsInGpa: false, countsInAttempted: false, countsInEarned: false });
+    const summary = await db.query.studentSemesterSummary.findFirst({
+      where: and(eq(studentSemesterSummary.studentId, STU), eq(studentSemesterSummary.semesterId, sem!.id)),
+    });
+    expect(summary?.gpa).toBe("3.000000");
   });
 });

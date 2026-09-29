@@ -1,17 +1,19 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { academicRecord } from "@/lib/db/schema";
+import { academicRecord, academicYear, semester } from "@/lib/db/schema";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { AppError, StateError, ValidationError } from "@/lib/errors";
 import { courseCodeKey } from "@/lib/courses/courseCode";
 import { semesterDisplayName } from "@/lib/academic/semesterName";
-import { enterHistoricalSemester } from "./historical";
+import { createAcademicYear } from "@/lib/academic/calendar";
+import { createRetrospectiveSemester, enterHistoricalSemester } from "./historical";
 import {
   analyseGradeSheetCsv,
   type ExistingRecord,
   type ImportAnalysis,
   type ImportContext,
   type ImportSheet,
+  type PlannedSemester,
 } from "./gradeSheetImportCore";
 
 /**
@@ -57,6 +59,14 @@ async function loadContext(): Promise<ImportContext> {
 
   const today = new Date();
   const yearById = new Map(years.map((y) => [y.id, y]));
+  const calendar = years.map((y) => ({
+    label: y.label,
+    startDate: String(y.startDate),
+    endDate: String(y.endDate),
+    semesters: semesters
+      .filter((sem) => sem.academicYearId === y.id)
+      .map((sem) => ({ sequence: sem.sequence, startDate: String(sem.startDate), endDate: String(sem.endDate) })),
+  }));
   const semesterMap: ImportContext["semesters"] = new Map();
   for (const s of semesters) {
     const year = yearById.get(s.academicYearId);
@@ -88,6 +98,8 @@ async function loadContext(): Promise<ImportContext> {
     // is treated as not matchable and the row is held back instead.
     courses: courses.filter((c) => c.code === c.code.trim().toUpperCase().replace(/\s+/g, " ")),
     existing,
+    calendar,
+    today,
   };
 }
 
@@ -104,6 +116,8 @@ export async function previewGradeSheetImport(actor: Actor, text: string): Promi
 
 export interface CommitGradeSheetResult {
   imported: Array<{ sheet: string; student: string; semester: string; courses: number }>;
+  /** Past semesters (and years) created in the Academic calendar for this import. */
+  created: string[];
   failed: Array<{ sheet: string; reason: string }>;
   /** Ready, but waiting for the repeats on them to be confirmed. */
   heldForRepeats: string[];
@@ -111,6 +125,28 @@ export interface CommitGradeSheetResult {
 }
 
 const describe = (s: ImportSheet) => `${s.sourceFile} sheet ${s.sheetNo}`;
+
+/** Creates a planned past semester, and its academic year when that is new
+ *  too, through the same audited services the Academic calendar uses. */
+async function createPlannedSemester(actor: Actor, plan: PlannedSemester): Promise<string> {
+  let year = await db.query.academicYear.findFirst({ where: eq(academicYear.label, plan.yearLabel) });
+  if (!year) {
+    if (!plan.newYear) throw new StateError(`Academic year ${plan.yearLabel} was expected to exist.`);
+    year = await createAcademicYear(actor, { label: plan.yearLabel, ...plan.newYear });
+  }
+  const existing = await db.query.semester.findFirst({
+    where: and(eq(semester.academicYearId, year.id), eq(semester.sequence, plan.sequence)),
+  });
+  if (existing) return existing.id;
+  const row = await createRetrospectiveSemester(actor, {
+    academicYearId: year.id,
+    sequence: plan.sequence,
+    name: plan.name,
+    startDate: plan.startDate,
+    endDate: plan.endDate,
+  });
+  return row.id;
+}
 
 export async function commitGradeSheetImport(
   actor: Actor,
@@ -124,6 +160,7 @@ export async function commitGradeSheetImport(
 
   const result: CommitGradeSheetResult = {
     imported: [],
+    created: [],
     failed: [],
     heldForRepeats: [],
     blocked: analysis.sheets.filter((s) => s.status === "blocked").length,
@@ -135,16 +172,40 @@ export async function commitGradeSheetImport(
     .filter((s) => s.status === "ready")
     .sort((a, b) => a.semester!.sortKey - b.semester!.sortKey);
 
+  // A past semester the calendar doesn't hold yet is created first -- once,
+  // however many sheets need it, and only for sheets that will go in.
+  const createdIds = new Map<string, string>();
+  const createFailed = new Map<string, string>();
+  const toImport = ready.filter((s) => !(s.courses.some((c) => c.repeatOf) && !input.confirmRepeats));
+  const plans = new Map(toImport.flatMap((s) => (s.semester!.create ? [[s.semester!.create.key, s.semester!.create] as const] : [])));
+  for (const plan of plans.values()) {
+    try {
+      createdIds.set(plan.key, await createPlannedSemester(actor, plan));
+      result.created.push(
+        `${plan.yearLabel} — ${plan.name} (${plan.startDate} to ${plan.endDate})${plan.newYear ? `, in the new academic year ${plan.yearLabel} (${plan.newYear.startDate} to ${plan.newYear.endDate})` : ""}`,
+      );
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      createFailed.set(plan.key, err.message);
+    }
+  }
+
   for (const sheet of ready) {
     const hasRepeats = sheet.courses.some((c) => c.repeatOf);
     if (hasRepeats && !input.confirmRepeats) {
       result.heldForRepeats.push(describe(sheet));
       continue;
     }
+    const plan = sheet.semester!.create;
+    const semesterId = sheet.semester!.id ?? (plan ? createdIds.get(plan.key) : undefined);
+    if (!semesterId) {
+      result.failed.push({ sheet: describe(sheet), reason: `${sheet.semester!.label} could not be created: ${plan ? createFailed.get(plan.key) : "unknown semester"}` });
+      continue;
+    }
     try {
       await enterHistoricalSemester(actor, {
         studentId: sheet.student!.id,
-        semesterId: sheet.semester!.id,
+        semesterId,
         records: sheet.courses.map((c) => ({
           courseCode: c.code,
           creditHours: c.creditHours,

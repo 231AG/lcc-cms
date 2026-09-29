@@ -76,6 +76,8 @@ export default function GradeSheetImportForm() {
   const blocked = analysis?.sheets.filter((s) => s.status === "blocked") ?? [];
   const withRepeats = ready.filter((s) => s.courses.some((c) => c.repeatOf));
   const readyCourses = ready.reduce((n, s) => n + s.courses.length, 0);
+  const idSettled = ready.filter((s) => s.idNote);
+  const toCreate = [...new Map(ready.flatMap((s) => (s.semester?.create ? [[s.semester.create.key, s.semester.create] as const] : []))).values()];
   const canImport = ready.length > 0 && checked && (withRepeats.length === 0 || confirmRepeats);
 
   return (
@@ -93,6 +95,9 @@ export default function GradeSheetImportForm() {
             {result.imported.reduce((n, s) => n + s.courses, 0)} courses).
           </p>
           <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5 text-sm">
+            {result.created.map((c) => (
+              <li key={c}>Created in the Academic calendar: {c}.</li>
+            ))}
             {result.blocked > 0 && <li>{result.blocked} held back by the check. Nothing from them was imported.</li>}
             {result.heldForRepeats.length > 0 && (
               <li>{result.heldForRepeats.length} not imported, because the repeated courses on them were not confirmed.</li>
@@ -193,8 +198,20 @@ export default function GradeSheetImportForm() {
                       <Td>
                         <span className="text-fg font-semibold">{s.student?.name}</span>
                         <span className="text-fg-muted block text-xs tabular-nums">{s.studentNumber}</span>
+                        {s.idNote && (
+                          <Badge tone="warning" className="mt-1">
+                            ID on sheet: {s.printedStudentNumber || "none"}
+                          </Badge>
+                        )}
                       </Td>
-                      <Td className="whitespace-nowrap">{s.semester?.label}</Td>
+                      <Td className="whitespace-nowrap">
+                        {s.semester?.label}
+                        {s.semester?.create && (
+                          <span className="text-fg-muted block text-xs">
+                            New in the calendar: {s.semester.create.startDate} to {s.semester.create.endDate}
+                          </span>
+                        )}
+                      </Td>
                       <Td>
                         <ul className="flex flex-col gap-0.5 text-sm">
                           {s.courses.map((c) => (
@@ -223,6 +240,42 @@ export default function GradeSheetImportForm() {
               </Table>
             )}
           </Card>
+
+          {(idSettled.length > 0 || toCreate.length > 0) && (
+            <Alert tone="info" className="mb-6">
+              {idSettled.length > 0 && (
+                <>
+                  <p className="font-semibold">
+                    {idSettled.length} sheet{idSettled.length === 1 ? " goes" : "s go"} in under the Student ID the system holds, not the one
+                    printed:
+                  </p>
+                  <ul className="mt-1 mb-2 flex list-disc flex-col gap-0.5 pl-5">
+                    {idSettled.map((s) => (
+                      <li key={s.key}>
+                        {s.student?.name}, {s.semester?.label}: {s.idNote}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {toCreate.length > 0 && (
+                <>
+                  <p className="font-semibold">
+                    {toCreate.length} past semester{toCreate.length === 1 ? " is" : "s are"} not in the Academic calendar and will be created,
+                    with dates copied from the calendar&rsquo;s own pattern:
+                  </p>
+                  <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5">
+                    {toCreate.map((p) => (
+                      <li key={p.key}>
+                        {p.yearLabel} — {p.name}: {p.startDate} to {p.endDate}
+                        {p.newYear && ` (and the academic year ${p.yearLabel}: ${p.newYear.startDate} to ${p.newYear.endDate})`}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </Alert>
+          )}
 
           {ready.length > 0 && (
             <Card className="mb-6">
@@ -264,8 +317,8 @@ function SheetHeading({ sheet }: { sheet: ImportSheet }) {
   return (
     <p className="text-sm">
       <span className="text-fg font-semibold">{sheet.nameOnSheet || "(no name on sheet)"}</span>
-      <span className="text-fg-muted"> · ID {sheet.studentNumber || "—"}</span>
-      {sheet.semester && <span className="text-fg-muted"> · {sheet.semester.label}</span>}
+      <span className="text-fg-muted"> · ID {sheet.printedStudentNumber || "—"}</span>
+      {sheet.semesterWanted && <span className="text-fg-muted"> · {sheet.semesterWanted}</span>}
       <span className="text-fg-muted block text-xs">
         {sheet.sourceFile}, page {sheet.page}, sheet {sheet.sheetNo} · CSV lines {sheet.lines}
       </span>
@@ -297,7 +350,7 @@ function downloadProblems(sheets: ImportSheet[], fileName: string) {
   for (const s of sheets)
     for (const p of s.problems)
       lines.push(
-        [s.sourceFile, s.page, s.sheetNo, s.lines, s.studentNumber, s.nameOnSheet, s.semester?.label ?? "", p].map((v) => csvCell(v)).join(","),
+        [s.sourceFile, s.page, s.sheetNo, s.lines, s.printedStudentNumber, s.nameOnSheet, s.semesterWanted, p].map((v) => csvCell(v)).join(","),
       );
   const blob = new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);

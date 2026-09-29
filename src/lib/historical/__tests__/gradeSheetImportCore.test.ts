@@ -5,6 +5,7 @@ import {
   mayBeSamePerson,
   namesMatch,
   parseCsv,
+  planPastSemester,
   type ImportContext,
 } from "../gradeSheetImportCore";
 
@@ -69,6 +70,19 @@ function ctx(over: Partial<ImportContext> = {}): ImportContext {
       { code: "CECS102", title: "Christian Service" },
     ],
     existing: new Map(),
+    calendar: [
+      { label: "2024/2025", startDate: "2024-09-01", endDate: "2025-07-31", semesters: [{ sequence: 2, startDate: "2025-02-03", endDate: "2025-06-27" }] },
+      {
+        label: "2025/2026",
+        startDate: "2025-09-01",
+        endDate: "2026-07-31",
+        semesters: [
+          { sequence: 1, startDate: "2025-09-08", endDate: "2026-01-23" },
+          { sequence: 2, startDate: "2026-02-02", endDate: "2026-06-26" },
+        ],
+      },
+    ],
+    today: new Date("2026-06-01"),
     ...over,
   };
 }
@@ -189,6 +203,23 @@ describe("what holds a sheet back", () => {
     blocked(csv(row()), /also matches Abraham Coleman \(ID 2024999\)/, c);
   });
 
+  it("an ID printed for two different people in the same semester: neither goes in", () => {
+    const c = ctx();
+    const a = analyseGradeSheetCsv(csv(row(), row({ sheet_no: "2", student_name: "Joseph Boimah", course_title: "ENGL" })), c);
+    expect(a.sheets.map((x) => x.status)).toEqual(["blocked", "blocked"]);
+    for (const x of a.sheets) expect(x.problems.join(" ")).toMatch(/ID 2024853 is printed for "Abraham B Coleman" and "Joseph Boimah" in 2024\/2025 — Semester II.*Neither is imported/);
+  });
+
+  it("an ID used by someone else in another semester: only that sheet is held, with its semester", () => {
+    const a = analyseGradeSheetCsv(
+      csv(row(), row({ sheet_no: "2", student_name: "Joseph Boimah", sheet_year: "2025/2026", semester_number: "1", sheet_gpa: "3.00" })),
+      ctx(),
+    );
+    expect(a.sheets.map((x) => x.status)).toEqual(["ready", "blocked"]);
+    expect(a.sheets[1].semesterWanted).toBe("2025/2026 — Semester I");
+    expect(a.sheets[1].problems.join(" ")).toMatch(/belongs to Abraham B\. Coleman, but this sheet is for "Joseph Boimah"/);
+  });
+
   it("the same person under two IDs in the file", () => {
     const c = ctx();
     c.students.set("2024999", { id: "s9", firstName: "Abrahim", middleName: null, lastName: "Colman", enrolmentYear: 2024 });
@@ -215,13 +246,13 @@ describe("what holds a sheet back", () => {
     blocked(csv(row({ course_title: "Military Science" })), /numbered 102 and titled "Military Science"/));
 
   it("an extraction flag nobody has cleared", () =>
-    blocked(csv(row({ flags: "UNREADABLE", notes: "smudged" })), /still flagged UNREADABLE.*smudged/));
+    blocked(csv(row({ flags: "UNREADABLE", notes: "smudged" })), /flagged UNREADABLE \(smudged\)/));
 
   it("a semester not yet ended", () =>
     blocked(csv(row({ sheet_year: "2025/2026", semester_number: "2" })), /has not ended yet/));
 
-  it("a semester not in the calendar", () =>
-    blocked(csv(row({ sheet_year: "2023/2024", semester_number: "1" })), /2023\/2024 — Semester I does not exist/));
+  it("a semester not in the calendar, with no year to copy its dates from", () =>
+    blocked(csv(row({ sheet_year: "2023/2024", semester_number: "1" })), /2023\/2024 — Semester I does not exist.*no other year has a Semester I/, ctx({ calendar: [] })));
 
   it("half-hours only", () => blocked(csv(row({ credit_hours: "0.3", grade_points: "0.9" })), /not a valid number of hours/));
 
@@ -237,6 +268,68 @@ describe("what holds a sheet back", () => {
 
   it("a file without the required columns", () => {
     expect(analyseGradeSheetCsv("student_id,grade\n1,A", ctx()).fileProblem).toMatch(/missing required columns/);
+  });
+});
+
+describe("the Student ID the system holds", () => {
+  it("settles a blank or unknown ID from the student's other sheets, when the system has exactly that ID for them", () => {
+    const a = analyseGradeSheetCsv(
+      csv(
+        row(),
+        row({ sheet_no: "2", student_id: "", student_name: "Abraham B. Colema", sheet_year: "2025/2026", semester_number: "1" }),
+        row({ sheet_no: "3", student_id: "20248530", student_name: "Abraham Coleman", sheet_year: "2025/2026", semester_number: "2" }),
+      ),
+      ctx({ today: new Date("2026-09-29") }),
+    );
+    expect(a.sheets[1].status).toBe("ready");
+    expect(a.sheets[1].studentNumber).toBe("2024853");
+    expect(a.sheets[1].idNote).toMatch(/no Student ID.*goes in under 2024853/);
+    expect(a.sheets[2].studentNumber).toBe("2024853");
+    expect(a.sheets[2].idNote).toMatch(/says ID 20248530, which is not in the system/);
+  });
+
+  it("does not settle an unknown ID that no other sheet in the file links to the system's record", () => {
+    const s = only(csv(row({ student_id: "2024999" })));
+    expect(s.status).toBe("blocked");
+    expect(s.idNote).toBeNull();
+    expect(s.problems.join(" ")).toMatch(/No student with ID 2024999/);
+  });
+});
+
+describe("a past semester missing from the calendar", () => {
+  it("is created with the dates of the nearest year's same semester, moved by whole years", () => {
+    const c = ctx();
+    const plan = planPastSemester("2023/2024", 2, c.calendar, c.today);
+    expect(plan).toEqual({
+      plan: {
+        key: "2023/2024|2",
+        yearLabel: "2023/2024",
+        newYear: { startDate: "2023-09-01", endDate: "2024-07-31" },
+        sequence: 2,
+        name: "Semester II",
+        startDate: "2024-02-03",
+        endDate: "2024-06-27",
+      },
+    });
+  });
+
+  it("goes into an existing year without re-creating it", () => {
+    const c = ctx();
+    const plan = planPastSemester("2024/2025", 1, c.calendar, c.today);
+    expect(plan).toEqual({
+      plan: { key: "2024/2025|1", yearLabel: "2024/2025", newYear: null, sequence: 1, name: "Semester I", startDate: "2024-09-08", endDate: "2025-01-23" },
+    });
+  });
+
+  it("is not created when it would not have ended yet", () => {
+    const c = ctx();
+    expect(planPastSemester("2026/2027", 1, c.calendar, c.today)).toHaveProperty("problem");
+  });
+
+  it("makes the sheet ready, marked to be created", () => {
+    const s = only(csv(row({ sheet_year: "2023/2024", semester_number: "2", student_id: "2022851", student_name: "Joseph Boimah" })));
+    expect(s.problems).toEqual([]);
+    expect(s.semester).toMatchObject({ id: null, label: "2023/2024 — Semester II", create: { startDate: "2024-02-03", endDate: "2024-06-27" } });
   });
 });
 

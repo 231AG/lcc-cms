@@ -18,6 +18,7 @@ import {
 import { auditWrite } from "@/lib/audit/audit";
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { StateError, ValidationError } from "@/lib/errors";
+import { MAJOR_REPEAT_LETTERS } from "@/lib/gpa/engine";
 import { isPlanningOpen, SEMESTER_STATE_LABEL, type SemesterState } from "@/lib/academic/semesterStateMachine";
 
 // ---------------------------------------------------------------------------
@@ -260,14 +261,14 @@ async function validatePlan(
 
     // V3 -- already completed and passed. A prior F never blocks (not
     // "completed and passed") and auto-flags as a retake, same as a prior
-    // D+/D- in a major course -- both carry a mandatory-repeat obligation
+    // D in a major course (MAJOR_REPEAT_LETTERS) -- both carry a mandatory-repeat obligation
     // and are auto-flagged rather than demanded of the student or blocked
     // (Section 14.3, edge cases 7/8: "The is_retake flag is set
     // automatically and shown to the student").
     const priorFailing = studentRecords.find((r) => {
       if (r.courseId !== item.courseId || r.isRepeatDropped) return false;
       if (r.letter === "F") return true;
-      return (r.letter === "D+" || r.letter === "D-") && r.wasMajorAtRecord;
+      return MAJOR_REPEAT_LETTERS.has(r.letter) && r.wasMajorAtRecord;
     });
     if (priorFailing && !item.isRetake) {
       item.isRetake = true; // auto-flag; not a block

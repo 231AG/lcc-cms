@@ -104,6 +104,7 @@ const STANDING_LABEL: Record<string, string> = {
  * themselves are the College's own, taken from its printed grade sheet.
  */
 function describeLetter(letter: string): string {
+  if (letter === "NG") return "No Grade";
   switch (letter.charAt(0)) {
     case "A":
       return "Excellent";
@@ -237,9 +238,14 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
     },
     // An older letter (plain A-D) appears in the key only on a sheet that
     // actually carries one, so a current sheet prints the current scale and
-    // a past sheet still explains every letter on it.
+    // a past sheet still explains every letter on it. No Grade is the same:
+    // printed only on a sheet that has one.
     gradingScale: scaleRows
-      .filter((r) => r.policyVersion === activeVersion && (!r.isLegacy || records.some((rec) => rec.letter === r.letter)))
+      .filter(
+        (r) =>
+          r.policyVersion === activeVersion &&
+          ((!r.isLegacy && r.letter !== "NG") || records.some((rec) => rec.letter === r.letter)),
+      )
       .map((r) => ({
         letter: r.letter,
         range: formatRange(r.minScore, r.maxScore),
