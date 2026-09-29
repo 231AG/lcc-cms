@@ -121,6 +121,9 @@ export interface CommitGradeSheetResult {
   failed: Array<{ sheet: string; reason: string }>;
   /** Ready, but waiting for the repeats on them to be confirmed. */
   heldForRepeats: string[];
+  /** Ready, but waiting for their older-curriculum courses (not in the
+   *  catalogue, imported as printed) to be confirmed. */
+  heldForUncatalogued: string[];
   blocked: number;
 }
 
@@ -150,7 +153,7 @@ async function createPlannedSemester(actor: Actor, plan: PlannedSemester): Promi
 
 export async function commitGradeSheetImport(
   actor: Actor,
-  input: { text: string; fileName: string; confirmRepeats: boolean },
+  input: { text: string; fileName: string; confirmRepeats: boolean; confirmUncatalogued?: boolean },
 ): Promise<CommitGradeSheetResult> {
   await assertCan(actor, "historical.enterRecord");
   checkSize(input.text);
@@ -163,6 +166,7 @@ export async function commitGradeSheetImport(
     created: [],
     failed: [],
     heldForRepeats: [],
+    heldForUncatalogued: [],
     blocked: analysis.sheets.filter((s) => s.status === "blocked").length,
   };
 
@@ -176,7 +180,9 @@ export async function commitGradeSheetImport(
   // however many sheets need it, and only for sheets that will go in.
   const createdIds = new Map<string, string>();
   const createFailed = new Map<string, string>();
-  const toImport = ready.filter((s) => !(s.courses.some((c) => c.repeatOf) && !input.confirmRepeats));
+  const needsConfirm = (s: ImportSheet) =>
+    (s.courses.some((c) => c.repeatOf) && !input.confirmRepeats) || (s.courses.some((c) => !c.inCatalogue) && !input.confirmUncatalogued);
+  const toImport = ready.filter((s) => !needsConfirm(s));
   const plans = new Map(toImport.flatMap((s) => (s.semester!.create ? [[s.semester!.create.key, s.semester!.create] as const] : [])));
   for (const plan of plans.values()) {
     try {
@@ -196,6 +202,10 @@ export async function commitGradeSheetImport(
       result.heldForRepeats.push(describe(sheet));
       continue;
     }
+    if (sheet.courses.some((c) => !c.inCatalogue) && !input.confirmUncatalogued) {
+      result.heldForUncatalogued.push(describe(sheet));
+      continue;
+    }
     const plan = sheet.semester!.create;
     const semesterId = sheet.semester!.id ?? (plan ? createdIds.get(plan.key) : undefined);
     if (!semesterId) {
@@ -208,6 +218,9 @@ export async function commitGradeSheetImport(
         semesterId,
         records: sheet.courses.map((c) => ({
           courseCode: c.code,
+          // An older-curriculum course keeps the title the sheet prints;
+          // a catalogue course takes the catalogue's.
+          courseTitleOverride: c.inCatalogue ? undefined : c.title,
           creditHours: c.creditHours,
           letter: c.letter,
           confirmAsRepeat: c.repeatOf !== null,

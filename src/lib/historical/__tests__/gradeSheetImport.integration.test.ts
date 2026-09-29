@@ -65,6 +65,12 @@ const CSV_PREV = [
   `sheets.pdf,2,2,${STUDENT_NO},Abraham B ${SURNAME},,,,,${PREV_LABEL},Two,2,${PREV_B.replace(/\d+$/, "")},202,1,NG,2,-,3.00,,`,
 ].join("\n");
 
+// A course of the older curriculum, printed as a title and number.
+const CSV_OLD = [
+  HEADER,
+  `sheets.pdf,3,3,${STUDENT_NO},Abraham B ${SURNAME},,,,,${YEAR_LABEL},Two,2,Military Science,110,1,B,1,3,3.00,,`,
+].join("\n");
+
 describe("grade sheet import", () => {
   beforeAll(async () => {
     await db.insert(appUser).values([
@@ -165,5 +171,23 @@ describe("grade sheet import", () => {
       where: and(eq(studentSemesterSummary.studentId, STU), eq(studentSemesterSummary.semesterId, sem!.id)),
     });
     expect(summary?.gpa).toBe("3.000000");
+  });
+
+  it("imports an older-curriculum course exactly as printed, and only once that is confirmed", async () => {
+    const a = await previewGradeSheetImport(admin, CSV_OLD);
+    expect(a.sheets[0].status).toBe("ready");
+    expect(a.sheets[0].courses[0]).toMatchObject({ code: "MILITARY SCIENCE 110", title: "Military Science", inCatalogue: false });
+
+    const held = await commitGradeSheetImport(admin, { text: CSV_OLD, fileName: "old.csv", confirmRepeats: false });
+    expect(held.imported).toEqual([]);
+    expect(held.heldForUncatalogued).toHaveLength(1);
+
+    const r = await commitGradeSheetImport(admin, { text: CSV_OLD, fileName: "old.csv", confirmRepeats: false, confirmUncatalogued: true });
+    expect(r.failed).toEqual([]);
+    expect(r.imported).toHaveLength(1);
+    const rec = await db.query.academicRecord.findFirst({
+      where: and(eq(academicRecord.studentId, STU), eq(academicRecord.courseCodeSnapshot, "MILITARY SCIENCE 110")),
+    });
+    expect(rec).toMatchObject({ courseId: null, courseTitleSnapshot: "Military Science", letter: "B", creditHours: "1.0" });
   });
 });

@@ -1,4 +1,4 @@
-import { courseCodeKey } from "@/lib/courses/courseCode";
+import { courseCodeKey, formatCourseCode } from "@/lib/courses/courseCode";
 
 /**
  * Checking a CSV of past grade sheets before any of it is imported.
@@ -171,6 +171,10 @@ export interface ImportCourse {
   /** Set when the student already has this course in an earlier semester,
    *  or it appears on an earlier sheet in this same file. */
   repeatOf: string | null;
+  /** False for a course of the older curriculum that today's catalogue does
+   *  not hold: it goes in exactly as the sheet prints it, marked "not in
+   *  catalogue", and only once the Admin has confirmed that at import. */
+  inCatalogue: boolean;
 }
 
 /** A past semester (and, if needed, its academic year) the import will
@@ -528,10 +532,20 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
       // A subject code is written in capitals ("ENGL"); a one-word title is
       // not ("French", "Math"), and must be matched as a title.
       else if (/^[A-Z]{2,6}$/.test(r.course_title) && r.course_number) code = `${r.course_title}${r.course_number}`;
+      // A course the catalogue does not hold is an older-curriculum course
+      // (decided 29 Sep 2026): it goes in exactly as the sheet prints it --
+      // its printed code, or its printed title and number when that is all
+      // the sheet gives -- rather than being matched to a different course.
       let course: ContextCourse | undefined;
+      let asPrinted: { code: string; title: string } | null = null;
       if (code) {
         course = catalogueByKey.get(courseCodeKey(code));
-        if (!course) problems.push(`${label}: course code ${code.toUpperCase()} is not in the course catalogue.`);
+        if (!course) {
+          // Only a code the sheet itself prints; a code supplied in the
+          // course_code column is a correction and must be a real one.
+          if (r.course_code) problems.push(`${label}: course code ${code.toUpperCase()} is not in the course catalogue.`);
+          else asPrinted = { code: code.replace(/\s+/g, "").toUpperCase(), title: formatCourseCode(code.toUpperCase()) };
+        }
       } else if (!r.course_number) {
         problems.push(`${label}: no course number.`);
       } else {
@@ -541,7 +555,7 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
         );
         if (matches.length === 1) course = matches[0];
         else if (matches.length === 0)
-          problems.push(`${label}: no course in the catalogue is numbered ${r.course_number} and titled "${r.course_title}". Add its code in a course_code column.`);
+          asPrinted = { code: `${r.course_title} ${r.course_number}`.replace(/\s+/g, " ").trim().toUpperCase(), title: r.course_title.replace(/\s+/g, " ").trim() };
         else problems.push(`${label}: ${matches.map((m) => m.code).join(" and ")} both match "${r.course_title} ${r.course_number}". Add the right code in a course_code column.`);
       }
 
@@ -576,7 +590,9 @@ export function analyseGradeSheetCsv(text: string, ctx: ImportContext): ImportAn
       }
 
       if (course && scale && hoursOk)
-        courses.push({ line: Number(r._line), code: course.code, title: course.title, letter, creditHours: hours, repeatOf: null });
+        courses.push({ line: Number(r._line), code: course.code, title: course.title, letter, creditHours: hours, repeatOf: null, inCatalogue: true });
+      else if (asPrinted && scale && hoursOk)
+        courses.push({ line: Number(r._line), code: asPrinted.code, title: asPrinted.title, letter, creditHours: hours, repeatOf: null, inCatalogue: false });
     }
 
     // The same course twice on one sheet.

@@ -31,6 +31,7 @@ export default function GradeSheetImportForm() {
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [confirmRepeats, setConfirmRepeats] = useState(false);
+  const [confirmUncatalogued, setConfirmUncatalogued] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const reset = () => {
@@ -39,6 +40,7 @@ export default function GradeSheetImportForm() {
     setError(null);
     setChecked(false);
     setConfirmRepeats(false);
+    setConfirmUncatalogued(false);
   };
 
   const onFile = async (file: File | undefined) => {
@@ -60,7 +62,7 @@ export default function GradeSheetImportForm() {
   const runImport = () => {
     setError(null);
     startTransition(async () => {
-      const outcome = await commitGradeSheetImportAction(text, fileName, confirmRepeats);
+      const outcome = await commitGradeSheetImportAction(text, fileName, confirmRepeats, confirmUncatalogued);
       if (!outcome.ok) {
         setError(outcome.error);
         return;
@@ -69,6 +71,7 @@ export default function GradeSheetImportForm() {
       setAnalysis(null);
       setChecked(false);
       setConfirmRepeats(false);
+      setConfirmUncatalogued(false);
     });
   };
 
@@ -78,7 +81,10 @@ export default function GradeSheetImportForm() {
   const readyCourses = ready.reduce((n, s) => n + s.courses.length, 0);
   const idSettled = ready.filter((s) => s.idNote);
   const toCreate = [...new Map(ready.flatMap((s) => (s.semester?.create ? [[s.semester.create.key, s.semester.create] as const] : []))).values()];
-  const canImport = ready.length > 0 && checked && (withRepeats.length === 0 || confirmRepeats);
+  const withUncatalogued = ready.filter((s) => s.courses.some((c) => !c.inCatalogue));
+  const uncataloguedCourses = new Set(ready.flatMap((s) => s.courses.filter((c) => !c.inCatalogue).map((c) => c.code))).size;
+  const canImport =
+    ready.length > 0 && checked && (withRepeats.length === 0 || confirmRepeats) && (withUncatalogued.length === 0 || confirmUncatalogued);
 
   return (
     <>
@@ -101,6 +107,9 @@ export default function GradeSheetImportForm() {
             {result.blocked > 0 && <li>{result.blocked} held back by the check. Nothing from them was imported.</li>}
             {result.heldForRepeats.length > 0 && (
               <li>{result.heldForRepeats.length} not imported, because the repeated courses on them were not confirmed.</li>
+            )}
+            {result.heldForUncatalogued.length > 0 && (
+              <li>{result.heldForUncatalogued.length} not imported, because their courses that are not in the catalogue were not confirmed.</li>
             )}
             {result.failed.map((f) => (
               <li key={f.sheet}>
@@ -224,6 +233,11 @@ export default function GradeSheetImportForm() {
                                   Repeat: {c.repeatOf}
                                 </Badge>
                               )}
+                              {!c.inCatalogue && (
+                                <Badge tone="info" className="ml-2">
+                                  Not in catalogue: as printed
+                                </Badge>
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -287,6 +301,22 @@ export default function GradeSheetImportForm() {
                       {withRepeats.length} of these sheet{withRepeats.length === 1 ? " has" : "s have"} a course the student
                       also took in another semester (marked <strong>Repeat</strong> above). I confirm the student really
                       took each of them again. Only the latest attempt will count in CGPA.
+                    </span>
+                  </label>
+                )}
+                {withUncatalogued.length > 0 && (
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={confirmUncatalogued}
+                      onChange={(e) => setConfirmUncatalogued(e.target.checked)}
+                    />
+                    <span>
+                      {withUncatalogued.length} of these sheet{withUncatalogued.length === 1 ? " has" : "s have"} {uncataloguedCourses} older
+                      course{uncataloguedCourses === 1 ? "" : "s"} that today&rsquo;s catalogue does not hold (marked <strong>Not in catalogue</strong>).
+                      Import them exactly as the sheets print them. They are listed as not in the catalogue on the student&rsquo;s past record, and
+                      the repeat rule for a D in the student&rsquo;s department cannot apply to them.
                     </span>
                   </label>
                 )}

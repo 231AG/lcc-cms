@@ -34,10 +34,14 @@ export async function commitGradeSheetImportAction(
   text: string,
   fileName: string,
   confirmRepeats: boolean,
+  confirmUncatalogued: boolean,
 ): Promise<CommitOutcome> {
   const actor = await requireActor();
   try {
-    return { ok: true, result: await commitGradeSheetImport(actor, { text, fileName, confirmRepeats }) };
+    return {
+      ok: true,
+      result: await commitGradeSheetImport(actor, { text, fileName, confirmRepeats: confirmRepeats === true, confirmUncatalogued: confirmUncatalogued === true }),
+    };
   } catch (err) {
     if (err instanceof AppError) return { ok: false, error: err.message };
     throw err;

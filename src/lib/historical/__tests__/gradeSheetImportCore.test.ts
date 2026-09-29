@@ -239,11 +239,17 @@ describe("what holds a sheet back", () => {
 
   it("the same course twice on one sheet", () => blocked(csv(row(), row()), /already on this sheet/));
 
-  it("a course code the catalogue does not have (ENG 201)", () =>
-    blocked(csv(row({ course_title: "ENG", course_number: "201" })), /ENG201 is not in the course catalogue/));
+  it("a corrected code (course_code column) the catalogue does not have", () => {
+    const text = [HEADER + ",course_code", row() + ",ZZZZ999"].join("\n");
+    blocked(text, /ZZZZ999 is not in the course catalogue/);
+  });
 
-  it("a title the catalogue cannot place", () =>
-    blocked(csv(row({ course_title: "Military Science" })), /numbered 102 and titled "Military Science"/));
+  it("a title two catalogue courses share at the same number", () =>
+    blocked(
+      csv(row({ course_title: "Christian Service" })),
+      /CECS102 and CECX102 both match "Christian Service 102"/,
+      ctx({ courses: [...ctx().courses, { code: "CECX102", title: "Christian Service" }] }),
+    ));
 
   it("an extraction flag nobody has cleared", () =>
     blocked(csv(row({ flags: "UNREADABLE", notes: "smudged" })), /flagged UNREADABLE \(smudged\)/));
@@ -330,6 +336,24 @@ describe("a past semester missing from the calendar", () => {
     const s = only(csv(row({ sheet_year: "2023/2024", semester_number: "2", student_id: "2022851", student_name: "Joseph Boimah" })));
     expect(s.problems).toEqual([]);
     expect(s.semester).toMatchObject({ id: null, label: "2023/2024 — Semester II", create: { startDate: "2024-02-03", endDate: "2024-06-27" } });
+  });
+});
+
+describe("older-curriculum courses the catalogue does not hold", () => {
+  it("go in exactly as the sheet prints them, marked not in the catalogue", () => {
+    const s = only(
+      csv(
+        row({ course_title: "CHRS", course_number: "102", grade: "B", credit_hours: "1", grade_points: "3", sheet_gpa: "3.00" }),
+        row({ course_title: "Military Science", grade: "B", credit_hours: "1", grade_points: "3", sheet_gpa: "3.00" }),
+        row({ course_title: "French", grade: "B", sheet_gpa: "3.00" }),
+      ),
+    );
+    expect(s.problems).toEqual([]);
+    expect(s.courses.map((c) => [c.code, c.title, c.inCatalogue])).toEqual([
+      ["CHRS102", "CHRS 102", false],
+      ["MILITARY SCIENCE 102", "Military Science", false],
+      ["FREN102", "French", true],
+    ]);
   });
 });
 
