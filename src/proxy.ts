@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { appUser } from "@/lib/db/schema";
 import { SESSION_COOKIE_OPTIONS } from "@/lib/supabase/cookieOptions";
+import { ACTIVITY_COOKIE, activityCookieValue, isIdle, readLastActivity } from "@/lib/auth/idle";
 
 /**
  * Security self-review finding (Stage 11, plan §18 REQUIRED control:
@@ -24,6 +25,9 @@ import { SESSION_COOKIE_OPTIONS } from "@/lib/supabase/cookieOptions";
  * for exactly one purpose (the plan's own stated requirement). It does not
  * attempt session invalidation on account disable or other broader
  * auth-hardening -- out of scope for the finding being fixed here.
+ *
+ * Since 29 Sep 2026 it also ends a session after an hour without activity
+ * (src/lib/auth/idle.ts), for every role.
  */
 const EXEMPT_EXACT = new Set(["/login", "/change-password"]);
 
@@ -197,6 +201,32 @@ export async function proxy(request: NextRequest) {
   // requireActor() check handle the /login redirect, exactly as today.
   if (!userId) return withSecurityHeaders(response, csp);
 
+  // An hour without activity ends the session (src/lib/auth/idle.ts).
+  // Checked before anything else a signed-in request can reach.
+  const sessionId = String(claimsData?.claims?.session_id ?? userId);
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const now = Date.now();
+  const lastActivity = await readLastActivity(request.cookies.get(ACTIVITY_COOKIE)?.value, sessionId, secret);
+  if (lastActivity !== null && isIdle(lastActivity, now)) {
+    // Revokes this session's refresh token with Supabase too, so the
+    // cookies are worthless even if something kept a copy.
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    const toLogin = NextResponse.redirect(new URL("/login?reason=idle", request.url));
+    for (const c of request.cookies.getAll()) {
+      if (c.name.startsWith("sb-") && c.name.includes("auth-token")) toLogin.cookies.set(c.name, "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
+    }
+    toLogin.cookies.set(ACTIVITY_COOKIE, "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
+    return withSecurityHeaders(toLogin, csp);
+  }
+  // A prefetch is the router fetching ahead on its own, not someone using
+  // the page, so it does not count as activity.
+  const isPrefetch = request.headers.get("next-router-prefetch") === "1" || request.headers.get("purpose") === "prefetch";
+  const activityValue = isPrefetch ? null : await activityCookieValue(sessionId, now, secret);
+  const markActive = (res: NextResponse) => {
+    if (activityValue) res.cookies.set(ACTIVITY_COOKIE, activityValue, { ...SESSION_COOKIE_OPTIONS });
+    return res;
+  };
+
   // One column, not the whole row: this runs on every authenticated
   // request and the only thing it decides is the redirect below.
   const [row] = await db
@@ -205,10 +235,10 @@ export async function proxy(request: NextRequest) {
     .where(eq(appUser.id, userId))
     .limit(1);
   if (row?.mustChangePassword) {
-    return withSecurityHeaders(NextResponse.redirect(new URL("/change-password", request.url)), csp);
+    return withSecurityHeaders(markActive(NextResponse.redirect(new URL("/change-password", request.url))), csp);
   }
 
-  return withSecurityHeaders(response, csp);
+  return withSecurityHeaders(markActive(response), csp);
 }
 
 export const config = {

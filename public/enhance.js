@@ -107,4 +107,34 @@
       }
     }, 0);
   });
+
+  // --- Signing out after an hour without activity ---------------------------
+  // The server ends a session after an hour with no requests (src/proxy.ts,
+  // src/lib/auth/idle.ts). Two things here make that work for a person:
+  // while the page is being used -- typing, scrolling, clicking -- it tells
+  // the server so every few minutes, so nobody filling in a long form is
+  // signed out mid-way; and a page nobody has touched for the hour reloads,
+  // which lets the server send it to the sign-in page instead of leaving a
+  // signed-in screen open on the desk. Only on the signed-in shell, which
+  // carries the timeout in `data-session-idle` (seconds).
+  var idleShell = document.querySelector("[data-session-idle]");
+  if (idleShell) {
+    var idleLimit = Number(idleShell.getAttribute("data-session-idle")) * 1000;
+    var lastUse = Date.now();
+    var lastPing = Date.now();
+    var PING_EVERY = 5 * 60 * 1000;
+    var noteUse = function () {
+      lastUse = Date.now();
+      if (lastUse - lastPing > PING_EVERY) {
+        lastPing = lastUse;
+        fetch("/api/session/ping", { method: "POST", credentials: "same-origin", cache: "no-store" }).catch(function () {});
+      }
+    };
+    ["pointerdown", "keydown", "scroll", "touchstart", "mousemove"].forEach(function (name) {
+      window.addEventListener(name, noteUse, { passive: true, capture: true });
+    });
+    setInterval(function () {
+      if (idleLimit > 0 && Date.now() - lastUse >= idleLimit) window.location.reload();
+    }, 30 * 1000);
+  }
 })();

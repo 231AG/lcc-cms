@@ -109,6 +109,10 @@ export const AUDIT_ACTIONS = [
   "USER_DISABLED",
   "USER_ENABLED",
   "PASSWORD_RESET_BY_ADMIN",
+  // A new temporary password issued for a printed login slip. Separate
+  // from a one-off reset so the log shows which passwords went out on
+  // paper, in a batch.
+  "LOGIN_SLIP_ISSUED",
   "PASSWORD_CHANGED_BY_SELF",
   "LOGIN_SUCCEEDED",
   "LOGIN_FAILED",

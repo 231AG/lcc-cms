@@ -53,6 +53,11 @@ export const gradeScale = appSchema.table(
     effectiveFrom: timestamp("effective_from", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // An older letter (plain A, B, C, D) kept so past records stay exactly
+    // as they were issued. Accepted for past records only: it has no score
+    // band, so grade entry for a current class can never produce it, and it
+    // is left out of the key printed for the current scale. See 0031.
+    isLegacy: boolean("is_legacy").notNull().default(false),
   },
   (table) => [primaryKey({ columns: [table.policyVersion, table.letter] })],
 );

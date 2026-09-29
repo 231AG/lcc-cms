@@ -284,13 +284,21 @@ export interface RepeatObligation {
 }
 
 /**
+ * The D grades that must be repeated when earned in the student's own
+ * department: D+ and D-, and the older plain D the College's past grade
+ * sheets use (decided 29 Sep 2026: it counts the same way). One list, so
+ * the engine, the student's obligations view and plan validation agree.
+ */
+export const MAJOR_REPEAT_LETTERS: ReadonlySet<string> = new Set(["D+", "D-", "D"]);
+
+/**
  * Evaluated only over the KEPT attempt of each course, not the whole
  * history (fixture F-23: a retake that is itself a D in a major course
  * creates its own fresh obligation; the engine never looks past the kept
- * row). F always requires a repeat; D+/D- requires one only in the
- * student's own department at the time the result was recorded
- * (`wasMajorAtRecord`, frozen -- a later department change neither
- * creates nor clears an obligation, fixture F-24).
+ * row). F always requires a repeat; a D (MAJOR_REPEAT_LETTERS) requires
+ * one only in the student's own department at the time the result was
+ * recorded (`wasMajorAtRecord`, frozen -- a later department change
+ * neither creates nor clears an obligation, fixture F-24).
  */
 export function deriveMandatoryRepeatObligations(
   records: EngineRecord[],
@@ -301,7 +309,7 @@ export function deriveMandatoryRepeatObligations(
   for (const r of kept) {
     if (r.letter === "F") {
       obligations.push({ recordId: r.id, courseCodeKey: r.courseCodeKey, reason: "F" });
-    } else if ((r.letter === "D+" || r.letter === "D-") && r.wasMajorAtRecord) {
+    } else if (MAJOR_REPEAT_LETTERS.has(r.letter) && r.wasMajorAtRecord) {
       obligations.push({ recordId: r.id, courseCodeKey: r.courseCodeKey, reason: "D_MAJOR" });
     }
   }

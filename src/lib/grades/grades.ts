@@ -30,7 +30,9 @@ async function getActiveGradeScale(tx: Tx): Promise<GradeScaleEntry[]> {
   const rows = await tx.query.gradeScale.findMany({ where: (g, { lte }) => lte(g.effectiveFrom, new Date()) });
   if (rows.length === 0) throw new StateError("No grade scale is in effect.");
   const maxVersion = Math.max(...rows.map((r) => r.policyVersion));
-  return rows.filter((r) => r.policyVersion === maxVersion);
+  // Older letters (plain A-D) exist for past records only; grading a
+  // current class never uses them.
+  return rows.filter((r) => r.policyVersion === maxVersion && !r.isLegacy);
 }
 
 async function assertSemesterInGradeSubmission(tx: Tx, semesterId: string): Promise<void> {

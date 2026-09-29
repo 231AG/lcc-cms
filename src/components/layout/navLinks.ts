@@ -11,6 +11,9 @@ import {
   FilePen,
   GraduationCap,
   History,
+  Hourglass,
+  KeyRound,
+  FileUp,
   Network,
   Scale,
   ScrollText,
@@ -80,6 +83,8 @@ export const ADMIN_GROUPS: NavGroup[] = [
     links: [
       { href: "/admin/students", label: "Student Listing", icon: Users },
       { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
+      { href: "/admin/historical/import", label: "Import past grades", icon: FileUp },
+      { href: "/admin/login-slips", label: "Login slips", icon: KeyRound },
     ],
   },
   {
@@ -110,6 +115,7 @@ export const ADMIN_GROUPS: NavGroup[] = [
       { href: "/admin/student-grades", label: "Student grades", icon: UserRoundSearch },
       { href: "/admin/grades", label: "Class grade entry", icon: GraduationCap },
       { href: "/admin/grade-corrections", label: "Grade corrections", icon: FilePen },
+      { href: "/admin/no-grades", label: "NG to settle", icon: Hourglass },
       { href: "/admin/export", label: "Semester export", icon: Download },
       { href: "/grading-policy", label: "Grading policy", icon: Scale },
     ],
@@ -144,6 +150,7 @@ export const SUPER_ADMIN_GROUPS: NavGroup[] = [
     links: [
       { href: "/admin/grade-review", label: "Grade submission review", icon: CheckCheck },
       { href: "/admin/grade-corrections", label: "Grade corrections", icon: FilePen },
+      { href: "/admin/no-grades", label: "NG to settle", icon: Hourglass },
       { href: "/admin/export", label: "Semester export", icon: Download },
       { href: "/grading-policy", label: "Grading policy", icon: Scale },
     ],

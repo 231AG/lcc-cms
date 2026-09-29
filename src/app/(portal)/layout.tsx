@@ -2,6 +2,7 @@ import { getCurrentActor } from "@/lib/auth/session";
 import { Header } from "@/components/layout/Header";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppTopBar } from "@/components/layout/AppTopBar";
+import { IDLE_TIMEOUT_MS } from "@/lib/auth/idle";
 
 /**
  * The signed-in application shell: sidebar navigation, a top bar, and the
@@ -63,7 +64,9 @@ export default async function PortalLayout({ children }: { children: React.React
   return (
     <>
       {skipLink}
-      <div className="app-shell">
+      {/* data-session-idle: the one-hour inactivity timeout, in seconds, for
+          public/enhance.js (the server enforces it; see src/lib/auth/idle.ts). */}
+      <div className="app-shell" data-session-idle={IDLE_TIMEOUT_MS / 1000}>
         <AppSidebar actor={actor} />
         {/* Dismisses the drawer on tap. Rendered always and hidden by CSS
             above lg and whenever the drawer is closed, so opening it needs

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { asUser } from "@/lib/db/asUser";
 import { academicRecord, studentCumulativeSummary, studentSemesterSummary } from "@/lib/db/schema";
 import type { Actor } from "@/lib/permissions/kernel";
-import { DEFAULT_GPA_POLICY, creditsToGraduation, deriveAcademicStanding, formatGpa, type AcademicStanding } from "./engine";
+import { DEFAULT_GPA_POLICY, MAJOR_REPEAT_LETTERS, creditsToGraduation, deriveAcademicStanding, formatGpa, type AcademicStanding } from "./engine";
 
 /**
  * Read-side of the GPA engine (S-04/S-05, A-10 -- Section 20). RLS-scoped
@@ -91,7 +91,7 @@ export async function getOutstandingRepeatObligations(actor: Actor, studentId: s
   for (const r of rows) {
     if (r.letter === "F") {
       obligations.push({ recordId: r.id, courseCode: r.courseCodeSnapshot, courseTitle: r.courseTitleSnapshot, letter: r.letter, reason: "F" });
-    } else if ((r.letter === "D+" || r.letter === "D-") && r.wasMajorAtRecord) {
+    } else if (MAJOR_REPEAT_LETTERS.has(r.letter) && r.wasMajorAtRecord) {
       obligations.push({ recordId: r.id, courseCode: r.courseCodeSnapshot, courseTitle: r.courseTitleSnapshot, letter: r.letter, reason: "D_MAJOR" });
     }
   }

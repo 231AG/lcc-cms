@@ -104,6 +104,7 @@ const STANDING_LABEL: Record<string, string> = {
  * themselves are the College's own, taken from its printed grade sheet.
  */
 function describeLetter(letter: string): string {
+  if (letter === "NG") return "No Grade";
   switch (letter.charAt(0)) {
     case "A":
       return "Excellent";
@@ -188,7 +189,10 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
       // component stays pure presentation and the screen table that reads
       // this same function cannot disagree with the printed sheet.
       code: formatCourseCode(r.courseCodeSnapshot),
-      creditHours: new Decimal(r.creditHours).toFixed(0),
+      // As recorded, without forcing whole numbers: past sheets carry
+      // half-hour courses (Christian Service, 0.5), which toFixed(0) printed
+      // as 1. Decimal's toString drops the stored trailing ".0" of 3.0.
+      creditHours: new Decimal(r.creditHours).toString(),
       letter: r.letter,
       gradePoint: r.gradePoint === null ? null : roundHalfUp(r.gradePoint, 2),
       gradePoints: points === null ? null : roundHalfUp(points, 2),
@@ -232,8 +236,16 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
         ? `Cumulative GPA ${cumulative.cgpa ?? "—"}`
         : "Not available until this student's record is complete.",
     },
+    // An older letter (plain A-D) appears in the key only on a sheet that
+    // actually carries one, so a current sheet prints the current scale and
+    // a past sheet still explains every letter on it. No Grade is the same:
+    // printed only on a sheet that has one.
     gradingScale: scaleRows
-      .filter((r) => r.policyVersion === activeVersion)
+      .filter(
+        (r) =>
+          r.policyVersion === activeVersion &&
+          ((!r.isLegacy && r.letter !== "NG") || records.some((rec) => rec.letter === r.letter)),
+      )
       .map((r) => ({
         letter: r.letter,
         range: formatRange(r.minScore, r.maxScore),

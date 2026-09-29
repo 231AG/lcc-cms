@@ -3,7 +3,7 @@ import { Label, Select } from "@/components/ui/Form";
 import { buttonClasses } from "@/components/ui/Button";
 import { SubmitTextButton } from "@/components/ui/SubmitButton";
 import { trimCredits, type GradeSheetData } from "@/lib/gradesheet/gradeSheet";
-import { computeIncompleteDeadlineSemester, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
+import { computeIncompleteDeadlineSemester, computeNoGradeDeadlineSemester, formatSemesterLabel, formatSemesterSortKey } from "@/lib/gpa/incompleteDeadline";
 
 /**
  * One semester's results, exactly as the student profile has shown them
@@ -94,7 +94,7 @@ export function SemesterResultsPicker({
 
 /**
  * The results themselves. `sortKey` is only used to work out an Incomplete
- * grade's resolution deadline, which is a function of the semester it was
+ * or No Grade's deadline, which is a function of the semester it was
  * earned in.
  */
 export function SemesterResultsTable({
@@ -138,6 +138,12 @@ export function SemesterResultsTable({
                 {c.letter === "I" && sortKey && (
                   <span className="ml-1 text-xs text-warning-fg">
                     — must be resolved by end of {formatSemesterSortKey(computeIncompleteDeadlineSemester(sortKey))}
+                  </span>
+                )}
+                {c.letter === "NG" && sortKey && (
+                  <span className="ml-1 text-xs text-warning-fg">
+                    — No Grade: must be settled by the end of {formatSemesterLabel(computeNoGradeDeadlineSemester(sortKey))}, or
+                    it is recorded as F
                   </span>
                 )}
               </Td>
