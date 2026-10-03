@@ -96,7 +96,7 @@ export default async function LoginPage({
           <div className="mt-6">
             {reason === "idle" && !error && (
               <Alert tone="info" className="mb-5">
-                You were signed out after an hour without activity. Sign in again to continue.
+                Session expired. Please sign in again.
               </Alert>
             )}
             {error === "disabled" && (
