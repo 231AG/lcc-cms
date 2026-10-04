@@ -697,9 +697,15 @@ export default async function StudentDetailPage({
                   </Link>
                 )}
                 {canEdit && (
-                  <Link href={`/admin/historical?studentId=${record.id}`} className="text-brand-fg text-sm font-medium hover:underline">
-                    Enter historical record
-                  </Link>
+                  <>
+                    <Link href={`/admin/historical/import?tab=hand&studentId=${record.id}`} className="text-brand-fg text-sm font-medium hover:underline">
+                      Add past grades
+                    </Link>
+                    {/* Import status, and correcting or voiding a past grade. */}
+                    <Link href={`/admin/historical?studentId=${record.id}`} className="text-brand-fg text-sm font-medium hover:underline">
+                      Past record
+                    </Link>
+                  </>
                 )}
               </span>
             </CardHeader>
