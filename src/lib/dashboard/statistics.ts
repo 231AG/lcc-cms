@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { asUser } from "@/lib/db/asUser";
-import { college, department, student } from "@/lib/db/schema";
+import { college, department, student, studentCumulativeSummary } from "@/lib/db/schema";
+import { LEVEL_LABEL, LEVEL_MIN_CREDITS, STUDENT_LEVELS } from "@/lib/students/level";
 import type { Actor } from "@/lib/permissions/kernel";
 
 /**
@@ -31,7 +32,10 @@ export interface CountByLabel {
 
 export interface StudentStatistics {
   total: number;
+  /** Enrollment: ACTIVE, GRADUATED ... -- the stored `student.status`. */
   byStatus: CountByLabel[];
+  /** The College's "Status": Freshman ... Senior, always in that order. */
+  byLevel: CountByLabel[];
   byCollege: CountByLabel[];
   byEnrolmentYear: CountByLabel[];
   /** Includes a "Not recorded" row for students enrolled before the field
@@ -41,11 +45,27 @@ export interface StudentStatistics {
 
 export async function getStudentStatistics(actor: Actor): Promise<StudentStatistics> {
   return asUser(actor.userId, async (tx) => {
-    const [statusRows, collegeRows, yearRows, genderRows] = await Promise.all([
+    // Highest cut-off first, so each student lands in the first level whose
+    // minimum they have reached -- level.ts's rule, written as SQL.
+    const earned = sql`coalesce(${studentCumulativeSummary.totalCreditsEarned}, 0)`;
+    const levelCase = sql.join(
+      [
+        sql`case`,
+        ...[...STUDENT_LEVELS].reverse().map((l) => sql`when ${earned} >= ${LEVEL_MIN_CREDITS[l]} then ${l}`),
+        sql`end`,
+      ],
+      sql` `,
+    );
+    const [statusRows, levelRows, collegeRows, yearRows, genderRows] = await Promise.all([
       tx
         .select({ label: student.status, count: sql<number>`count(*)::int` })
         .from(student)
         .groupBy(student.status),
+      tx
+        .select({ label: sql<string>`${levelCase}`, count: sql<number>`count(*)::int` })
+        .from(student)
+        .leftJoin(studentCumulativeSummary, sql`${studentCumulativeSummary.studentId} = ${student.id}`)
+        .groupBy(sql`1`),
       tx
         .select({ label: sql<string>`${college.code} || ' — ' || ${college.name}`, count: sql<number>`count(*)::int` })
         .from(student)
@@ -69,6 +89,9 @@ export async function getStudentStatistics(actor: Actor): Promise<StudentStatist
     return {
       total: byStatus.reduce((sum, r) => sum + r.count, 0),
       byStatus: byStatus.sort((a, b) => b.count - a.count),
+      // Freshman to Senior, every level listed even at zero: the order is
+      // the meaning here, as with enrolment year.
+      byLevel: STUDENT_LEVELS.map((l) => ({ label: LEVEL_LABEL[l], count: levelRows.find((r) => r.label === l)?.count ?? 0 })),
       // Ranked by size: the question a college breakdown answers is "which
       // are the big ones", so the chart should not make the reader scan for
       // that.

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getStudentLevels } from "@/lib/gpa/gpa";
+import { StudentStatus } from "@/components/students/StudentStatus";
 import Link from "next/link";
 import { ArrowLeft, Eye, FilePen, GraduationCap, Printer, UserRound } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
@@ -132,6 +134,7 @@ export default async function StudentGradesPage({
 async function StudentPicker({ actor, sq, sp }: { actor: Actor; sq?: string; sp?: string }) {
   const pageNum = Math.max(1, Number(sp) || 1);
   const results = await searchStudents(actor, { query: sq?.trim() || undefined, page: pageNum, pageSize: PAGE_SIZE });
+  const levels = await getStudentLevels(actor, results.rows.map((s) => s.id));
   const departments = results.rows.length ? await asUser(actor.userId, (tx) => tx.query.department.findMany()) : [];
   const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? "—";
 
@@ -191,7 +194,7 @@ async function StudentPicker({ actor, sq, sp }: { actor: Actor; sq?: string; sp?
                     <Td className="font-medium text-fg">{listName(s)}</Td>
                     <Td className="hidden text-fg-secondary sm:table-cell">{departmentName(s.departmentId)}</Td>
                     <Td className="hidden whitespace-nowrap sm:table-cell">
-                      <Badge tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status}</Badge>
+                      <StudentStatus level={levels.get(s.id) ?? "FRESHMAN"} enrollment={s.status} />
                     </Td>
                     <Td className="text-right">
                       <Link

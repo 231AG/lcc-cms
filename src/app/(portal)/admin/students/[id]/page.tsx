@@ -6,8 +6,17 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  BadgeCheck,
+  Cake,
   Camera,
+  CalendarCheck,
   ClipboardList,
+  FileText,
+  Globe,
+  House,
+  MapPin,
+  Medal,
+  Users,
   GraduationCap,
   History,
   KeyRound,
@@ -42,6 +51,10 @@ import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { GENDER_LABEL } from "@/lib/students/gender";
+import { enrollmentLabel } from "@/lib/students/enrollment";
+import { LEVEL_LABEL, levelForCredits } from "@/lib/students/level";
+import { formatDay } from "@/lib/transcript/formatDay";
+import { titleCase } from "@/lib/transcript/titleCase";
 import { removeStudentPhotoAction, updateStudentProfileAction, uploadStudentPhotoAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
 
@@ -58,6 +71,13 @@ const STATUS_TONE: Record<string, Tone> = {
   SUSPENDED: "danger",
   GRADUATED: "info",
   ADMISSION_FORFEITED: "warning",
+};
+
+/** The student's past record (`historicalImportStatus`), in words. */
+const PAST_RECORD_LABEL: Record<string, string> = {
+  NOT_STARTED: "Not started",
+  IN_PROGRESS: "In progress",
+  COMPLETE: "Complete",
 };
 
 const IMPORT_STATUS_TONE: Record<string, Tone> = {
@@ -86,6 +106,25 @@ const ITEM_STATUS_LABEL: Record<string, string> = {
   REJECTED: "Turned down",
   PENDING: "Awaiting decision",
 };
+
+/**
+ * The optional details the academic transcript prints (migration 0034),
+ * in the order the office reads them off a paper file. One list for both
+ * the edit form and the read-only view, so the two cannot drift.
+ */
+const TRANSCRIPT_DETAILS = [
+  { name: "dateOfBirth", label: "Date of birth", type: "date", icon: Cake },
+  { name: "countryOfOrigin", label: "Country of origin", type: "text", icon: Globe },
+  { name: "countyOfOrigin", label: "County of origin", type: "text", icon: MapPin },
+  { name: "parentGuardian", label: "Parent or guardian", type: "text", icon: Users },
+  { name: "address", label: "Address", type: "text", icon: House },
+  { name: "acceptedFrom", label: "Accepted from", type: "text", icon: School },
+  { name: "enrollmentStatus", label: "Enrollment status", type: "text", icon: BadgeCheck },
+  { name: "enrolmentDate", label: "Date of enrollment", type: "date", icon: CalendarDays },
+  { name: "degree", label: "Degree", type: "text", icon: GraduationCap },
+  { name: "graduationDate", label: "Date of graduation", type: "date", icon: CalendarCheck },
+  { name: "distinction", label: "Distinction", type: "text", icon: Medal },
+] as const;
 
 /** One figure with its label -- the four-up row under the profile header. */
 function Stat({
@@ -204,6 +243,8 @@ export default async function StudentDetailPage({
         tx.query.course.findMany(),
       ]),
     );
+  // The College's "Status": Freshman ... Senior, from credit hours earned.
+  const level = levelForCredits(cumulative?.totalCreditsEarned);
   const semesterSummaryFor = (semesterId: string) => semesterSummaries.find((s) => s.semesterId === semesterId);
   const yearLabel = (semesterId: string) => {
     const sem = semesters.find((s) => s.id === semesterId);
@@ -349,9 +390,12 @@ export default async function StudentDetailPage({
               </h1>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-fg-secondary">{record.studentNumber}</span>
-                <Badge tone={STATUS_TONE[record.status] ?? "neutral"}>{record.status}</Badge>
+                {/* Status is the level, as the College uses the word;
+                    Enrollment is whether they are enrolled at all. */}
+                <Badge tone="brand">{LEVEL_LABEL[level]}</Badge>
+                <Badge tone={STATUS_TONE[record.status] ?? "neutral"}>{enrollmentLabel(record.status)}</Badge>
                 <Badge tone={IMPORT_STATUS_TONE[record.historicalImportStatus] ?? "neutral"}>
-                  Import: {record.historicalImportStatus}
+                  Past record: {PAST_RECORD_LABEL[record.historicalImportStatus] ?? record.historicalImportStatus}
                 </Badge>
               </div>
             </div>
@@ -372,6 +416,12 @@ export default async function StudentDetailPage({
                   Edit student
                 </Link>
               ))}
+            {/* The official transcript, ready to print -- the same screen
+                the Transcripts menu item opens for this student. */}
+            <Link href={`/admin/transcripts?studentId=${record.id}`} className={buttonClasses("secondary", "md")}>
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              Transcript
+            </Link>
             {/* Secondary rather than ghost, with the arrow the action is
                 actually named after. A ghost link beside a filled primary
                 read as disabled text, which is the opposite of what a way
@@ -550,19 +600,49 @@ export default async function StudentDetailPage({
                     </Label>
                     <Input id="contactPhone" name="contactPhone" defaultValue={record.contactPhone ?? ""} className="max-w-xs" />
                   </div>
+                  {/* Optional, all of them: blank is "not recorded", and the
+                      transcript prints a dash. Clearing a field clears it. */}
+                  <fieldset className="border-line-subtle flex flex-col gap-3 border-t pt-3">
+                    <legend className="text-fg-secondary pr-2 text-xs font-semibold tracking-wide uppercase">
+                      Transcript details (optional)
+                    </legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {TRANSCRIPT_DETAILS.map((field) => (
+                        <div key={field.name} className={field.name === "address" ? "sm:col-span-2" : undefined}>
+                          <Label htmlFor={field.name} className="text-xs">
+                            {field.label}
+                          </Label>
+                          <Input
+                            id={field.name}
+                            name={field.name}
+                            type={field.type}
+                            defaultValue={record[field.name] ?? ""}
+                            maxLength={field.type === "text" ? 120 : undefined}
+                            placeholder={field.name === "degree" ? "e.g. BSc, BA" : undefined}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
                   <div>
                     <Label htmlFor="status" className="text-xs">
-                      Status
+                      Enrollment
                     </Label>
-                    <Select id="status" name="status" defaultValue={record.status} className="max-w-xs">
+                    <Select id="status" name="status" defaultValue={record.status} className="max-w-xs" aria-describedby="status-help">
                       {STUDENT_STATUSES.map((s) => (
                         <option key={s} value={s}>
-                          {s}
+                          {enrollmentLabel(s)}
                         </option>
                       ))}
                     </Select>
+                    <p id="status-help" className="mt-1 text-xs text-fg-muted">
+                      Only Active students can plan courses and register. Status ({LEVEL_LABEL[level]}) is worked out from
+                      credit hours earned, so there is nothing to set for it.
+                    </p>
                   </div>
-                  <p className="text-xs text-fg-muted">Import status: {record.historicalImportStatus}</p>
+                  <p className="text-xs text-fg-muted">
+                    Past record: {PAST_RECORD_LABEL[record.historicalImportStatus] ?? record.historicalImportStatus}
+                  </p>
                   <SubmitButton className="w-fit">
                     Save changes
                   </SubmitButton>
@@ -581,6 +661,16 @@ export default async function StudentDetailPage({
                   <Detail icon={UserRound} label="Gender">
                     {GENDER_LABEL[record.gender ?? ""] ?? "—"}
                   </Detail>
+                  <Detail icon={GraduationCap} label="Status">
+                    {LEVEL_LABEL[level]}
+                    <span className="text-fg-muted font-normal">
+                      {" "}
+                      · {cumulative ? trimCredits(cumulative.totalCreditsEarned) : "0"} credit hours earned
+                    </span>
+                  </Detail>
+                  <Detail icon={BadgeCheck} label="Enrollment">
+                    {enrollmentLabel(record.status)}
+                  </Detail>
                   <Detail icon={BookMarked} label="Minor">
                     {record.minor || "—"}
                   </Detail>
@@ -590,8 +680,25 @@ export default async function StudentDetailPage({
                   <Detail icon={Phone} label="Phone">
                     {record.contactPhone || "—"}
                   </Detail>
-                  <Detail icon={ClipboardList} label="Import status">
-                    {record.historicalImportStatus}
+                  {TRANSCRIPT_DETAILS.map((field) => {
+                    const value = record[field.name];
+                    return (
+                      <Detail key={field.name} icon={field.icon} label={field.label}>
+                        {/* Shown as the transcript prints it: dates in one
+                            format, words capitalised -- except the degree,
+                            whose "BSc" has its own casing. */}
+                        {!value
+                          ? "—"
+                          : field.type === "date"
+                            ? formatDay(value)
+                            : field.name === "degree"
+                              ? value
+                              : titleCase(value)}
+                      </Detail>
+                    );
+                  })}
+                  <Detail icon={ClipboardList} label="Past record">
+                    {PAST_RECORD_LABEL[record.historicalImportStatus] ?? record.historicalImportStatus}
                   </Detail>
                 </dl>
               )}
@@ -697,9 +804,15 @@ export default async function StudentDetailPage({
                   </Link>
                 )}
                 {canEdit && (
-                  <Link href={`/admin/historical?studentId=${record.id}`} className="text-brand-fg text-sm font-medium hover:underline">
-                    Enter historical record
-                  </Link>
+                  <>
+                    <Link href={`/admin/historical/import?tab=hand&studentId=${record.id}`} className="text-brand-fg text-sm font-medium hover:underline">
+                      Add past grades
+                    </Link>
+                    {/* Import status, and correcting or voiding a past grade. */}
+                    <Link href={`/admin/historical?studentId=${record.id}`} className="text-brand-fg text-sm font-medium hover:underline">
+                      Past record
+                    </Link>
+                  </>
                 )}
               </span>
             </CardHeader>

@@ -32,11 +32,10 @@ around by typing a different URL.
   through its six states (Draft → Open → Registration → In Progress → Grade Submission → Closed). Moving
   backward is Super Admin-only and always needs a reason.
 - **Students** (`/admin/students`): enrolling a new student, searching, resetting a password.
-- **Historical import** (`/admin/historical`, progress at `/admin/historical/progress`): entering a
-  student's past academic record from paper, one semester at a time. The progress page shows counts by
-  status, a breakdown by department and cohort, records entered per week (a flat line means the import has
-  stalled), and any flagged issues (a course code that doesn't match the catalogue) with a direct link to
-  fix them.
+- **Import past grades** (`/admin/historical/import`): entering a student's past academic record from
+  paper, either by uploading the grade-sheet CSV or by hand, one semester at a time. Correcting or voiding
+  a past grade, and marking a student's past record complete, is on **Past record**
+  (`/admin/historical?studentId=…`), linked from the student's profile.
 - **Course offerings** (`/admin/offerings`): sections, instructors, meeting times, publishing a class so
   students can plan around it.
 - **Course plan review** (`/admin/planning`): approving, rejecting (with a reason), or overriding a failed

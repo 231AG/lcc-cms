@@ -3,6 +3,9 @@ import Link from "next/link";
 import { getCurrentActor } from "@/lib/auth/session";
 import { asUser } from "@/lib/db/asUser";
 import { getEnrolmentYears, searchStudents, STUDENT_STATUSES } from "@/lib/students/students";
+import { getStudentLevels } from "@/lib/gpa/gpa";
+import { enrollmentLabel } from "@/lib/students/enrollment";
+import { LEVEL_LABEL, STUDENT_LEVELS } from "@/lib/students/level";
 import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
 import { Label, Input, Select } from "@/components/ui/Form";
@@ -67,7 +70,7 @@ export default async function StudentsPage({
   // "the export respects the current filters" is structurally true rather
   // than three separate implementations agreeing by luck.
   const filters = parseStudentFilters(params);
-  const { status: validStatus, enrolmentYear: validYear, pageSize: size, page: pageNum, hasFilters } = filters;
+  const { status: validStatus, level: validLevel, enrolmentYear: validYear, pageSize: size, page: pageNum, hasFilters } = filters;
 
   // Departments are still fetched -- the enrolment form enrols INTO a
   // department, and the listing needs the department -> college mapping to
@@ -96,6 +99,7 @@ export default async function StudentsPage({
     return d ? collegeLabel(d.collegeId) : departmentId;
   };
 
+  const levels = await getStudentLevels(actor, results.rows.map((s) => s.id));
   const rows: StudentRow[] = results.rows.map((s) => ({
     id: s.id,
     studentNumber: s.studentNumber,
@@ -104,6 +108,7 @@ export default async function StudentsPage({
     lastName: s.lastName,
     gender: s.gender,
     status: s.status,
+    level: levels.get(s.id) ?? "FRESHMAN",
     collegeName: collegeForStudent(s.departmentId),
     enrolmentYear: s.enrolmentYear,
   }));
@@ -178,14 +183,27 @@ export default async function StudentsPage({
             <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Search students..." className="w-full sm:w-64" />
           </div>
           <div>
-            <Label htmlFor="status" className="text-xs">
+            <Label htmlFor="level" className="text-xs">
               Status
             </Label>
+            <Select id="level" name="level" defaultValue={validLevel ?? ""}>
+              <option value="">All levels</option>
+              {STUDENT_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {LEVEL_LABEL[l]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="status" className="text-xs">
+              Enrollment
+            </Label>
             <Select id="status" name="status" defaultValue={validStatus ?? ""}>
-              <option value="">All statuses</option>
+              <option value="">Any</option>
               {STUDENT_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {enrollmentLabel(s)}
                 </option>
               ))}
             </Select>

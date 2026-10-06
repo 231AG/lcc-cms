@@ -131,7 +131,7 @@ const describe = (s: ImportSheet) => `${s.sourceFile} sheet ${s.sheetNo}`;
 
 /** Creates a planned past semester, and its academic year when that is new
  *  too, through the same audited services the Academic calendar uses. */
-async function createPlannedSemester(actor: Actor, plan: PlannedSemester): Promise<string> {
+export async function createPlannedSemester(actor: Actor, plan: PlannedSemester): Promise<string> {
   let year = await db.query.academicYear.findFirst({ where: eq(academicYear.label, plan.yearLabel) });
   if (!year) {
     if (!plan.newYear) throw new StateError(`Academic year ${plan.yearLabel} was expected to exist.`);

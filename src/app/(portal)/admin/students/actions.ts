@@ -6,6 +6,8 @@ import { requireActor } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
 import {
   enrollStudent,
+  STUDENT_DETAIL_DATE_FIELDS,
+  STUDENT_DETAIL_TEXT_FIELDS,
   resetStudentPassword,
   updateStudentProfile,
   type StudentGender,
@@ -98,6 +100,13 @@ export async function updateStudentProfileAction(formData: FormData): Promise<vo
       minor: String(formData.get("minor") ?? ""),
       contactPhone: contactPhoneRaw || null,
       status: String(formData.get("status") ?? "") as StudentStatus,
+      // The transcript details. Only a field the form actually sent is
+      // passed on, and a blank one clears it, like the minor above.
+      details: Object.fromEntries(
+        [...STUDENT_DETAIL_TEXT_FIELDS, ...STUDENT_DETAIL_DATE_FIELDS]
+          .filter((field) => formData.has(field))
+          .map((field) => [field, String(formData.get(field) ?? "")]),
+      ),
     });
   } catch (err) {
     if (err instanceof AppError) {

@@ -133,6 +133,9 @@ export const AUDIT_ACTIONS = [
   "GRADE_SCALE_VERSION_CREATED",
   "INSTITUTION_SETTING_CHANGED",
   "CLASS_SHEET_PRINTED",
+  // A transcript, official (staff) or the student's own unofficial copy,
+  // sent to the printer or saved as a PDF.
+  "TRANSCRIPT_PRINTED",
   "ACADEMIC_EXPORT_RUN",
   "AUDIT_LOG_VIEWED",
 

@@ -19,3 +19,23 @@ export async function logSemesterPrintAction(semesterId: string): Promise<void> 
     }),
   );
 }
+
+/**
+ * The student's own unofficial transcript going to the printer. Always the
+ * signed-in student's own record -- there is no student id to pass in.
+ */
+export async function logOwnTranscriptPrintAction(): Promise<void> {
+  const actor = await requireActor();
+  if (actor.role !== "STUDENT") throw new Error("Only a student prints their own transcript here.");
+  await db.transaction((tx) =>
+    auditWrite(tx, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: "TRANSCRIPT_PRINTED",
+      entityType: "student",
+      entityId: actor.userId,
+      studentId: actor.userId,
+      newValue: { copy: "UNOFFICIAL" },
+    }),
+  );
+}

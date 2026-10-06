@@ -14,34 +14,17 @@ import { cn } from "@/components/ui/cn";
  * Design rules being followed deliberately:
  *
  *  - EVERY BAR IS DIRECTLY LABELLED with its name and its value. Colour is
- *    never the only channel carrying identity, which is also what licenses
- *    the two colours below that sit under 3:1 against the page (amber and
- *    the neutral grey): the label is the required relief, not an optional
- *    nicety.
- *  - ONE HUE for a single series. The College and Enrolment-year charts are
- *    one series each, so they are one colour and carry no legend -- the
- *    heading names them. Only the status chart is multi-colour, and that is
- *    because status colour is meaningful there (suspended is red because it
- *    is red everywhere else in this app), not decoration.
- *  - The status colours are the app's own semantic tokens, so a status reads
- *    identically on a badge, in an alert and on this chart. Validated for
- *    colour-vision separation; the neutral grey deliberately stays neutral,
- *    because "inactive" is exactly what a neutral means here.
+ *    never the only channel carrying identity.
+ *  - ONE HUE for a single series. The Status (level), College and
+ *    Enrolment-year charts are one series each, so they are one colour and
+ *    carry no legend -- the heading names them.
  *  - Rounded data-ends, a recessive track, and a hover title on every bar.
  */
-
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: "var(--success-solid)",
-  GRADUATED: "var(--info-solid)",
-  ADMISSION_FORFEITED: "var(--warning-solid)",
-  SUSPENDED: "var(--danger-solid)",
-  INACTIVE: "var(--fg-subtle)",
-};
 
 /** The tinted icon chips on the stat cards. Colour here says something or
  * nothing: every tile wears the brand chip, and only a figure that IS a
  * status takes that status's colour -- "Active" is green because ACTIVE is
- * green on the status chart below it and on every badge in the app. There
+ * green on every enrollment badge in the app. There
  * used to be four tones handed out one per tile purely so the row looked
  * varied; a colour that means nothing teaches the reader to ignore colour,
  * which is exactly what the status colours need them not to do. The icon
@@ -138,11 +121,6 @@ export function BarList({
       ))}
     </ul>
   );
-}
-
-/** Ranked bars using the app's own status colours. */
-export function StatusBarList({ data }: { data: CountByLabel[] }) {
-  return <BarList data={data} colorFor={(label) => STATUS_COLOR[label] ?? "var(--primary)"} emptyMessage="No students enrolled yet." />;
 }
 
 /**

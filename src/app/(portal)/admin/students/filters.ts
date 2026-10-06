@@ -1,4 +1,6 @@
 import { STUDENT_STATUSES, type StudentStatus } from "@/lib/students/students";
+import { enrollmentLabel } from "@/lib/students/enrollment";
+import { isStudentLevel, LEVEL_LABEL, type StudentLevel } from "@/lib/students/level";
 
 /**
  * The Students listing's filter state, parsed once.
@@ -16,7 +18,10 @@ export const DEFAULT_PAGE_SIZE = 25;
 
 export interface StudentListParams {
   q?: string;
+  /** Enrollment (Active, Graduated...). Kept as `status` so existing links still work. */
   status?: string;
+  /** Status in the College's sense: the level, Freshman ... Senior. */
+  level?: string;
   collegeId?: string;
   year?: string;
   page?: string;
@@ -26,6 +31,7 @@ export interface StudentListParams {
 export interface StudentFilters {
   query?: string;
   status?: StudentStatus;
+  level?: StudentLevel;
   collegeId?: string;
   enrolmentYear?: number;
   page: number;
@@ -39,6 +45,7 @@ export function parseStudentFilters(params: StudentListParams): StudentFilters {
     params.status && (STUDENT_STATUSES as readonly string[]).includes(params.status)
       ? (params.status as StudentStatus)
       : undefined;
+  const level = isStudentLevel(params.level) ? params.level : undefined;
   const enrolmentYear = params.year && /^\d{4}$/.test(params.year) ? Number(params.year) : undefined;
   const pageSize = PAGE_SIZES.includes(Number(params.pageSize) as (typeof PAGE_SIZES)[number])
     ? Number(params.pageSize)
@@ -49,11 +56,12 @@ export function parseStudentFilters(params: StudentListParams): StudentFilters {
   return {
     query,
     status,
+    level,
     collegeId,
     enrolmentYear,
     page: Math.max(1, Number(params.page) || 1),
     pageSize,
-    hasFilters: Boolean(query || status || collegeId || enrolmentYear),
+    hasFilters: Boolean(query || status || level || collegeId || enrolmentYear),
   };
 }
 
@@ -66,6 +74,7 @@ export function parseStudentFilters(params: StudentListParams): StudentFilters {
 export function filterSearchParams(filters: StudentFilters): URLSearchParams {
   const sp = new URLSearchParams();
   if (filters.query) sp.set("q", filters.query);
+  if (filters.level) sp.set("level", filters.level);
   if (filters.status) sp.set("status", filters.status);
   if (filters.collegeId) sp.set("collegeId", filters.collegeId);
   if (filters.enrolmentYear) sp.set("year", String(filters.enrolmentYear));
@@ -77,7 +86,8 @@ export function filterSearchParams(filters: StudentFilters): URLSearchParams {
 export function describeFilters(filters: StudentFilters, collegeName?: string): string {
   const parts: string[] = [];
   if (filters.query) parts.push(`matching “${filters.query}”`);
-  if (filters.status) parts.push(`status ${filters.status}`);
+  if (filters.level) parts.push(LEVEL_LABEL[filters.level]);
+  if (filters.status) parts.push(`enrollment ${enrollmentLabel(filters.status).toLowerCase()}`);
   if (collegeName) parts.push(collegeName);
   if (filters.enrolmentYear) parts.push(`enrolled ${filters.enrolmentYear}`);
   return parts.length ? `Filtered: ${parts.join(" · ")}` : "All enrolled students";

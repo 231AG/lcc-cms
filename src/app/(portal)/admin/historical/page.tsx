@@ -10,21 +10,18 @@ import { NotFoundError } from "@/lib/errors";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Label, Input, Select } from "@/components/ui/Form";
+import { Label, Input } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
+import { buttonClasses } from "@/components/ui/Button";
 import {
   correctHistoricalRecordAction,
-  createRetrospectiveSemesterAction,
-  enterHistoricalSemesterAction,
   markImportCompleteAction,
   reopenImportStatusAction,
   voidHistoricalRecordAction,
 } from "./actions";
 
-export const metadata: Metadata = { title: "Historical import" };
-
-const ROW_COUNT = 8;
+export const metadata: Metadata = { title: "Past record" };
 
 /**
  * A-15 (plan Section 20.4, Stage 6): historical entry, one semester at a
@@ -36,10 +33,10 @@ const ROW_COUNT = 8;
 export default async function HistoricalEntryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ studentId?: string; semesterId?: string; error?: string; entered?: string; warnings?: string }>;
+  searchParams: Promise<{ studentId?: string; error?: string }>;
 }) {
   const actor = await getCurrentActor();
-  const { studentId, semesterId, error, entered, warnings } = await searchParams;
+  const { studentId, error } = await searchParams;
 
   if (!actor)
     return (
@@ -60,13 +57,13 @@ export default async function HistoricalEntryPage({
   if (!studentId) {
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
-        <PageHeader title="Historical import" />
+        <PageHeader title="Past record" />
         <p className="text-sm text-fg-secondary">
           Open a student&apos;s record from{" "}
           <Link href="/admin/students" className="font-medium text-brand-fg hover:underline">
             Students
           </Link>{" "}
-          and use &quot;Enter historical record&quot; to get here with a student selected.
+          and use &quot;Past record&quot; on their profile to get here with a student selected.
         </p>
       </main>
     );
@@ -96,7 +93,6 @@ export default async function HistoricalEntryPage({
   );
 
   const yearLabel = (id: string) => academicYears.find((y) => y.id === id)?.label ?? id;
-  const selectedSemester = semesterId ? semesters.find((s) => s.id === semesterId) : undefined;
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
@@ -119,12 +115,6 @@ export default async function HistoricalEntryPage({
       {error && (
         <Alert tone="danger" className="mb-4">
           {error}
-        </Alert>
-      )}
-      {entered && (
-        <Alert tone="success" className="mb-4">
-          Saved {entered} record(s).
-          {Number(warnings) > 0 && ` ${warnings} warning(s) -- check the unknown-course entries below.`}
         </Alert>
       )}
 
@@ -163,128 +153,16 @@ export default async function HistoricalEntryPage({
       {isAdmin && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Enter a past semester</CardTitle>
+            <CardTitle>Add past grades</CardTitle>
           </CardHeader>
           <CardBody>
-            <form method="GET" className="mb-4 flex flex-wrap items-end gap-2">
-              <input type="hidden" name="studentId" value={studentId} />
-              <div>
-                <Label htmlFor="semesterId" className="text-xs">
-                  Semester
-                </Label>
-                <Select id="semesterId" name="semesterId" defaultValue={semesterId ?? ""} className="w-72">
-                  <option value="">Select a semester…</option>
-                  {semesters.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {yearLabel(s.academicYearId)} — {semesterDisplayName(s)} ({s.state})
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <SubmitButton variant="secondary">
-                Select
-              </SubmitButton>
-            </form>
-
-            <details className="mb-4">
-              <summary className="cursor-pointer text-sm font-medium text-brand-fg hover:underline">
-                Create a new past semester (created directly Closed)
-              </summary>
-              <form action={createRetrospectiveSemesterAction} className="mt-3 flex flex-wrap items-end gap-2">
-                <input type="hidden" name="studentId" value={studentId} />
-                <div>
-                  <Label htmlFor="academicYearId" className="text-xs">
-                    Academic year
-                  </Label>
-                  <Select id="academicYearId" name="academicYearId" required>
-                    {academicYears.map((y) => (
-                      <option key={y.id} value={y.id}>
-                        {y.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="sequence" className="text-xs">
-                    Sequence
-                  </Label>
-                  <Select id="sequence" name="sequence" required>
-                    <option value="1">1 (First)</option>
-                    <option value="2">2 (Second)</option>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="sem-name" className="text-xs">
-                    Name
-                  </Label>
-                  <Input id="sem-name" name="name" required placeholder="First Semester" />
-                </div>
-                <div>
-                  <Label htmlFor="sem-start" className="text-xs">
-                    Start date
-                  </Label>
-                  <Input id="sem-start" name="startDate" type="date" required />
-                </div>
-                <div>
-                  <Label htmlFor="sem-end" className="text-xs">
-                    End date
-                  </Label>
-                  <Input id="sem-end" name="endDate" type="date" required />
-                </div>
-                <SubmitButton variant="secondary">
-                  Create semester
-                </SubmitButton>
-              </form>
-            </details>
-
-            {selectedSemester && (
-              <form action={enterHistoricalSemesterAction} className="flex flex-col gap-3">
-                <input type="hidden" name="studentId" value={studentId} />
-                <input type="hidden" name="semesterId" value={selectedSemester.id} />
-                <p className="text-sm text-fg-secondary">
-                  Entering courses for {yearLabel(selectedSemester.academicYearId)} — {selectedSemester.name}
-                </p>
-                <Table>
-                  <Thead>
-                    <tr>
-                      <Th>Course code</Th>
-                      <Th>Cr/Hrs</Th>
-                      <Th>Grade</Th>
-                      <Th>Score</Th>
-                      <Th>Note</Th>
-                      <Th>Repeat?</Th>
-                    </tr>
-                  </Thead>
-                  <tbody>
-                    {Array.from({ length: ROW_COUNT }).map((_, i) => (
-                      <Tr key={i}>
-                        <Td>
-                          <Input name={`courseCode-${i}`} aria-label={`Course code, row ${i + 1}`} className="w-28" />
-                        </Td>
-                        <Td>
-                          <Input name={`creditHours-${i}`} aria-label={`Credit hours, row ${i + 1}`} type="number" step="0.5" className="w-20" />
-                        </Td>
-                        <Td>
-                          <Input name={`letter-${i}`} aria-label={`Grade, row ${i + 1}`} className="w-16" />
-                        </Td>
-                        <Td>
-                          <Input name={`score-${i}`} aria-label={`Score, row ${i + 1}`} type="number" className="w-16" />
-                        </Td>
-                        <Td>
-                          <Input name={`note-${i}`} aria-label={`Note, row ${i + 1}`} className="w-32" />
-                        </Td>
-                        <Td>
-                          <input name={`confirmAsRepeat-${i}`} aria-label={`Confirm as repeat, row ${i + 1}`} type="checkbox" />
-                        </Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                </Table>
-                <SubmitButton className="w-fit">
-                  Save semester
-                </SubmitButton>
-              </form>
-            )}
+            <p className="mb-3 text-sm text-fg-secondary">
+              Past semesters are entered on Import past grades: pick the year and semester, search the catalogue for each course, and the
+              grade points and GPA are worked out for you.
+            </p>
+            <Link href={`/admin/historical/import?tab=hand&studentId=${studentId}`} className={buttonClasses("primary", "sm")}>
+              Add past grades
+            </Link>
           </CardBody>
         </Card>
       )}
