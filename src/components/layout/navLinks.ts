@@ -11,7 +11,6 @@ import {
   FilePen,
   FileText,
   GraduationCap,
-  History,
   Hourglass,
   KeyRound,
   FileUp,
@@ -84,7 +83,6 @@ export const ADMIN_GROUPS: NavGroup[] = [
     label: "Students",
     links: [
       { href: "/admin/students", label: "Student Listing", icon: Users },
-      { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
       { href: "/admin/transcripts", label: "Transcripts", icon: FileText },
       { href: "/admin/historical/import", label: "Import past grades", icon: FileUp },
       { href: "/admin/login-slips", label: "Login slips", icon: KeyRound },
@@ -138,7 +136,6 @@ export const SUPER_ADMIN_GROUPS: NavGroup[] = [
     label: "Students",
     links: [
       { href: "/admin/students", label: "Student Listing", icon: Users },
-      { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
       { href: "/admin/transcripts", label: "Transcripts", icon: FileText },
     ],
   },

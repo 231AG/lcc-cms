@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getStudentLevels } from "@/lib/gpa/gpa";
+import { StudentStatus } from "@/components/students/StudentStatus";
 import Link from "next/link";
 import { ArrowLeft, FileText, UserRound } from "lucide-react";
 import { getCurrentActor } from "@/lib/auth/session";
@@ -13,7 +15,6 @@ import { PrintTranscriptButton } from "@/components/transcript/PrintTranscriptBu
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
 import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input } from "@/components/ui/Form";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
@@ -130,6 +131,7 @@ export default async function TranscriptsPage({
 async function StudentPicker({ actor, sq, sp }: { actor: Actor; sq?: string; sp?: string }) {
   const pageNum = Math.max(1, Number(sp) || 1);
   const results = await searchStudents(actor, { query: sq?.trim() || undefined, page: pageNum, pageSize: PAGE_SIZE });
+  const levels = await getStudentLevels(actor, results.rows.map((s) => s.id));
   const departments = results.rows.length ? await asUser(actor.userId, (tx) => tx.query.department.findMany()) : [];
   const departmentName = (id: string) => departments.find((d) => d.id === id)?.name ?? "—";
 
@@ -180,7 +182,7 @@ async function StudentPicker({ actor, sq, sp }: { actor: Actor; sq?: string; sp?
                     <Td className="font-medium text-fg">{listName(s)}</Td>
                     <Td className="hidden text-fg-secondary sm:table-cell">{departmentName(s.departmentId)}</Td>
                     <Td className="hidden whitespace-nowrap sm:table-cell">
-                      <Badge tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status}</Badge>
+                      <StudentStatus level={levels.get(s.id) ?? "FRESHMAN"} enrollment={s.status} />
                     </Td>
                     <Td className="text-right">
                       <Link

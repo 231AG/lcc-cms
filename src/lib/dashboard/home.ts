@@ -4,7 +4,6 @@ import { courseOffering, gradeRecord, gradeSubmission, registration, semester } 
 import { assertCan, type Actor } from "@/lib/permissions/kernel";
 import { countPlansAwaitingApproval } from "@/lib/planning/planning";
 import { getSubmissionQueue, getCorrectionQueue } from "@/lib/grades/grades";
-import { getImportProgressReport } from "@/lib/historical/historical";
 import { ACTIVE_SEMESTER_STATES, isGradeEntryOpen, type SemesterState } from "@/lib/academic/semesterStateMachine";
 import { semesterDisplayName } from "@/lib/academic/semesterName";
 
@@ -21,13 +20,15 @@ export interface AdminHomeSummary {
   plansAwaitingApproval: number;
   classesNotYetSubmitted: number;
   rejectedGradesNeedingRework: number;
-  importByStatus: Record<string, number>;
 }
 
 /**
  * A-01 (plan Section 20.4): "Work queues: plans awaiting approval, classes
- * with grades not yet submitted, submissions rejected and needing rework,
- * import progress summary. Queues, not analytics." Aggregates existing,
+ * with grades not yet submitted, submissions rejected and needing rework.
+ * Queues, not analytics. (The import progress summary it also listed was
+ * retired with the Historical import progress page: Import past grades is
+ * where past records are entered, and a student's own profile shows how far
+ * theirs has got.) Aggregates existing,
  * already-permission-gated queue functions rather than re-implementing
  * their access rules here.
  */
@@ -42,7 +43,7 @@ export async function getAdminHomeSummary(actor: Actor): Promise<AdminHomeSummar
   // rows only to read `.length`), and every one of its four independent
   // figures was awaited in series. They share no data, so they now run
   // together and the plan count is a single COUNT in the database.
-  const [plansAwaitingApproval, classesNotYetSubmitted, rejectedGrades, progress] = await Promise.all([
+  const [plansAwaitingApproval, classesNotYetSubmitted, rejectedGrades] = await Promise.all([
     countPlansAwaitingApproval(actor, activeSemesters.map((s) => s.id)),
     countClassesNotYetSubmitted(gradeSemesterIds),
     // A grade returned to DRAFT with a decision_reason set is one that was
@@ -51,14 +52,12 @@ export async function getAdminHomeSummary(actor: Actor): Promise<AdminHomeSummar
     db.query.gradeRecord.findMany({
       where: and(eq(gradeRecord.status, "DRAFT"), isNotNull(gradeRecord.decisionReason)),
     }),
-    getImportProgressReport(actor),
   ]);
 
   return {
     plansAwaitingApproval,
     classesNotYetSubmitted,
     rejectedGradesNeedingRework: rejectedGrades.length,
-    importByStatus: progress.byStatus,
   };
 }
 

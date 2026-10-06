@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getStudentLevels } from "@/lib/gpa/gpa";
+import { StudentStatus } from "@/components/students/StudentStatus";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Eye, PenLine, Plus } from "lucide-react";
@@ -212,6 +214,7 @@ async function StudentChooser({
 }) {
   const pageNum = Math.max(1, Number(sp) || 1);
   const results = await searchStudents(actor, { query: sq?.trim() || undefined, page: pageNum, pageSize: PAGE_SIZE_STUDENTS });
+  const levels = await getStudentLevels(actor, results.rows.map((s) => s.id));
 
   // Reference data read whole and resolved in memory rather than joined per
   // row -- tens of departments, and the same approach every other listing
@@ -331,7 +334,7 @@ async function StudentChooser({
                         )}
                       </Td>
                       <Td className="hidden whitespace-nowrap sm:table-cell">
-                        <Badge tone={s.status === "ACTIVE" ? "success" : "neutral"}>{s.status}</Badge>
+                        <StudentStatus level={levels.get(s.id) ?? "FRESHMAN"} enrollment={s.status} />
                       </Td>
                       <Td className="text-right">
                         <Link

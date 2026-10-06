@@ -3,6 +3,9 @@ import { asUser } from "@/lib/db/asUser";
 import { exportStudents } from "@/lib/students/students";
 import { listName } from "@/lib/students/name";
 import { genderLabel } from "@/lib/students/gender";
+import { enrollmentLabel } from "@/lib/students/enrollment";
+import { LEVEL_LABEL } from "@/lib/students/level";
+import { getStudentLevels } from "@/lib/gpa/gpa";
 import type { Actor } from "@/lib/permissions/kernel";
 import type { SearchStudentsInput } from "@/lib/students/students";
 
@@ -26,6 +29,9 @@ export interface StudentListRow {
   studentNumber: string;
   name: string;
   gender: string;
+  /** The level: Freshman ... Senior. */
+  level: string;
+  /** Enrollment: Active, Graduated ... */
   status: string;
   college: string;
   enrolmentYear: string;
@@ -37,18 +43,20 @@ export const STUDENT_LIST_COLUMNS = [
   { key: "studentNumber", header: "Student ID", nowrap: true },
   { key: "name", header: "Name" },
   { key: "gender", header: "Gender", nowrap: true },
-  { key: "status", header: "Status", nowrap: true },
+  { key: "level", header: "Status", nowrap: true },
+  { key: "status", header: "Enrollment", nowrap: true },
   { key: "college", header: "College" },
   { key: "enrolmentYear", header: "Enrolment year", nowrap: true },
 ] as const satisfies ReadonlyArray<{ key: keyof StudentListRow; header: string; nowrap?: boolean }>;
 
 /**
- * The printed listing drops Status.
+ * The printed listing drops Enrollment.
  *
  * A CSV is data -- you filter and pivot it, so more columns are strictly
- * better. A printed page is a document somebody reads across a room, and the
- * enrolment status of every row is not what a printed roll is for; leaving it
- * out buys the four remaining columns the width they need in landscape.
+ * better. A printed page is a document somebody reads across a room, and
+ * whether each row is enrolled is not what a printed roll is for; leaving it
+ * out buys the remaining columns the width they need in landscape. The
+ * level (Status) stays: it is what a roll is often sorted by.
  */
 export const STUDENT_PRINT_COLUMNS = STUDENT_LIST_COLUMNS.filter((c) => c.key !== "status");
 
@@ -63,6 +71,7 @@ export async function getStudentListRows(
     ),
   ]);
   const [departments, colleges] = reference;
+  const levels = await getStudentLevels(actor, students.map((s) => s.id));
 
   // The college's name without its code, matching the on-screen listing.
   const collegeFor = (departmentId: string): string => {
@@ -79,7 +88,8 @@ export async function getStudentListRows(
       // reads as "not recorded" rather than as an empty cell that looks like
       // a rendering fault.
       gender: genderLabel(s.gender),
-      status: s.status,
+      level: LEVEL_LABEL[levels.get(s.id) ?? "FRESHMAN"],
+      status: enrollmentLabel(s.status),
       college: collegeFor(s.departmentId),
       enrolmentYear: String(s.enrolmentYear),
     })),

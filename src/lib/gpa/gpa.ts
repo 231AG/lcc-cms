@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { asUser } from "@/lib/db/asUser";
 import { academicRecord, studentCumulativeSummary, studentSemesterSummary } from "@/lib/db/schema";
 import type { Actor } from "@/lib/permissions/kernel";
+import { levelForCredits, type StudentLevel } from "@/lib/students/level";
 import { DEFAULT_GPA_POLICY, MAJOR_REPEAT_LETTERS, creditsToGraduation, deriveAcademicStanding, formatGpa, type AcademicStanding } from "./engine";
 
 /**
@@ -96,4 +97,23 @@ export async function getOutstandingRepeatObligations(actor: Actor, studentId: s
     }
   }
   return obligations;
+}
+
+/**
+ * Each student's level (Freshman ... Senior), from the credit hours the
+ * engine has them as having earned. One query for a whole page of
+ * students; a student with no summary yet has earned nothing, so is a
+ * Freshman. RLS-scoped like every other read here.
+ */
+export async function getStudentLevels(actor: Actor, studentIds: string[]): Promise<Map<string, StudentLevel>> {
+  const rows = studentIds.length
+    ? await asUser(actor.userId, (tx) =>
+        tx
+          .select({ studentId: studentCumulativeSummary.studentId, earned: studentCumulativeSummary.totalCreditsEarned })
+          .from(studentCumulativeSummary)
+          .where(inArray(studentCumulativeSummary.studentId, studentIds)),
+      )
+    : [];
+  const earned = new Map(rows.map((r) => [r.studentId, r.earned]));
+  return new Map(studentIds.map((id) => [id, levelForCredits(earned.get(id))]));
 }

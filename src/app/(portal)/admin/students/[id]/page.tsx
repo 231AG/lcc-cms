@@ -51,6 +51,8 @@ import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { GENDER_LABEL } from "@/lib/students/gender";
+import { enrollmentLabel } from "@/lib/students/enrollment";
+import { LEVEL_LABEL, levelForCredits } from "@/lib/students/level";
 import { formatDay } from "@/lib/transcript/formatDay";
 import { titleCase } from "@/lib/transcript/titleCase";
 import { removeStudentPhotoAction, updateStudentProfileAction, uploadStudentPhotoAction } from "../actions";
@@ -69,6 +71,13 @@ const STATUS_TONE: Record<string, Tone> = {
   SUSPENDED: "danger",
   GRADUATED: "info",
   ADMISSION_FORFEITED: "warning",
+};
+
+/** The student's past record (`historicalImportStatus`), in words. */
+const PAST_RECORD_LABEL: Record<string, string> = {
+  NOT_STARTED: "Not started",
+  IN_PROGRESS: "In progress",
+  COMPLETE: "Complete",
 };
 
 const IMPORT_STATUS_TONE: Record<string, Tone> = {
@@ -234,6 +243,8 @@ export default async function StudentDetailPage({
         tx.query.course.findMany(),
       ]),
     );
+  // The College's "Status": Freshman ... Senior, from credit hours earned.
+  const level = levelForCredits(cumulative?.totalCreditsEarned);
   const semesterSummaryFor = (semesterId: string) => semesterSummaries.find((s) => s.semesterId === semesterId);
   const yearLabel = (semesterId: string) => {
     const sem = semesters.find((s) => s.id === semesterId);
@@ -379,9 +390,12 @@ export default async function StudentDetailPage({
               </h1>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-fg-secondary">{record.studentNumber}</span>
-                <Badge tone={STATUS_TONE[record.status] ?? "neutral"}>{record.status}</Badge>
+                {/* Status is the level, as the College uses the word;
+                    Enrollment is whether they are enrolled at all. */}
+                <Badge tone="brand">{LEVEL_LABEL[level]}</Badge>
+                <Badge tone={STATUS_TONE[record.status] ?? "neutral"}>{enrollmentLabel(record.status)}</Badge>
                 <Badge tone={IMPORT_STATUS_TONE[record.historicalImportStatus] ?? "neutral"}>
-                  Import: {record.historicalImportStatus}
+                  Past record: {PAST_RECORD_LABEL[record.historicalImportStatus] ?? record.historicalImportStatus}
                 </Badge>
               </div>
             </div>
@@ -612,17 +626,23 @@ export default async function StudentDetailPage({
                   </fieldset>
                   <div>
                     <Label htmlFor="status" className="text-xs">
-                      Status
+                      Enrollment
                     </Label>
-                    <Select id="status" name="status" defaultValue={record.status} className="max-w-xs">
+                    <Select id="status" name="status" defaultValue={record.status} className="max-w-xs" aria-describedby="status-help">
                       {STUDENT_STATUSES.map((s) => (
                         <option key={s} value={s}>
-                          {s}
+                          {enrollmentLabel(s)}
                         </option>
                       ))}
                     </Select>
+                    <p id="status-help" className="mt-1 text-xs text-fg-muted">
+                      Only Active students can plan courses and register. Status ({LEVEL_LABEL[level]}) is worked out from
+                      credit hours earned, so there is nothing to set for it.
+                    </p>
                   </div>
-                  <p className="text-xs text-fg-muted">Import status: {record.historicalImportStatus}</p>
+                  <p className="text-xs text-fg-muted">
+                    Past record: {PAST_RECORD_LABEL[record.historicalImportStatus] ?? record.historicalImportStatus}
+                  </p>
                   <SubmitButton className="w-fit">
                     Save changes
                   </SubmitButton>
@@ -640,6 +660,16 @@ export default async function StudentDetailPage({
                   </Detail>
                   <Detail icon={UserRound} label="Gender">
                     {GENDER_LABEL[record.gender ?? ""] ?? "—"}
+                  </Detail>
+                  <Detail icon={GraduationCap} label="Status">
+                    {LEVEL_LABEL[level]}
+                    <span className="text-fg-muted font-normal">
+                      {" "}
+                      · {cumulative ? trimCredits(cumulative.totalCreditsEarned) : "0"} credit hours earned
+                    </span>
+                  </Detail>
+                  <Detail icon={BadgeCheck} label="Enrollment">
+                    {enrollmentLabel(record.status)}
                   </Detail>
                   <Detail icon={BookMarked} label="Minor">
                     {record.minor || "—"}
@@ -667,8 +697,8 @@ export default async function StudentDetailPage({
                       </Detail>
                     );
                   })}
-                  <Detail icon={ClipboardList} label="Import status">
-                    {record.historicalImportStatus}
+                  <Detail icon={ClipboardList} label="Past record">
+                    {PAST_RECORD_LABEL[record.historicalImportStatus] ?? record.historicalImportStatus}
                   </Detail>
                 </dl>
               )}

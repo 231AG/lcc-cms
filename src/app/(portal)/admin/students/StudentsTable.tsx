@@ -4,6 +4,8 @@ import { Badge, type Tone } from "@/components/ui/Badge";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/Table";
 import { fullName, initials, listName } from "@/lib/students/name";
 import { genderLabel } from "@/lib/students/gender";
+import { enrollmentLabel } from "@/lib/students/enrollment";
+import { LEVEL_LABEL, type StudentLevel } from "@/lib/students/level";
 
 /**
  * The Students table.
@@ -25,15 +27,18 @@ export interface StudentRow {
   lastName: string;
   /** NULL for a student enrolled before the field existed. */
   gender: string | null;
+  /** Enrollment: Active, Graduated ... (`student.status`). */
   status: string;
+  /** Status in the College's sense: Freshman ... Senior. */
+  level: StudentLevel;
   /** The college's name on its own -- the page resolves it. */
   collegeName: string;
   enrolmentYear: number;
 }
 
 /**
- * Semantic colour per status, over the app's existing Badge tones and only
- * the five statuses STUDENT_STATUSES actually defines. There is no
+ * Semantic colour per enrollment value, over the app's existing Badge tones
+ * and only the five STUDENT_STATUSES actually defines. There is no
  * "pending" status in this system; ADMISSION_FORFEITED is the one that
  * reads as a warning.
  */
@@ -59,7 +64,10 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
           <Th className="px-2 sm:px-3">Student ID</Th>
           <Th className="px-2 sm:px-3">Name</Th>
           <Th className="hidden lg:table-cell px-2 sm:px-3">Gender</Th>
+          {/* Status is the level, as the College uses the word; whether
+              the student is enrolled at all is Enrollment beside it. */}
           <Th className="px-2 sm:px-3">Status</Th>
+          <Th className="hidden lg:table-cell px-2 sm:px-3">Enrollment</Th>
           {/* College and Enrolment year are the two that drop first on a
               narrow screen -- Student ID, Name, Status and Actions stay
               visible at every width. */}
@@ -86,8 +94,9 @@ export function StudentsTable({ students, canEdit }: { students: StudentRow[]; c
             <Td className="hidden lg:table-cell px-2 whitespace-nowrap text-fg-secondary sm:px-3">
               {genderLabel(s.gender)}
             </Td>
-            <Td className="px-2 sm:px-3">
-              <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{s.status}</Badge>
+            <Td className="px-2 whitespace-nowrap text-fg sm:px-3">{LEVEL_LABEL[s.level]}</Td>
+            <Td className="hidden lg:table-cell px-2 sm:px-3">
+              <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{enrollmentLabel(s.status)}</Badge>
             </Td>
             {/* Truncated with the full value on hover/focus rather than
                 widening the table -- some college names are long. */}

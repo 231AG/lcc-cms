@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { asUser } from "@/lib/db/asUser";
 import { academicRecord, semester } from "@/lib/db/schema";
 import type { Actor } from "@/lib/permissions/kernel";
@@ -10,6 +10,7 @@ import { semesterDisplayName, semesterNumeral } from "@/lib/academic/semesterNam
 import { getCumulativeSummary, getSemesterSummaries } from "@/lib/gpa/gpa";
 import { roundHalfUp } from "@/lib/gpa/engine";
 import { getGradeSheetSignatories, type GradeSheetSignatories } from "@/lib/settings/signatories";
+import { LEVEL_LABEL, levelForCredits } from "@/lib/students/level";
 
 /**
  * Everything one printed Student Grade Sheet needs, assembled once.
@@ -49,6 +50,8 @@ export interface GradeSheetData {
   student: {
     name: string;
     studentNumber: string;
+    /** The College's "Status": the level (Freshman ... Senior) the student
+     *  was at during this semester. */
     status: string;
     college: string;
     major: string;
@@ -200,6 +203,26 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
     };
   });
 
+  // The level during this semester: from the credit hours earned in every
+  // semester that started before it, so a past sheet says what the student
+  // was then (a Freshman's first sheet stays "Freshman" after they become
+  // a Senior), not what they are today.
+  const earlierSemesterIds = summaries.length
+    ? (
+        await asUser(actor.userId, (tx) =>
+          tx
+            .select({ id: semester.id, startDate: semester.startDate })
+            .from(semester)
+            .where(inArray(semester.id, summaries.map((s) => s.semesterId))),
+        )
+      )
+        .filter((s) => s.startDate < semesterRow.startDate)
+        .map((s) => s.id)
+    : [];
+  const earnedBefore = summaries
+    .filter((s) => earlierSemesterIds.includes(s.semesterId))
+    .reduce((sum, s) => sum.plus(s.creditsEarned), new Decimal(0));
+
   const summary = summaries.find((s) => s.semesterId === semesterId);
   const isProvisional = summary?.isProvisional ?? studentRow.historicalImportStatus !== "COMPLETE";
 
@@ -207,7 +230,7 @@ export async function getGradeSheet(actor: Actor, studentId: string, semesterId:
     student: {
       name: fullName(studentRow).toUpperCase(),
       studentNumber: studentRow.studentNumber,
-      status: studentRow.status,
+      status: LEVEL_LABEL[levelForCredits(earnedBefore)],
       college: college ? college.name : "—",
       // The system has no separate "major" field: a student belongs to a
       // department, and that department IS their programme of study.

@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateTemporaryPassword } from "@/lib/identity/temporaryPassword";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { fullName } from "./name";
+import { levelCreditRange, type StudentLevel } from "./level";
 
 export const STUDENT_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED", "GRADUATED", "ADMISSION_FORFEITED"] as const;
 export type StudentStatus = (typeof STUDENT_STATUSES)[number];
@@ -511,6 +512,8 @@ export async function resetStudentPassword(
 export interface SearchStudentsInput {
   query?: string;
   status?: StudentStatus;
+  /** The level (Freshman ... Senior), worked out from earned credit hours. */
+  level?: StudentLevel;
   /** Filters combine with AND, and with `query`/`status`. */
   departmentId?: string;
   /**
@@ -566,6 +569,18 @@ function buildStudentWhere(tx: Tx, input: SearchStudentsInput) {
   }
   if (input.enrolmentYear !== undefined) {
     conditions.push(eq(student.enrolmentYear, input.enrolmentYear));
+  }
+  if (input.level) {
+    // The level is not stored: it is the earned credit hours on the
+    // student's cumulative summary, read against level.ts's cut-offs. A
+    // student with no summary yet has earned nothing, hence the COALESCE.
+    const { min, below } = levelCreditRange(input.level);
+    // Spelled out with its own alias: inside a relational query Drizzle
+    // re-labels every column reference with the outer table's alias, which
+    // turned `student_cumulative_summary.total_credits_earned` into
+    // `student.total_credits_earned`.
+    const earned = sql`coalesce((select cs.total_credits_earned from app.student_cumulative_summary cs where cs.student_id = ${student.id}), 0)`;
+    conditions.push(below === null ? sql`${earned} >= ${min}` : sql`${earned} >= ${min} and ${earned} < ${below}`);
   }
   return conditions.length > 0 ? and(...conditions) : undefined;
 }

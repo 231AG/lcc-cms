@@ -21,7 +21,7 @@ import {
   voidHistoricalRecordAction,
 } from "./actions";
 
-export const metadata: Metadata = { title: "Historical import" };
+export const metadata: Metadata = { title: "Past record" };
 
 /**
  * A-15 (plan Section 20.4, Stage 6): historical entry, one semester at a
@@ -57,13 +57,13 @@ export default async function HistoricalEntryPage({
   if (!studentId) {
     return (
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
-        <PageHeader title="Historical import" />
+        <PageHeader title="Past record" />
         <p className="text-sm text-fg-secondary">
           Open a student&apos;s record from{" "}
           <Link href="/admin/students" className="font-medium text-brand-fg hover:underline">
             Students
           </Link>{" "}
-          and use &quot;Enter historical record&quot; to get here with a student selected.
+          and use &quot;Past record&quot; on their profile to get here with a student selected.
         </p>
       </main>
     );

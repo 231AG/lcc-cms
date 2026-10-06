@@ -24,7 +24,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   GraduationCap,
-  History,
   PieChart,
   School,
   TrendingUp,
@@ -32,7 +31,9 @@ import {
   Users,
 } from "lucide-react";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
-import { BarList, ColumnChart, GenderDonut, StatTile, StatusBarList } from "@/components/charts/Charts";
+import { BarList, ColumnChart, GenderDonut, StatTile } from "@/components/charts/Charts";
+import { enrollmentLabel } from "@/lib/students/enrollment";
+import { LEVEL_LABEL, levelForCredits } from "@/lib/students/level";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody, CardTitle } from "@/components/ui/Card";
 import { RecordPanel } from "@/components/ui/RecordPanel";
@@ -148,9 +149,10 @@ export default async function PortalPage({
     };
     const semesterSummaryFor = (semesterId: string) => semesterSummaries.find((s) => s.semesterId === semesterId);
     const isProvisional = cumulative?.isProvisional ?? record.historicalImportStatus !== "COMPLETE";
-    // The status badge by the name and the Status fact card say the same
-    // thing, so they take their colour from one place.
-    const statusTone = record.status === "ACTIVE" ? "success" : "neutral";
+    // The student's Status as the College means it: their level, from
+    // credit hours earned. Enrollment (Active, Suspended...) is shown beside
+    // it only when it is not the ordinary Active, which is when it matters.
+    const level = LEVEL_LABEL[levelForCredits(cumulative?.totalCreditsEarned)];
 
     // S-03 (plan Section 20.3): "current semester and its state" -- the
     // most recently started semester that is not DRAFT or CLOSED, if any.
@@ -316,7 +318,8 @@ export default async function PortalPage({
               title={
                 <span className="inline-flex flex-wrap items-center gap-3">
                   {fullName(record)}
-                  <Badge tone={statusTone}>{record.status}</Badge>
+                  <Badge tone="brand">{level}</Badge>
+                  {record.status !== "ACTIVE" && <Badge tone="neutral">{enrollmentLabel(record.status)}</Badge>}
                 </span>
               }
               description={`Student ID ${record.studentNumber}`}
@@ -345,7 +348,7 @@ export default async function PortalPage({
                 : "No semester is currently open."
             }
           />
-          <FactCard icon={<UserCheck className="h-5 w-5" />} tone={statusTone} term="Status" value={record.status} />
+          <FactCard icon={<UserCheck className="h-5 w-5" />} tone="brand" term="Status" value={level} />
         </div>
 
         {/* Guidance for the screen, not part of the record: a printed copy
@@ -630,24 +633,6 @@ export default async function PortalPage({
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle icon={<History className="h-4 w-4" aria-hidden="true" />}>Historical import</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <ul className="flex flex-col divide-y divide-line-subtle text-sm">
-            {Object.entries(summary.importByStatus).map(([status, count]) => (
-              <li key={status} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                <span className="text-fg">{status}</span>
-                <span className="font-medium text-fg">{count}</span>
-              </li>
-            ))}
-          </ul>
-          <Link href="/admin/historical/progress" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-fg hover:underline">
-            Full progress report
-          </Link>
-        </CardBody>
-      </Card>
       </div>
     </main>
   );
@@ -707,7 +692,9 @@ function StatisticsSection({ stats, semesterCount }: { stats: StudentStatistics;
             <CardTitle icon={<PieChart className="h-4 w-4" aria-hidden="true" />}>Students by status</CardTitle>
           </CardHeader>
           <CardBody>
-            <StatusBarList data={stats.byStatus} />
+            {/* Status in the College's sense: the level, from credit hours
+                earned. Whether students are enrolled is the Active tile. */}
+            <BarList data={stats.byLevel} emptyMessage="No students enrolled yet." />
           </CardBody>
         </Card>
 

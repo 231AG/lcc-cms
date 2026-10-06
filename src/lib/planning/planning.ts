@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { enrollmentLabel } from "@/lib/students/enrollment";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, type Tx } from "@/lib/db/client";
 import { asUser } from "@/lib/db/asUser";
@@ -387,7 +388,7 @@ export async function getOrCreateDraftPlan(actor: Actor, semesterId: string, for
       const subject = await tx.query.student.findFirst({ where: eq(student.id, studentId) });
       if (!subject) throw new ValidationError("Student not found.");
       if (subject.status !== "ACTIVE") {
-        throw new ValidationError(`Only an active student can be registered for courses (this student is ${subject.status}).`);
+        throw new ValidationError(`Only an active student can be registered for courses (this student's enrollment is ${enrollmentLabel(subject.status)}).`);
       }
     }
 
@@ -1093,7 +1094,7 @@ export async function approvePlan(actor: Actor, planId: string): Promise<Approve
     const studentRow = await tx.query.student.findFirst({ where: eq(student.id, plan.studentId) });
     if (!studentRow) throw new ValidationError("Student not found.");
     if (studentRow.status !== "ACTIVE") {
-      throw new StateError(`This student's status is ${studentRow.status}; approval is refused.`);
+      throw new StateError(`This student's enrollment is ${enrollmentLabel(studentRow.status)}; approval is refused.`);
     }
 
     // "Approve all" (DEV-19): decides every item still PENDING -- an item
@@ -1271,7 +1272,7 @@ export async function approvePlanItem(actor: Actor, planItemId: string): Promise
     const studentRow = await tx.query.student.findFirst({ where: eq(student.id, plan.studentId) });
     if (!studentRow) throw new ValidationError("Student not found.");
     if (studentRow.status !== "ACTIVE") {
-      throw new StateError(`This student's status is ${studentRow.status}; approval is refused.`);
+      throw new StateError(`This student's enrollment is ${enrollmentLabel(studentRow.status)}; approval is refused.`);
     }
 
     await tx.select().from(courseOffering).where(eq(courseOffering.id, item.offeringId)).for("update");
