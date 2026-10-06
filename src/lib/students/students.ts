@@ -171,6 +171,94 @@ export interface UpdateStudentProfileInput {
   minor?: string | null;
   contactPhone?: string | null;
   status?: StudentStatus;
+  /**
+   * The optional details the academic transcript prints. Each follows the
+   * minor's rule: `undefined` leaves it as it is, `null` or a blank clears
+   * it. Dates are "YYYY-MM-DD".
+   */
+  details?: Partial<StudentDetails>;
+}
+
+/** The optional transcript details on a student record (migration 0034). */
+export interface StudentDetails {
+  dateOfBirth: string | null;
+  countryOfOrigin: string | null;
+  countyOfOrigin: string | null;
+  parentGuardian: string | null;
+  address: string | null;
+  acceptedFrom: string | null;
+  enrollmentStatus: string | null;
+  enrolmentDate: string | null;
+  degree: string | null;
+  graduationDate: string | null;
+  distinction: string | null;
+}
+
+export const STUDENT_DETAIL_TEXT_FIELDS = [
+  "countryOfOrigin",
+  "countyOfOrigin",
+  "parentGuardian",
+  "address",
+  "acceptedFrom",
+  "enrollmentStatus",
+  "degree",
+  "distinction",
+] as const;
+export const STUDENT_DETAIL_DATE_FIELDS = ["dateOfBirth", "enrolmentDate", "graduationDate"] as const;
+
+/** Long enough for any address or school name; short enough to print. */
+const DETAIL_MAX_LENGTH = 120;
+
+const DETAIL_LABEL: Record<keyof StudentDetails, string> = {
+  dateOfBirth: "Date of birth",
+  countryOfOrigin: "Country of origin",
+  countyOfOrigin: "County of origin",
+  parentGuardian: "Parent or guardian",
+  address: "Address",
+  acceptedFrom: "Accepted from",
+  enrollmentStatus: "Enrollment status",
+  enrolmentDate: "Date of enrollment",
+  degree: "Degree",
+  graduationDate: "Date of graduation",
+  distinction: "Distinction",
+};
+
+/**
+ * A submitted date, checked: a real calendar day in "YYYY-MM-DD" form.
+ * The browser's date input already sends that shape, but a server action
+ * is reachable without the form, and Postgres would turn "2001-02-30" into
+ * an error page rather than a message.
+ */
+function cleanDate(field: keyof StudentDetails, value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const day = match ? new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) : null;
+  if (!match || !day || day.toISOString().slice(0, 10) !== value) {
+    throw new ValidationError(`${DETAIL_LABEL[field]} must be a real date.`);
+  }
+  return value;
+}
+
+/**
+ * The details after an edit: each field is the submitted value when one
+ * was sent (trimmed, blank meaning "clear it") and the stored one when not.
+ */
+function mergeDetails(existing: StudentDetails, input: Partial<StudentDetails> | undefined): StudentDetails {
+  const next = { ...existing };
+  if (!input) return next;
+  for (const field of STUDENT_DETAIL_TEXT_FIELDS) {
+    if (input[field] === undefined) continue;
+    const value = input[field]?.trim() || null;
+    if (value && value.length > DETAIL_MAX_LENGTH) {
+      throw new ValidationError(`${DETAIL_LABEL[field]} is too long (${DETAIL_MAX_LENGTH} characters at most).`);
+    }
+    next[field] = value;
+  }
+  for (const field of STUDENT_DETAIL_DATE_FIELDS) {
+    if (input[field] === undefined) continue;
+    const value = input[field]?.trim() || null;
+    next[field] = value ? cleanDate(field, value) : null;
+  }
+  return next;
 }
 
 /**
@@ -296,6 +384,20 @@ export async function updateStudentProfile(
   const newMinor = input.minor === undefined ? existing.minor : input.minor?.trim() || null;
   const newContactPhone = input.contactPhone === undefined ? existing.contactPhone : input.contactPhone;
   const newStatus = input.status ?? (existing.status as StudentStatus);
+  const oldDetails: StudentDetails = {
+    dateOfBirth: existing.dateOfBirth,
+    countryOfOrigin: existing.countryOfOrigin,
+    countyOfOrigin: existing.countyOfOrigin,
+    parentGuardian: existing.parentGuardian,
+    address: existing.address,
+    acceptedFrom: existing.acceptedFrom,
+    enrollmentStatus: existing.enrollmentStatus,
+    enrolmentDate: existing.enrolmentDate,
+    degree: existing.degree,
+    graduationDate: existing.graduationDate,
+    distinction: existing.distinction,
+  };
+  const newDetails = mergeDetails(oldDetails, input.details);
 
   if (input.status && !STUDENT_STATUSES.includes(input.status)) {
     throw new ValidationError(`Invalid status "${input.status}".`);
@@ -314,6 +416,9 @@ export async function updateStudentProfile(
     ["minor", existing.minor, newMinor],
     ["contactPhone", existing.contactPhone, newContactPhone],
     ["status", existing.status, newStatus],
+    ...(Object.keys(oldDetails) as Array<keyof StudentDetails>).map(
+      (key): [string, unknown, unknown] => [key, oldDetails[key], newDetails[key]],
+    ),
   ];
   const changedFields = allFields.filter(([, oldV, newV]) => oldV !== newV);
 
@@ -343,6 +448,7 @@ export async function updateStudentProfile(
         minor: newMinor,
         contactPhone: newContactPhone,
         status: newStatus,
+        ...newDetails,
       })
       .where(eq(student.id, studentId))
       .returning();

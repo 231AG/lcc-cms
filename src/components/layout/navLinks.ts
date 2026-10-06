@@ -9,6 +9,7 @@ import {
   ClipboardPen,
   Download,
   FilePen,
+  FileText,
   GraduationCap,
   History,
   Hourglass,
@@ -71,6 +72,7 @@ export const STUDENT_GROUPS: NavGroup[] = [
       // only by scrolling their own profile. /portal/grades is the screen
       // for them, and this is the way in.
       { href: "/portal/grades", label: "My grades", icon: GraduationCap },
+      { href: "/portal/transcript", label: "My transcript", icon: FileText },
       { href: "/grading-policy", label: "Grading policy", icon: Scale },
     ],
   },
@@ -83,6 +85,7 @@ export const ADMIN_GROUPS: NavGroup[] = [
     links: [
       { href: "/admin/students", label: "Student Listing", icon: Users },
       { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
+      { href: "/admin/transcripts", label: "Transcripts", icon: FileText },
       { href: "/admin/historical/import", label: "Import past grades", icon: FileUp },
       { href: "/admin/login-slips", label: "Login slips", icon: KeyRound },
     ],
@@ -136,6 +139,7 @@ export const SUPER_ADMIN_GROUPS: NavGroup[] = [
     links: [
       { href: "/admin/students", label: "Student Listing", icon: Users },
       { href: "/admin/historical/progress", label: "Historical import progress", icon: History },
+      { href: "/admin/transcripts", label: "Transcripts", icon: FileText },
     ],
   },
   {

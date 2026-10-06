@@ -6,8 +6,17 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  BadgeCheck,
+  Cake,
   Camera,
+  CalendarCheck,
   ClipboardList,
+  FileText,
+  Globe,
+  House,
+  MapPin,
+  Medal,
+  Users,
   GraduationCap,
   History,
   KeyRound,
@@ -42,6 +51,8 @@ import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { GENDER_LABEL } from "@/lib/students/gender";
+import { formatDay } from "@/lib/transcript/formatDay";
+import { titleCase } from "@/lib/transcript/titleCase";
 import { removeStudentPhotoAction, updateStudentProfileAction, uploadStudentPhotoAction } from "../actions";
 import { ResetPasswordForm } from "../ResetPasswordForm";
 
@@ -86,6 +97,25 @@ const ITEM_STATUS_LABEL: Record<string, string> = {
   REJECTED: "Turned down",
   PENDING: "Awaiting decision",
 };
+
+/**
+ * The optional details the academic transcript prints (migration 0034),
+ * in the order the office reads them off a paper file. One list for both
+ * the edit form and the read-only view, so the two cannot drift.
+ */
+const TRANSCRIPT_DETAILS = [
+  { name: "dateOfBirth", label: "Date of birth", type: "date", icon: Cake },
+  { name: "countryOfOrigin", label: "Country of origin", type: "text", icon: Globe },
+  { name: "countyOfOrigin", label: "County of origin", type: "text", icon: MapPin },
+  { name: "parentGuardian", label: "Parent or guardian", type: "text", icon: Users },
+  { name: "address", label: "Address", type: "text", icon: House },
+  { name: "acceptedFrom", label: "Accepted from", type: "text", icon: School },
+  { name: "enrollmentStatus", label: "Enrollment status", type: "text", icon: BadgeCheck },
+  { name: "enrolmentDate", label: "Date of enrollment", type: "date", icon: CalendarDays },
+  { name: "degree", label: "Degree", type: "text", icon: GraduationCap },
+  { name: "graduationDate", label: "Date of graduation", type: "date", icon: CalendarCheck },
+  { name: "distinction", label: "Distinction", type: "text", icon: Medal },
+] as const;
 
 /** One figure with its label -- the four-up row under the profile header. */
 function Stat({
@@ -372,6 +402,12 @@ export default async function StudentDetailPage({
                   Edit student
                 </Link>
               ))}
+            {/* The official transcript, ready to print -- the same screen
+                the Transcripts menu item opens for this student. */}
+            <Link href={`/admin/transcripts?studentId=${record.id}`} className={buttonClasses("secondary", "md")}>
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              Transcript
+            </Link>
             {/* Secondary rather than ghost, with the arrow the action is
                 actually named after. A ghost link beside a filled primary
                 read as disabled text, which is the opposite of what a way
@@ -550,6 +586,30 @@ export default async function StudentDetailPage({
                     </Label>
                     <Input id="contactPhone" name="contactPhone" defaultValue={record.contactPhone ?? ""} className="max-w-xs" />
                   </div>
+                  {/* Optional, all of them: blank is "not recorded", and the
+                      transcript prints a dash. Clearing a field clears it. */}
+                  <fieldset className="border-line-subtle flex flex-col gap-3 border-t pt-3">
+                    <legend className="text-fg-secondary pr-2 text-xs font-semibold tracking-wide uppercase">
+                      Transcript details (optional)
+                    </legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {TRANSCRIPT_DETAILS.map((field) => (
+                        <div key={field.name} className={field.name === "address" ? "sm:col-span-2" : undefined}>
+                          <Label htmlFor={field.name} className="text-xs">
+                            {field.label}
+                          </Label>
+                          <Input
+                            id={field.name}
+                            name={field.name}
+                            type={field.type}
+                            defaultValue={record[field.name] ?? ""}
+                            maxLength={field.type === "text" ? 120 : undefined}
+                            placeholder={field.name === "degree" ? "e.g. BSc, BA" : undefined}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
                   <div>
                     <Label htmlFor="status" className="text-xs">
                       Status
@@ -590,6 +650,23 @@ export default async function StudentDetailPage({
                   <Detail icon={Phone} label="Phone">
                     {record.contactPhone || "—"}
                   </Detail>
+                  {TRANSCRIPT_DETAILS.map((field) => {
+                    const value = record[field.name];
+                    return (
+                      <Detail key={field.name} icon={field.icon} label={field.label}>
+                        {/* Shown as the transcript prints it: dates in one
+                            format, words capitalised -- except the degree,
+                            whose "BSc" has its own casing. */}
+                        {!value
+                          ? "—"
+                          : field.type === "date"
+                            ? formatDay(value)
+                            : field.name === "degree"
+                              ? value
+                              : titleCase(value)}
+                      </Detail>
+                    );
+                  })}
                   <Detail icon={ClipboardList} label="Import status">
                     {record.historicalImportStatus}
                   </Detail>

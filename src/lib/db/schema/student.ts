@@ -1,4 +1,4 @@
-import { text, integer, timestamp, uuid, index, check, customType } from "drizzle-orm/pg-core";
+import { text, integer, timestamp, date, uuid, index, check, customType } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { appSchema } from "./app";
 import { appUser } from "./identity";
@@ -43,6 +43,20 @@ export const student = appSchema.table(
     // degrees in. Same ""-becomes-NULL discipline as middleName.
     minor: text("minor"),
     contactPhone: text("contact_phone"),
+    // What the academic transcript prints (migration 0034). All optional:
+    // NULL is "not recorded", never a guess, and the transcript prints a
+    // dash. Free text throughout -- see the migration for why.
+    dateOfBirth: date("date_of_birth"),
+    countryOfOrigin: text("country_of_origin"),
+    countyOfOrigin: text("county_of_origin"),
+    parentGuardian: text("parent_guardian"),
+    address: text("address"),
+    acceptedFrom: text("accepted_from"),
+    enrollmentStatus: text("enrollment_status"),
+    enrolmentDate: date("enrolment_date"),
+    degree: text("degree"),
+    graduationDate: date("graduation_date"),
+    distinction: text("distinction"),
     historicalImportStatus: text("historical_import_status").notNull().default("NOT_STARTED"), // NOT_STARTED | IN_PROGRESS | COMPLETE
     importCompletedBy: uuid("import_completed_by"),
     importCompletedAt: timestamp("import_completed_at", { withTimezone: true }),
