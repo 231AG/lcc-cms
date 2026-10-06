@@ -13,17 +13,21 @@
 -- ("BA", "BSc") and distinction ("Cum Laude") are free text for the same
 -- reason -- the College has not fixed a list, and a CHECK here would have
 -- to be migrated every time it added one.
+--
+-- IF NOT EXISTS so this can be pasted into the Supabase SQL editor ahead
+-- of a deploy, and the Migrate workflow running it again afterwards is a
+-- no-op rather than a failure.
 ALTER TABLE "app"."student"
-  ADD COLUMN "date_of_birth" date,
-  ADD COLUMN "country_of_origin" text,
-  ADD COLUMN "county_of_origin" text,
-  ADD COLUMN "parent_guardian" text,
-  ADD COLUMN "address" text,
-  ADD COLUMN "accepted_from" text,
-  ADD COLUMN "enrollment_status" text,
+  ADD COLUMN IF NOT EXISTS "date_of_birth" date,
+  ADD COLUMN IF NOT EXISTS "country_of_origin" text,
+  ADD COLUMN IF NOT EXISTS "county_of_origin" text,
+  ADD COLUMN IF NOT EXISTS "parent_guardian" text,
+  ADD COLUMN IF NOT EXISTS "address" text,
+  ADD COLUMN IF NOT EXISTS "accepted_from" text,
+  ADD COLUMN IF NOT EXISTS "enrollment_status" text,
   -- The day the student enrolled, when the office has it. enrolment_year
   -- (from the Student ID) stays the required figure; this only refines it.
-  ADD COLUMN "enrolment_date" date,
-  ADD COLUMN "degree" text,
-  ADD COLUMN "graduation_date" date,
-  ADD COLUMN "distinction" text;
+  ADD COLUMN IF NOT EXISTS "enrolment_date" date,
+  ADD COLUMN IF NOT EXISTS "degree" text,
+  ADD COLUMN IF NOT EXISTS "graduation_date" date,
+  ADD COLUMN IF NOT EXISTS "distinction" text;
