@@ -210,13 +210,18 @@ export async function getTranscript(actor: Actor, studentId: string): Promise<Tr
 
   // The scale in effect today, as on the grade sheet. The older plain
   // letters and No Grade are explained in the notes line instead, and only
-  // when this record actually carries one.
+  // when this record actually carries one (the older letters as a set).
   const now = new Date();
   const inEffect = scaleRows.filter((r) => new Date(r.effectiveFrom) <= now);
   const activeVersion = inEffect.length ? Math.max(...inEffect.map((r) => r.policyVersion)) : 0;
   const active = scaleRows.filter((r) => r.policyVersion === activeVersion);
   const letters = new Set(records.map((r) => r.letter));
-  const legacy = active.filter((r) => r.isLegacy && letters.has(r.letter));
+  // Older records use plain A, B, C and D. When a record has any of them,
+  // the note explains all four, not only the ones this student happens to
+  // have -- they are one family (4, 3, 2, 1), and a note that skipped the D
+  // of a student with no D would read as though D did not exist.
+  const hasOlderLetter = active.some((r) => r.isLegacy && r.letter !== "NG" && letters.has(r.letter));
+  const legacy = hasOlderLetter ? active.filter((r) => r.isLegacy && r.letter !== "NG") : [];
 
   const gradingNotes: { mark: string; meaning: string }[] = [];
   if (legacy.length) {
