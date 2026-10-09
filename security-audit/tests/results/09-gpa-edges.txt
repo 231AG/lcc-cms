@@ -1,0 +1,25 @@
+0         F (gp 0.00) stored-score=0.0  academic_record.score=0
+0.4       F (gp 0.00) stored-score=0.4  academic_record.score=0
+0.5       F (gp 0.00) stored-score=0.5  academic_record.score=1
+58.9      F (gp 0.00) stored-score=58.9  academic_record.score=59
+59        F (gp 0.00) stored-score=59.0  academic_record.score=59
+59.4      F (gp 0.00) stored-score=59.4  academic_record.score=59
+59.45     F (gp 0.00) stored-score=59.5  academic_record.score=60
+59.49     F (gp 0.00) stored-score=59.5  academic_record.score=60
+59.5      D- (gp 0.70) stored-score=59.5  academic_record.score=60
+59.6      D- (gp 0.70) stored-score=59.6  academic_record.score=60
+60        D- (gp 0.70) stored-score=60.0  academic_record.score=60
+62.5      D- (gp 0.70) stored-score=62.5  academic_record.score=63
+94.4      A- (gp 3.70) stored-score=94.4  academic_record.score=94
+94.49     A- (gp 3.70) stored-score=94.5  academic_record.score=95
+94.5      A+ (gp 4.00) stored-score=94.5  academic_record.score=95
+99.5      A+ (gp 4.00) stored-score=99.5  academic_record.score=100
+99.9      A+ (gp 4.00) stored-score=99.9  academic_record.score=100
+100       A+ (gp 4.00) stored-score=100.0  academic_record.score=100
+100       A+ (gp 4.00) stored-score=100.0  academic_record.score=100
+-0.01     THROWS OutOfRangeScoreError: Score -0.01 is out of range (0-100).
+100.01    THROWS OutOfRangeScoreError: Score 100.01 is out of range (0-100).
+NaN       THROWS OutOfRangeScoreError: No grade-scale band contains rounded score NaN.
+Infinity  THROWS OutOfRangeScoreError: Score Infinity is out of range (0-100).
+-Infinity THROWS OutOfRangeScoreError: Score -Infinity is out of range (0-100).
+Infinity  THROWS OutOfRangeScoreError: Score Infinity is out of range (0-100).

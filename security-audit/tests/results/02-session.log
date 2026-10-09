@@ -1,0 +1,6 @@
+PASS  A7a  Idle timeout signs out a session with a stale activity cookie
+        status 307 -> /login?reason=idle
+FAIL  A7b  Idle timeout cannot be skipped by omitting the activity cookie
+        session cookie alone (no lcc-last-active) -> 200 and the signed-in portal is served: the 1-hour idle rule only binds clients that choose to send the cookie
+PASS  H3  After an admin password reset, the OLD session cannot take over the account
+        old session before reset: 200; after reset /portal -> 200 ; old session set its own password without knowing any: /login; attacker's password then logs in: /login?error=1; the real student's fresh temporary password logs in: /change-password

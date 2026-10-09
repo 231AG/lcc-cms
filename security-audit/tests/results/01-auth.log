@@ -1,0 +1,137 @@
+FAIL  A5a  Session cookie flags (HttpOnly, Secure, SameSite=Lax, <=12h)
+        [{"httpOnly":true,"secure":true,"sameSite":"lax","maxAge":"34560000"}]
+PASS  A2a  Login failure response identical for existing/missing/malformed IDs
+        existing student, wrong password           -> /login?error=1  median 85ms
+        non-existent student ID (valid format)     -> /login?error=1  median 10ms
+        malformed identifier                       -> /login?error=1  median 8ms
+        existing staff, wrong password             -> /login?error=1  median 83ms
+        non-existent staff                         -> /login?error=1  median 9ms
+        DISABLED staff, CORRECT password           -> /login?error=disabled  median 99ms
+FAIL  A2b  Login timing: existing vs non-existent student ID
+        existing 85ms vs missing 10ms (local GoTrue; hosted timing may differ)
+INFO  A2c  Disabled account reveals itself only with the correct password
+        disabled+correct pw -> /login?error=disabled (needs the real password, so not enumeration)
+FAIL  A1  No rate limit / lockout on login (60 wrong guesses, then the right password)
+        60 guesses in 4.9s, throttled=0, 5xx=0; right password afterwards -> /portal. (App has no limiter; hosted Supabase Auth applies its own per-IP limits — dashboard setting, cannot be verified from here.)
+PASS  A4a  Forced-change user is sent to /change-password at login
+        /change-password
+PASS  A4b  Direct navigation by a forced-change user is redirected (11 URLs)
+        all redirected to /change-password
+PASS  A4c  Server action by a forced-change user is stopped before it runs
+        status 307 location /change-password
+PASS  A4d  x-middleware-subrequest header does not bypass the proxy
+        status 307 location /change-password
+PASS  A6a  Replaying a session cookie after logout does not work
+        before logout 200; logout 303; replay -> 200
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 2 errors:
+/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:10:12: ERROR: Top-level await is currently not supported with the "cjs" output format
+/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:11:10: ERROR: Top-level await is currently not supported with the "cjs" output format
+    at failureErrorWithLog (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:1752:15)
+    at /home/user/lcc-cms/node_modules/esbuild/lib/main.js:1019:50
+    at responseCallbacks.<computed> (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:886:9)
+    at handleIncomingPacket (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:941:12)
+    at Socket.readFromStdout (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:864:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError',
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v22.22.2
+node:internal/errors:983
+  const err = new Error(message);
+              ^
+
+Error: Command failed: npx tsx /home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts 34cdbc00-ac26-4e0c-b65f-ad5e0959ac8e /tmp/claude-0/audit-tmp-pw
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 2 errors:
+/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:10:12: ERROR: Top-level await is currently not supported with the "cjs" output format
+/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:11:10: ERROR: Top-level await is currently not supported with the "cjs" output format
+    at failureErrorWithLog (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:1752:15)
+    at /home/user/lcc-cms/node_modules/esbuild/lib/main.js:1019:50
+    at responseCallbacks.<computed> (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:886:9)
+    at handleIncomingPacket (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:941:12)
+    at Socket.readFromStdout (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:864:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError',
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v22.22.2
+
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:916:11)
+    at execFileSync (node:child_process:952:15)
+    at runTs (file:///home/user/lcc-cms/security-audit/tests/lib.mjs:123:10)
+    at file:///home/user/lcc-cms/security-audit/tests/01-auth.mjs:91:3
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  status: 1,
+  signal: null,
+  output: [
+    null,
+    '',
+    'node:internal/modules/run_main:123\n' +
+      '    triggerUncaughtException(\n' +
+      '    ^\n' +
+      '\n' +
+      'Error: Transform failed with 2 errors:\n' +
+      '/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:10:12: ERROR: Top-level await is currently not supported with the "cjs" output format\n' +
+      '/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:11:10: ERROR: Top-level await is currently not supported with the "cjs" output format\n' +
+      '    at failureErrorWithLog (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:1752:15)\n' +
+      '    at /home/user/lcc-cms/node_modules/esbuild/lib/main.js:1019:50\n' +
+      '    at responseCallbacks.<computed> (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:886:9)\n' +
+      '    at handleIncomingPacket (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:941:12)\n' +
+      '    at Socket.readFromStdout (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:864:7)\n' +
+      '    at Socket.emit (node:events:519:28)\n' +
+      '    at addChunk (node:internal/streams/readable:561:12)\n' +
+      '    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)\n' +
+      '    at Readable.push (node:internal/streams/readable:392:5)\n' +
+      '    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {\n' +
+      "  name: 'TransformError',\n" +
+      "  code: 'ERR_REQUIRE_ASYNC_MODULE'\n" +
+      '}\n' +
+      '\n' +
+      'Node.js v22.22.2\n'
+  ],
+  pid: 2298,
+  stdout: '',
+  stderr: 'node:internal/modules/run_main:123\n' +
+    '    triggerUncaughtException(\n' +
+    '    ^\n' +
+    '\n' +
+    'Error: Transform failed with 2 errors:\n' +
+    '/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:10:12: ERROR: Top-level await is currently not supported with the "cjs" output format\n' +
+    '/home/user/lcc-cms/security-audit/tests/helpers/reset-password.ts:11:10: ERROR: Top-level await is currently not supported with the "cjs" output format\n' +
+    '    at failureErrorWithLog (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:1752:15)\n' +
+    '    at /home/user/lcc-cms/node_modules/esbuild/lib/main.js:1019:50\n' +
+    '    at responseCallbacks.<computed> (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:886:9)\n' +
+    '    at handleIncomingPacket (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:941:12)\n' +
+    '    at Socket.readFromStdout (/home/user/lcc-cms/node_modules/esbuild/lib/main.js:864:7)\n' +
+    '    at Socket.emit (node:events:519:28)\n' +
+    '    at addChunk (node:internal/streams/readable:561:12)\n' +
+    '    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)\n' +
+    '    at Readable.push (node:internal/streams/readable:392:5)\n' +
+    '    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {\n' +
+    "  name: 'TransformError',\n" +
+    "  code: 'ERR_REQUIRE_ASYNC_MODULE'\n" +
+    '}\n' +
+    '\n' +
+    'Node.js v22.22.2\n'
+}
+
+Node.js v22.22.2

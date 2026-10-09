@@ -1,0 +1,10 @@
+PASS  D-photo-small  Photo upload small (60x60)
+        status 303 location=/admin/students/3d7ecb58-af1e-4751-9876-16dcc49c8690 body=
+FAIL  D-photo-1.5  Photo upload 1.5 MB (under the 2 MB app cap)
+        status 500 location= body=Internal Server Error
+PASS  D-import-900KB  Grade-sheet import preview with 900 KB of text
+        status 200 2:"$Sreact.fragment" 3:I[39756,["/_next/static/chunks/3fntmmi971322.js"],"default"] 4:I[37457,["/_next/static/chunks/3fntmmi971322.js"],"default"] 5:I[5014,["/_
+FAIL  D-import-1100KB  Grade-sheet import preview with 1100 KB of text
+        status 500 0:{"a":"$@1","f":"","q":"","i":false,"b":"eRbcJJGFIXpF0HPblprCd"} 1:E{"digest":"3835754816@E394"} 
+FAIL  D-import-3000KB  Grade-sheet import preview with 3000 KB of text
+        status 500 0:{"a":"$@1","f":"","q":"","i":false,"b":"eRbcJJGFIXpF0HPblprCd"} 1:E{"digest":"3835754816@E394"} 

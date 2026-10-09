@@ -1,0 +1,18 @@
+PASS  F-csrf-origin  Server Action POST with a foreign Origin header is rejected
+        status 500, row created: 0
+FAIL  F-csrf-xfh  Foreign Origin + spoofed X-Forwarded-Host is rejected
+        status 303, row created: 1
+PASS  F-csrf-null  Origin: null (sandboxed iframe / data: form) is rejected
+        status 500, row created: 0
+INFO  F-csrf-noorigin  No Origin header at all (non-browser client)
+        status 303, row created: 1 (browsers always send Origin on cross-site POST; this is the normal curl/test path)
+PASS  F-err-bogus-action  Unknown Server Action id returns a bare error
+        status 404: Server action not found.
+PASS  F-err-badid  Malformed id on the photo route does not leak SQL or a stack
+        body: (empty)
+PASS  F-err-badpage  Malformed id on a page does not leak SQL or a stack
+        status 200
+PASS  F-open-redirect  Login page does not honour next/redirect parameters to other origins
+        status 200
+PASS  F-open-redirect-post  Login action ignores a posted next/redirectTo
+        -> /portal

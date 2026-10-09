@@ -1,0 +1,25 @@
+profile update: 303 /admin/students/34cdbc00-ac26-4e0c-b65f-ad5e0959ac8e
+stored first_name: "><img src=x onerror=alert(1)><script>alert(2)</script>
+PASS  D-xss-stored  Hostile markup in student fields is rendered as text on every page
+        unescaped occurrences: 0 (/admin/students:0, /admin/students/<id>:0, /admin/transcripts?studentId=<id>:0, /admin/students/<id>/grade-sheet/48551f1:0, /admin/students?q=%22%3E%3Cimg%20src%3Dx:0, /admin/students/print:0, portal, transcript)
+PASS  D-search-hostile  Hostile search strings and absurd page numbers do not crash the student list
+        all 200
+PASS  D-audit-filters  Audit log filters with garbage values do not crash
+        status 200
+PASS  E-sem-admin_CLOSED_OPEN  Semester admin: CLOSED -> OPEN
+        CLOSED -> CLOSED  Closed semester to Open. The lifecycle is forward-only; legal next state(s): In Progress.
+PASS  E-sem-admin_CLOSED_IN_PROGRESS_reopen_  Semester admin: CLOSED -> IN_PROGRESS (reopen)
+        CLOSED -> CLOSED calendar?error=Moving a semester from Closed to In Progress requires the SUPER_ADMIN role.
+PASS  E-sem-admin_CLOSED_DRAFT  Semester admin: CLOSED -> DRAFT
+        CLOSED -> CLOSED Closed semester to Draft. The lifecycle is forward-only; legal next state(s): In Progress.
+PASS  E-sem-admin_OPEN_CLOSED_skips_a_step_  Semester admin: OPEN -> CLOSED (skips a step)
+        OPEN -> OPEN  Open semester to Closed. The lifecycle is forward-only; legal next state(s): In Progress.
+PASS  E-sem-admin_OPEN_DRAFT_backwards_  Semester admin: OPEN -> DRAFT (backwards)
+        OPEN -> OPEN a Open semester to Draft. The lifecycle is forward-only; legal next state(s): In Progress.
+PASS  E-sem-admin_OPEN_BOGUS  Semester admin: OPEN -> BOGUS
+        OPEN -> OPEN en semester to undefined. The lifecycle is forward-only; legal next state(s): In Progress.
+FAIL  E-sem-SA_OPEN_IN_PROGRESS  Semester SA: OPEN -> IN_PROGRESS
+        OPEN -> OPEN r is already In Progress. Only one semester may be in this state at a time (Section 13.6).
+SA reopen without reason: CLOSED quires a reason. It is recorded in the audit log before any change is permitted.
+PASS  E-sem-reopen-needs-reason  Reopening a CLOSED semester without a reason is refused
+        CLOSED

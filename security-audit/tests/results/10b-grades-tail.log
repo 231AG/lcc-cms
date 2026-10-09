@@ -1,0 +1,12 @@
+student cumulative: [ '0.000000', '0.0' ]
+PASS  E-edit-after-publish  Admin cannot overwrite a published grade through the draft screen
+        xists for this registration and is no longer a draft (status PUBLISHED) -- use a correction instead.
+request correction: 303 /admin/grade-corrections
+PASS  E-admin-no-decide  Admin cannot approve their own correction request
+        /admin/grade-corrections?error=Not available to your role: grade.decideCorrection
+decide: 303 /admin/grade-corrections
+PASS  E-correction-applied  Approved correction updates the grade and the academic record to 80 / B-
+        grade=80.0,B-,PUBLISHED record=80,B-
+PASS  E-correction-twice  Deciding the same correction twice is refused
+        /admin/grade-corrections?error=This request is already APPROVED.
+audit actions in last 10 min: [["ACADEMIC_EXPORT_RUN","6"],["AUDIT_LOG_VIEWED","1"],["CLASS_SHEET_PRINTED","15"],["COLLEGE_CREATED","1"],["GRADE_CORRECTION_APPROVED","1"],["GRADE_CORRECTION_REQUESTED","1"],["GRADE_ENTERED","3"],["GRADE_PUBLISHED","3"],["GRADE_SUBMISSION_APPROVED","1"],["GRADE_SUBMISSION_CREATED","1"],["SEMESTER_STATE_CHANGED","1"],["STUDENT_PHOTO_UPLOADED","1"],["TRANSCRIPT_PRINTED","7"],["USER_DISABLED","1"],["USER_ENABLED","1"]]

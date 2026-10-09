@@ -1,0 +1,2 @@
+audited commit: ac50f9dc1e1bd94893ef86561f3610a8e829b5ce
+node: v22.22.2  npm: 10.9.7
