@@ -124,7 +124,9 @@ describe("academic transcript", () => {
     const repeated = t.semesters[1].courses.find((c) => c.title === "Intro to Criminology");
     expect(repeated).toMatchObject({ grade: "D (R)", points: null });
     expect(t.semesters[1].totalPoints).toBe("6.90");
-    expect(t.gradingNotes.map((n) => n.mark)).toEqual(expect.arrayContaining(["A, B, D", "I", "R"]));
+    // The record has plain A, B and D but no C; the note still explains all four.
+    expect(t.gradingNotes.map((n) => n.mark)).toEqual(expect.arrayContaining(["A, B, C, D", "I", "R"]));
+    expect(t.gradingNotes.find((n) => n.mark === "A, B, C, D")?.meaning).toBe("Older plain letters on past records (4, 3, 2, 1)");
     // 18 + 6.90 + (9.90 + 11.10): the replaced D adds nothing.
     expect(t.summary.totalAccumulatedPoints).toBe("45.90");
   });
@@ -141,6 +143,12 @@ describe("academic transcript", () => {
     expect(value(t.academic, "College of Discipline")).toBe("College of Liberal Arts");
     expect(value(t.academic, "Degree Acquired")).toBe("BSc");
     expect(value(t.admission, "Date of Enrollment")).toBe(String(Y0));
+  });
+
+  it("leaves the older-letters note out of a record with none of them", async () => {
+    // OTHER has no results at all, so no plain letters.
+    const t = await getTranscript(admin, OTHER);
+    expect(t.gradingNotes.map((n) => n.mark)).toEqual(["I"]);
   });
 
   it("lets a student read their own transcript and no one else's", async () => {

@@ -1,0 +1,13 @@
+PASS  D-upload-SVG  Upload: SVG claiming image/png is rejected
+        0959ac8e?error=That file is not a JPEG, PNG or WebP image (it arrived as image/png). [303] stored type=undefined
+PASS  D-upload-HTML  Upload: HTML claiming image/jpeg is rejected
+        959ac8e?error=That file is not a JPEG, PNG or WebP image (it arrived as image/jpeg). [303] stored type=undefined
+PASS  D-upload-SVG  Upload: SVG as image/svg+xml is rejected
+        ac8e?error=That file is not a JPEG, PNG or WebP image (it arrived as image/svg+xml). [303] stored type=undefined
+polyglot (JPEG magic + <script>): /admin/students/34cdbc00-ac26-4e0c-b65f-ad5e0959ac8e [303] stored [ 'image/jpeg', '29' ] served 200 image/jpeg nosniff: nosniff CD: inline
+PASS  D-upload-polyglot  JPEG-magic file with script payload: served only as image/jpeg with nosniff
+        stored=image/jpeg,29 served ct=image/jpeg
+audit rows mentioning password/secret/token: [["LOGIN_SLIP_ISSUED","9"]]
+PASS  D-audit-no-secrets  Audit log never records a password value
+        rows with a password-like field: 0
+ping anon: 204 ping signed-in: 204 [ 'lcc-last-active' ]

@@ -1,0 +1,58 @@
+/                                              | 307->/login            | 307->/login                        | 307->/login                | 307->/login
+/login                                         | 200                    | 200                                | 200                        | 200
+/access-denied                                 | 200 [denied-page]      | 200 [denied-page]                  | 200 [denied-page]          | 200 [denied-page]
+/portal                                        | 200                    | 200                                | 200                        | 200
+/portal/grades                                 | 200                    | 200                                | 200 [denied-page]          | 200 [denied-page]
+/portal/transcript                             | 200                    | 200                                | 200                        | 200
+/portal/grade-sheet/<id>                       | 200                    | 200                                | 200                        | 200
+/planning                                      | 200                    | 200                                | 200 [denied-page]          | 200 [denied-page]
+/grading-policy                                | 200                    | 200                                | 200                        | 200
+/change-password                               | 307->/login            | 200                                | 200                        | 200
+/admin/students                                | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/students/<id>                           | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/students/<id>/grade-sheet/<id>          | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/students/print                          | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/accounts                                | 200                    | 200 [denied-page]                  | 200 [denied-page]          | 200
+/admin/audit                                   | 200                    | 200 [denied-page]                  | 200 [denied-page]          | 200
+/admin/calendar                                | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/export                                  | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/export/<id>/print                       | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/grade-corrections                       | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/grade-review                            | 200                    | 200 [denied-page]                  | 200 [denied-page]          | 200
+/admin/grade-review/<id>                       | 200                    | 200 [denied-page]                  | 200 [denied-page]          | 200
+/admin/grades                                  | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/historical                              | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/historical/import                       | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/login-slips                             | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/no-grades                               | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/offerings                               | 200                    | 200                                | 200                        | 200
+/admin/offerings/print                         | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/planning                                | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/planning/<id>                           | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/planning/<id>/control-sheet             | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/registrations                           | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/structure                               | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/structure/import                        | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/student-grades                          | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/student-plan                            | 200                    | 200 [denied-page]                  | 200                        | 200 [denied-page]
+/admin/transcripts                             | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/transcripts?studentId=<id>              | 200                    | 200 [denied-page]                  | 200                        | 200
+/admin/historical/progress                     | 404                    | 404                                | 404                        | 404
+/api/health                                    | 200                    | 200                                | 200                        | 200
+/api/session/ping                              | 405                    | 405                                | 405                        | 405
+/api/students/<id>/photo                       | 401                    | 404                                | 404                        | 404
+/api/students/<id>/photo                       | 401                    | 404                                | 404                        | 404
+/api/students/<id>/photo                       | 401                    | 404                                | 200 [IMAGE]                | 200 [IMAGE]
+/admin/export/<id>                             | 500                    | 403 [denied-page]                  | 200 [CSV 1150B]            | 200 [CSV 1150B]
+/admin/export/<id>/results                     | 500                    | 403 [denied-page]                  | 200 [CSV 315B]             | 200 [CSV 315B]
+/admin/offerings/export                        | 500                    | 403 [denied-page]                  | 400                        | 400
+/admin/students/export                         | 500                    | 403 [denied-page]                  | 200 [CSV 9207B]            | 200 [CSV 9207B]
+  A->victim add     303 /planning?semesterId=5cc65eb0-d028-4c29-af88-c41bb858dea1&error=Plan not found.
+  A->victim remove  303 /planning?semesterId=5cc65eb0-d028-4c29-af88-c41bb858dea1&error=Plan not found.
+  A->victim submit  303 /planning?semesterId=5cc65eb0-d028-4c29-af88-c41bb858dea1&error=Plan not found.
+  A->victim del     303 /planning?semesterId=5cc65eb0-d028-4c29-af88-c41bb858dea1&error=Plan not found.
+  victim plan before/after: DRAFT/2 -> DRAFT/2
+PASS  B2  Student cannot add/remove/submit/delete another student's course plan
+        before=DRAFT/2 after=DRAFT/2
+PASS  B3  Student A cannot fetch student B's photo
+        status 404

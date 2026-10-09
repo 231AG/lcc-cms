@@ -1,0 +1,60 @@
+academic_record | academic_record_select_own | SELECT | {authenticated} | ((student_id = auth.uid()) AND (NOT is_void)) | -
+academic_record | academic_record_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -
+academic_year | academic_year_delete_admin_only | DELETE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | -
+academic_year | academic_year_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+academic_year | academic_year_select_all | SELECT | {authenticated} | true | -
+academic_year | academic_year_update_admin_only | UPDATE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | (app.current_user_role() = 'ADMIN'::text)
+app_user | app_user_select_admin_sees_students | SELECT | {authenticated} | ((app.current_user_role() = 'ADMIN'::text) AND (role = 'STUDENT'::text)) | -
+app_user | app_user_select_own | SELECT | {authenticated} | (id = auth.uid()) | -
+app_user | app_user_select_super_admin_sees_all | SELECT | {authenticated} | (app.current_user_role() = 'SUPER_ADMIN'::text) | -
+audit_log | audit_log_insert_any_authenticated | INSERT | {authenticated,service_role} | - | true
+college | college_delete_admin_only | DELETE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | -
+college | college_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+college | college_select_active_or_staff | SELECT | {authenticated} | ((is_active = true) OR (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text]))) | -
+college | college_update_admin_only | UPDATE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | (app.current_user_role() = 'ADMIN'::text)
+course | course_delete_admin_only | DELETE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | -
+course | course_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+course | course_select_active_or_staff | SELECT | {authenticated} | ((is_active = true) OR (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text]))) | -
+course | course_update_admin_only | UPDATE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | (app.current_user_role() = 'ADMIN'::text)
+course_offering | course_offering_delete_admin_only | DELETE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | -
+course_offering | course_offering_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+course_offering | course_offering_select_published_or_staff | SELECT | {authenticated} | ((status = 'PUBLISHED'::text) OR (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text]))) | -
+course_offering | course_offering_update_admin_only | UPDATE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | (app.current_user_role() = 'ADMIN'::text)
+course_plan | course_plan_select_own_or_admin | SELECT | {authenticated} | ((app.current_user_role() = 'ADMIN'::text) OR (student_id = auth.uid())) | -
+course_plan_item | course_plan_item_select_own_or_admin | SELECT | {authenticated} | (EXISTS ( SELECT 1
+   FROM app.course_plan cp
+  WHERE ((cp.id = course_plan_item.plan_id) AND ((app.current_user_role() = 'ADMIN'::text) OR (cp.student_id = auth.uid()))))) | -
+course_prerequisite | course_prerequisite_delete_admin_only | DELETE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | -
+course_prerequisite | course_prerequisite_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+course_prerequisite | course_prerequisite_select_all | SELECT | {authenticated} | true | -
+department | department_delete_admin_only | DELETE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | -
+department | department_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+department | department_select_active_or_staff | SELECT | {authenticated} | ((is_active = true) OR (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text]))) | -
+department | department_update_admin_only | UPDATE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | (app.current_user_role() = 'ADMIN'::text)
+grade_correction_request | grade_correction_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -
+grade_record | grade_record_select_own_published | SELECT | {authenticated} | ((status = ANY (ARRAY['PUBLISHED'::text, 'LOCKED'::text])) AND (EXISTS ( SELECT 1
+   FROM app.registration r
+  WHERE ((r.id = grade_record.registration_id) AND (r.student_id = auth.uid()))))) | -
+grade_record | grade_record_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -
+grade_scale | grade_scale_select_authenticated | SELECT | {authenticated} | true | -
+grade_submission | grade_submission_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -
+institution_setting | institution_setting_select_authenticated | SELECT | {authenticated} | true | -
+offering_meeting | offering_meeting_delete_admin_only | DELETE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | -
+offering_meeting | offering_meeting_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+offering_meeting | offering_meeting_select_published_or_staff | SELECT | {authenticated} | ((app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) OR (EXISTS ( SELECT 1
+   FROM app.course_offering co
+  WHERE ((co.id = offering_meeting.offering_id) AND (co.status = 'PUBLISHED'::text))))) | -
+offering_meeting | offering_meeting_update_admin_only | UPDATE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | (app.current_user_role() = 'ADMIN'::text)
+permission | permission_select_authenticated | SELECT | {authenticated} | true | -
+registration | registration_select_own_or_admin | SELECT | {authenticated} | ((app.current_user_role() = 'ADMIN'::text) OR (student_id = auth.uid())) | -
+semester | semester_write_admin_only | INSERT | {authenticated} | - | (app.current_user_role() = 'ADMIN'::text)
+semester | semester_select_visible_or_staff | SELECT | {authenticated} | ((state <> 'DRAFT'::text) OR (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text]))) | -
+semester | semester_update_admin_only | UPDATE | {authenticated} | (app.current_user_role() = 'ADMIN'::text) | (app.current_user_role() = 'ADMIN'::text)
+student | student_select_own | SELECT | {authenticated} | (id = auth.uid()) | -
+student | student_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -
+student_cumulative_summary | student_cumulative_summary_select_own | SELECT | {authenticated} | (student_id = auth.uid()) | -
+student_cumulative_summary | student_cumulative_summary_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -
+student_photo | student_photo_select_own | SELECT | {authenticated} | (student_id = auth.uid()) | -
+student_photo | student_photo_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -
+student_semester_summary | student_semester_summary_select_own | SELECT | {authenticated} | (student_id = auth.uid()) | -
+student_semester_summary | student_semester_summary_select_staff | SELECT | {authenticated} | (app.current_user_role() = ANY (ARRAY['ADMIN'::text, 'SUPER_ADMIN'::text])) | -

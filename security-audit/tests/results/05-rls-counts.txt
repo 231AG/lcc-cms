@@ -1,0 +1,26 @@
+table                                   total |   anon   stuA   stuB    reg
+app.academic_record                       118 | ERROR:  permission denied for      46     14    118
+app.academic_year                          18 | ERROR:  permission denied for      18     18     18
+app.app_user                              220 | ERROR:  permission denied for       1      1    148
+app.college                                35 | ERROR:  permission denied for      35     35     35
+app.course                                 42 | ERROR:  permission denied for      42     42     42
+app.course_offering                        27 | ERROR:  permission denied for      21     21     27
+app.course_plan                            60 | ERROR:  permission denied for       0      0     60
+app.course_plan_item                       99 | ERROR:  permission denied for       0      0     99
+app.course_prerequisite                     0 | ERROR:  permission denied for       0      0      0
+app.department                             34 | ERROR:  permission denied for      34     34     34
+app.grade_correction_request                0 | ERROR:  permission denied for       0      0      0
+app.grade_record                            0 | ERROR:  permission denied for       0      0      0
+app.grade_scale                            15 | ERROR:  permission denied for      15     15     15
+app.grade_submission                        0 | ERROR:  permission denied for       0      0      0
+app.idempotency_key                         0 | ERROR:  permission denied for  ERROR:  permission denied for  ERROR:  permission denied for  ERROR:  permission denied for 
+app.institution_setting                    14 | ERROR:  permission denied for      14     14     14
+app.offering_meeting                        0 | ERROR:  permission denied for       0      0      0
+app.permission                             96 | ERROR:  permission denied for      96     96     96
+app.registration                           75 | ERROR:  permission denied for       0      0     75
+app.semester                               24 | ERROR:  permission denied for      24     24     24
+app.student                               139 | ERROR:  permission denied for       1      1    139
+app.student_cumulative_summary              3 | ERROR:  permission denied for       1      1      3
+app.student_photo                           6 | ERROR:  permission denied for       0      0      6
+app.student_semester_summary               21 | ERROR:  permission denied for      10      3     21
+audit.audit_log                           708 | ERROR:  permission denied for  ERROR:  permission denied for  ERROR:  permission denied for  ERROR:  permission denied for 

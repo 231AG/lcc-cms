@@ -1,0 +1,686 @@
+[
+ {
+  "name": "createStaffAccountAction",
+  "file": "src/app/(portal)/admin/accounts/actions.ts",
+  "page": "/admin/accounts",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-",
+  "admin": "DENIED(forbidden) [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-",
+  "super_admin": "REACHED [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-"
+ },
+ {
+  "name": "disableAccountAction",
+  "file": "src/app/(portal)/admin/accounts/actions.ts",
+  "page": "/admin/accounts",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/accounts?error=Not available to your role: identity.disableAccount]",
+  "admin": "DENIED(forbidden) [303 -> /admin/accounts?error=Not available to your role: identity.disableAccount]",
+  "super_admin": "ERROR500 [500]"
+ },
+ {
+  "name": "enableAccountAction",
+  "file": "src/app/(portal)/admin/accounts/actions.ts",
+  "page": "/admin/accounts",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/accounts?error=Not available to your role: identity.enableAccount]",
+  "admin": "DENIED(forbidden) [303 -> /admin/accounts?error=Not available to your role: identity.enableAccount]",
+  "super_admin": "ERROR500 [500]"
+ },
+ {
+  "name": "deleteSemesterAction",
+  "file": "src/app/(portal)/admin/calendar/actions.ts",
+  "page": "/admin/calendar",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/calendar?error=Not available to your role: calendar.manageSemester]",
+  "admin": "REACHED [303 -> /admin/calendar?error=Semester not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/calendar?error=Not available to your role: calendar.manageSemester]"
+ },
+ {
+  "name": "createAcademicYearAction",
+  "file": "src/app/(portal)/admin/calendar/actions.ts",
+  "page": "/admin/calendar",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/calendar?error=Not available to your role: calendar.manageAcademicYear]",
+  "admin": "REACHED [303 -> /admin/calendar?error=Academic year label must look like \"2026/2027\".]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/calendar?error=Not available to your role: calendar.manageAcademicYear]"
+ },
+ {
+  "name": "createSemesterAction",
+  "file": "src/app/(portal)/admin/calendar/actions.ts",
+  "page": "/admin/calendar",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/calendar?error=Choose Semester I or Semester II.]",
+  "admin": "REACHED [303 -> /admin/calendar?error=Choose Semester I or Semester II.]",
+  "super_admin": "REACHED [303 -> /admin/calendar?error=Choose Semester I or Semester II.]"
+ },
+ {
+  "name": "transitionSemesterAction",
+  "file": "src/app/(portal)/admin/calendar/actions.ts",
+  "page": "/admin/calendar",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/calendar?error=Not available to your role: calendar.transitionSemester]",
+  "admin": "REACHED [303 -> /admin/calendar?error=Semester not found.]",
+  "super_admin": "REACHED [303 -> /admin/calendar?error=Semester not found.]"
+ },
+ {
+  "name": "requestCorrectionAction",
+  "file": "src/app/(portal)/admin/grade-corrections/actions.ts",
+  "page": "/admin/grade-corrections",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/grade-corrections?error=Not available to your role: grade.requestCorrection]",
+  "admin": "ERROR500 [500]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/grade-corrections?error=Not available to your role: grade.requestCorrection]"
+ },
+ {
+  "name": "decideCorrectionAction",
+  "file": "src/app/(portal)/admin/grade-corrections/actions.ts",
+  "page": "/admin/grade-corrections",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/grade-corrections?error=Not available to your role: grade.decideCorrection]",
+  "admin": "DENIED(forbidden) [303 -> /admin/grade-corrections?error=Not available to your role: grade.decideCorrection]",
+  "super_admin": "ERROR500 [500]"
+ },
+ {
+  "name": "rejectSubmissionAction",
+  "file": "src/app/(portal)/admin/grade-review/actions.ts",
+  "page": "/admin/grade-review/00000000-0000-4000-8000-000000000000",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/grade-review/00000000-0000-4000-8000-000000000000?error=Not available to your role:]",
+  "admin": "DENIED(forbidden) [303 -> /admin/grade-review/00000000-0000-4000-8000-000000000000?error=Not available to your role:]",
+  "super_admin": "REACHED [303 -> /admin/grade-review/00000000-0000-4000-8000-000000000000?error=Submission not found.]"
+ },
+ {
+  "name": "approveSubmissionAction",
+  "file": "src/app/(portal)/admin/grade-review/actions.ts",
+  "page": "/admin/grade-review/00000000-0000-4000-8000-000000000000",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/grade-review/00000000-0000-4000-8000-000000000000?error=Not available to your role:]",
+  "admin": "DENIED(forbidden) [303 -> /admin/grade-review/00000000-0000-4000-8000-000000000000?error=Not available to your role:]",
+  "super_admin": "REACHED [303 -> /admin/grade-review/00000000-0000-4000-8000-000000000000?error=Submission not found.]"
+ },
+ {
+  "name": "clearDraftGradeAction",
+  "file": "src/app/(portal)/admin/grades/actions.ts",
+  "page": "/admin/grades",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=Not available to your ]",
+  "admin": "ERROR500 [500]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=Not available to your ]"
+ },
+ {
+  "name": "saveClassDraftAction",
+  "file": "src/app/(portal)/admin/grades/actions.ts",
+  "page": "/admin/grades",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=No grades were entered]",
+  "admin": "REACHED [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=No grades were entered]",
+  "super_admin": "REACHED [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=No grades were entered]"
+ },
+ {
+  "name": "submitClassAction",
+  "file": "src/app/(portal)/admin/grades/actions.ts",
+  "page": "/admin/grades",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=Not available to your ]",
+  "admin": "REACHED [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=Offering not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/grades?offeringId=00000000-0000-4000-8000-000000000000&error=Not available to your ]"
+ },
+ {
+  "name": "reopenImportStatusAction",
+  "file": "src/app/(portal)/admin/historical/actions.ts",
+  "page": "/admin/historical",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Student not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "voidHistoricalRecordAction",
+  "file": "src/app/(portal)/admin/historical/actions.ts",
+  "page": "/admin/historical",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Record not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "markImportCompleteAction",
+  "file": "src/app/(portal)/admin/historical/actions.ts",
+  "page": "/admin/historical",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Student not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "correctHistoricalRecordAction",
+  "file": "src/app/(portal)/admin/historical/actions.ts",
+  "page": "/admin/historical",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Record not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/historical?studentId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "commitGradeSheetImportAction",
+  "file": "src/app/(portal)/admin/historical/import/actions.ts",
+  "page": "/admin/historical/import",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "previewGradeSheetImportAction",
+  "file": "src/app/(portal)/admin/historical/import/actions.ts",
+  "page": "/admin/historical/import",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "checkManualEntryAction",
+  "file": "src/app/(portal)/admin/historical/import/actions.ts",
+  "page": "/admin/historical/import",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "saveManualEntryAction",
+  "file": "src/app/(portal)/admin/historical/import/actions.ts",
+  "page": "/admin/historical/import",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "issueLoginSlipsAction",
+  "file": "src/app/(portal)/admin/login-slips/actions.ts",
+  "page": "/admin/login-slips",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "addMeetingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Offering not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "cancelOfferingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Offering not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "removeMeetingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000]",
+  "super_admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000]"
+ },
+ {
+  "name": "deleteOfferingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Offering not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "reinstateOfferingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Offering not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "createOfferingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Semester not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "updateOfferingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Offering not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "rescheduleMeetingsAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=No meeting selected]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "publishOfferingAction",
+  "file": "src/app/(portal)/admin/offerings/actions.ts",
+  "page": "/admin/offerings",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]",
+  "admin": "REACHED [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Offering not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/offerings?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to yo]"
+ },
+ {
+  "name": "overrideScheduleConflictAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]",
+  "admin": "REACHED [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Plan item not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]"
+ },
+ {
+  "name": "rejectPlanAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]",
+  "admin": "REACHED [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Plan not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]"
+ },
+ {
+  "name": "deletePlanAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]",
+  "admin": "REACHED [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Plan not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]"
+ },
+ {
+  "name": "approvePlanAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]",
+  "admin": "REACHED [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Plan not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]"
+ },
+ {
+  "name": "findPlanAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "ERROR500 [500]",
+  "admin": "REACHED [303 -> /admin/planning?error=No student has the ID \"\".]",
+  "super_admin": "ERROR500 [500]"
+ },
+ {
+  "name": "overridePrerequisiteAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]",
+  "admin": "REACHED [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=The prerequisite override windo]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]"
+ },
+ {
+  "name": "approvePlanItemAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]",
+  "admin": "REACHED [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Planned course not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]"
+ },
+ {
+  "name": "rejectPlanItemAction",
+  "file": "src/app/(portal)/admin/planning/actions.ts",
+  "page": "/admin/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]",
+  "admin": "REACHED [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Planned course not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/planning/00000000-0000-4000-8000-000000000000?error=Not available to your role: pla]"
+ },
+ {
+  "name": "registerDirectAction",
+  "file": "src/app/(portal)/admin/registrations/actions.ts",
+  "page": "/admin/registrations",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/registrations?offeringId=00000000-0000-4000-8000-000000000000&error=Not available t]",
+  "admin": "REACHED [303 -> /admin/registrations?offeringId=00000000-0000-4000-8000-000000000000&error=Offering not fo]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/registrations?offeringId=00000000-0000-4000-8000-000000000000&error=Not available t]"
+ },
+ {
+  "name": "dropRegistrationAction",
+  "file": "src/app/(portal)/admin/registrations/actions.ts",
+  "page": "/admin/registrations",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/registrations?offeringId=00000000-0000-4000-8000-000000000000&error=Not available t]",
+  "admin": "REACHED [303 -> /admin/registrations?offeringId=00000000-0000-4000-8000-000000000000&error=Registration no]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/registrations?offeringId=00000000-0000-4000-8000-000000000000&error=Not available t]"
+ },
+ {
+  "name": "addPrerequisiteAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/structure?error=No course has the code \"\".]",
+  "admin": "REACHED [303 -> /admin/structure?error=No course has the code \"\".]",
+  "super_admin": "REACHED [303 -> /admin/structure?error=No course has the code \"\".]"
+ },
+ {
+  "name": "createDepartmentAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageDepartment]",
+  "admin": "REACHED [303 -> /admin/structure?error=That college does not exist.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageDepartment]"
+ },
+ {
+  "name": "toggleDepartmentActiveAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageDepartment]",
+  "admin": "REACHED [303 -> /admin/structure?error=Department not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageDepartment]"
+ },
+ {
+  "name": "createCourseAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCourse]",
+  "admin": "REACHED [303 -> /admin/structure?error=Code and title are required.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCourse]"
+ },
+ {
+  "name": "toggleCourseActiveAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCourse]",
+  "admin": "REACHED [303 -> /admin/structure?error=Course not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCourse]"
+ },
+ {
+  "name": "createCollegeAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCollege]",
+  "admin": "REACHED [303 -> /admin/structure?error=A college with code \"X1\" already exists.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCollege]"
+ },
+ {
+  "name": "updateDepartmentAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageDepartment]",
+  "admin": "REACHED [303 -> /admin/structure?error=Department not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageDepartment]"
+ },
+ {
+  "name": "toggleCollegeActiveAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCollege]",
+  "admin": "REACHED [303 -> /admin/structure?error=College not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCollege]"
+ },
+ {
+  "name": "removePrerequisiteAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.managePrerequisite]",
+  "admin": "ERROR500 [500]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.managePrerequisite]"
+ },
+ {
+  "name": "updateCollegeAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCollege]",
+  "admin": "REACHED [303 -> /admin/structure?error=College not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCollege]"
+ },
+ {
+  "name": "updateCourseAction",
+  "file": "src/app/(portal)/admin/structure/actions.ts",
+  "page": "/admin/structure",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCourse]",
+  "admin": "REACHED [303 -> /admin/structure?error=Course not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/structure?error=Not available to your role: structure.manageCourse]"
+ },
+ {
+  "name": "commitCourseImportAction",
+  "file": "src/app/(portal)/admin/structure/import/actions.ts",
+  "page": "/admin/structure/import",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "previewCourseImportAction",
+  "file": "src/app/(portal)/admin/structure/import/actions.ts",
+  "page": "/admin/structure/import",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "requestCorrectionFromStudentGradesAction",
+  "file": "src/app/(portal)/admin/student-grades/actions.ts",
+  "page": "/admin/student-grades",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/student-grades?studentId=00000000-0000-4000-8000-000000000000&error=Not available t]",
+  "admin": "ERROR500 [500]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/student-grades?studentId=00000000-0000-4000-8000-000000000000&error=Not available t]"
+ },
+ {
+  "name": "startStudentPlanAction",
+  "file": "src/app/(portal)/admin/student-plan/actions.ts",
+  "page": "/admin/student-plan",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]"
+ },
+ {
+  "name": "submitStudentPlanAction",
+  "file": "src/app/(portal)/admin/student-plan/actions.ts",
+  "page": "/admin/student-plan",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "super_admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]"
+ },
+ {
+  "name": "addStudentPlanItemAction",
+  "file": "src/app/(portal)/admin/student-plan/actions.ts",
+  "page": "/admin/student-plan",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "super_admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]"
+ },
+ {
+  "name": "deleteStudentDraftPlanAction",
+  "file": "src/app/(portal)/admin/student-plan/actions.ts",
+  "page": "/admin/student-plan",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "super_admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]"
+ },
+ {
+  "name": "removeStudentPlanItemAction",
+  "file": "src/app/(portal)/admin/student-plan/actions.ts",
+  "page": "/admin/student-plan",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]",
+  "super_admin": "REACHED [303 -> /admin/student-plan?studentId=00000000-0000-4000-8000-000000000000&semesterId=00000000-000]"
+ },
+ {
+  "name": "enrollStudentAction",
+  "file": "src/app/(portal)/admin/students/actions.ts",
+  "page": "/admin/students",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-",
+  "admin": "REACHED [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-",
+  "super_admin": "REACHED [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-"
+ },
+ {
+  "name": "removeStudentPhotoAction",
+  "file": "src/app/(portal)/admin/students/actions.ts",
+  "page": "/admin/students/3d7ecb58-af1e-4751-9876-16dcc49c8690",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Not available to your role: ide]",
+  "admin": "REACHED [303 -> /admin/students/00000000-0000-4000-8000-000000000000]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Not available to your role: ide]"
+ },
+ {
+  "name": "updateStudentProfileAction",
+  "file": "src/app/(portal)/admin/students/actions.ts",
+  "page": "/admin/students/3d7ecb58-af1e-4751-9876-16dcc49c8690",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Not available to your role: ide]",
+  "admin": "REACHED [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Student not found.]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Not available to your role: ide]"
+ },
+ {
+  "name": "uploadStudentPhotoAction",
+  "file": "src/app/(portal)/admin/students/actions.ts",
+  "page": "/admin/students/3d7ecb58-af1e-4751-9876-16dcc49c8690",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Choose an image file first.]",
+  "admin": "REACHED [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Choose an image file first.]",
+  "super_admin": "REACHED [303 -> /admin/students/00000000-0000-4000-8000-000000000000?error=Choose an image file first.]"
+ },
+ {
+  "name": "resetStudentPasswordAction",
+  "file": "src/app/(portal)/admin/students/actions.ts",
+  "page": "/admin/students/3d7ecb58-af1e-4751-9876-16dcc49c8690",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-",
+  "admin": "REACHED [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-",
+  "super_admin": "REACHED [200] <!DOCTYPE html><html lang=\"en\" class=\"plus_jakarta_sans_ed0c94bc-module__SiS1tG__variable geist_mono_8d43a2aa-"
+ },
+ {
+  "name": "logGradeSheetPrintAction",
+  "file": "src/app/(portal)/admin/students/[id]/grade-sheet/[semesterId]/actions.ts",
+  "page": "/admin/students/3d7ecb58-af1e-4751-9876-16dcc49c8690/grade-sheet/48551f18-3170-46dd-ad3b-d07f4b30a125",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "updateSignatoriesAction",
+  "file": "src/app/(portal)/admin/students/[id]/grade-sheet/[semesterId]/actions.ts",
+  "page": "/admin/students/3d7ecb58-af1e-4751-9876-16dcc49c8690/grade-sheet/48551f18-3170-46dd-ad3b-d07f4b30a125",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [303 -> /admin/students/00000000-0000-4000-8000-000000000000/grade-sheet/00000000-0000-4000-8000-0]",
+  "admin": "REACHED [303 -> /admin/students/00000000-0000-4000-8000-000000000000/grade-sheet/00000000-0000-4000-8000-0]",
+  "super_admin": "DENIED(forbidden) [303 -> /admin/students/00000000-0000-4000-8000-000000000000/grade-sheet/00000000-0000-4000-8000-0]"
+ },
+ {
+  "name": "logTranscriptPrintAction",
+  "file": "src/app/(portal)/admin/transcripts/actions.ts",
+  "page": "/admin/transcripts",
+  "anonymous": "ERROR500 [500]",
+  "student": "DENIED(forbidden) [500]",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "addPlanItemAction",
+  "file": "src/app/(portal)/planning/actions.ts",
+  "page": "/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]",
+  "admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]",
+  "super_admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]"
+ },
+ {
+  "name": "deleteDraftPlanAction",
+  "file": "src/app/(portal)/planning/actions.ts",
+  "page": "/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]",
+  "admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]",
+  "super_admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]"
+ },
+ {
+  "name": "submitPlanAction",
+  "file": "src/app/(portal)/planning/actions.ts",
+  "page": "/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]",
+  "admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]",
+  "super_admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan not found.]"
+ },
+ {
+  "name": "startPlanAction",
+  "file": "src/app/(portal)/planning/actions.ts",
+  "page": "/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Semester not found.]",
+  "admin": "DENIED(forbidden) [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to your role]",
+  "super_admin": "DENIED(forbidden) [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Not available to your role]"
+ },
+ {
+  "name": "removePlanItemAction",
+  "file": "src/app/(portal)/planning/actions.ts",
+  "page": "/planning",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan item not found.]",
+  "admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan item not found.]",
+  "super_admin": "REACHED [303 -> /planning?semesterId=00000000-0000-4000-8000-000000000000&error=Plan item not found.]"
+ },
+ {
+  "name": "logSemesterPrintAction",
+  "file": "src/app/(portal)/portal/actions.ts",
+  "page": "/portal/transcript",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "super_admin": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/"
+ },
+ {
+  "name": "logOwnTranscriptPrintAction",
+  "file": "src/app/(portal)/portal/actions.ts",
+  "page": "/portal/transcript",
+  "anonymous": "ERROR500 [500]",
+  "student": "REACHED [200] 2:\"$Sreact.fragment\" 3:I[39756,[\"/_next/static/chunks/3fntmmi971322.js\"],\"default\"] 4:I[37457,[\"/_next/static/",
+  "admin": "ERROR500 [500]",
+  "super_admin": "ERROR500 [500]"
+ }
+]

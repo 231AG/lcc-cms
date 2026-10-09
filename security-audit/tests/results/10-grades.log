@@ -1,0 +1,70 @@
+transition: 303 /admin/calendar
+FAIL  E-score-abc  Grade entry with score "abc"
+        status 500 
+FAIL  E-score-101  Grade entry with score "101"
+        status 500 
+FAIL  E-score--1  Grade entry with score "-1"
+        status 500 
+FAIL  E-score-NaN  Grade entry with score "NaN"
+        status 500 
+FAIL  E-score-1e3  Grade entry with score "1e3"
+        status 500 
+FAIL  E-score-Infinity  Grade entry with score "Infinity"
+        status 500 
+PASS  E-score-0x10  Grade entry with score "0x10"
+        status 303 /admin/grades?offeringId=8ae2d4cf-bca8-43eb-a817-eeada65e1406
+FAIL  E-score-59,5  Grade entry with score "59,5"
+        status 500 
+FAIL  E-score-none-stored  No grade row was stored by any of the invalid scores
+        rows=1
+save drafts: 303 /admin/grades?offeringId=8ae2d4cf-bca8-43eb-a817-eeada65e1406
+grade rows: [["17554b39-93cc-45ee-b282-9e329e753996","59.5","F","DRAFT"],["294a966f-fcd1-4bc1-85d7-4bf9ec569f9c","94.5","A-","DRAFT"],["4d3e11af-ca55-44fe-b31c-a06282a38384","100.0","A+","DRAFT"]]
+PASS  E-round-letter  59.46 -> F, 94.45 -> A-, 100 -> A+
+        [["59.5","F"],["94.5","A-"],["100.0","A+"]]
+PASS  E-draft-hidden  A student cannot read their own DRAFT grade row
+        visible rows for the student at DB level: 0
+submit: 303 /admin/grades?offeringId=8ae2d4cf-bca8-43eb-a817-eeada65e1406
+submission: [ '643f351b-3412-4c64-8b93-645a275a680f', 'SUBMITTED' ]
+PASS  E-edit-after-submit  Admin cannot change a score after it was submitted
+        score now 59.5; response xists for this registration and is no longer a draft (status SUBMITTED) -- use a correction instead.
+PASS  E-admin-no-approve  Admin cannot approve (publish) grades
+        min/grade-review/643f351b-3412-4c64-8b93-645a275a680f?error=Not available to your role: grade.review
+approve x2: 303 /admin/grade-review/643f351b-3412-4c64-8b93-645a275a680f | 303 5a680f?error=This submission is already CLOSED; there is nothing left to decide.
+PASS  E-double-approve  Approving twice in parallel yields one academic record per grade
+        records=3 distinct=3
+ERROR:  column reference "status" is ambiguous
+LINE 1: select status from app.grade_record g join app.registration ...
+               ^
+node:internal/errors:983
+  const err = new Error(message);
+              ^
+
+Error: Command failed: psql -h 127.0.0.1 -p 54329 -U postgres -d lcc_tr -At -F 	 -c select status from app.grade_record g join app.registration r on r.id=g.registration_id where r.offering_id='8ae2d4cf-bca8-43eb-a817-eeada65e1406'
+ERROR:  column reference "status" is ambiguous
+LINE 1: select status from app.grade_record g join app.registration ...
+               ^
+
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:916:11)
+    at execFileSync (node:child_process:952:15)
+    at sql (file:///home/user/lcc-cms/security-audit/tests/lib.mjs:32:15)
+    at file:///home/user/lcc-cms/security-audit/tests/10-grades.mjs:67:12
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  status: 1,
+  signal: null,
+  output: [
+    null,
+    '',
+    'ERROR:  column reference "status" is ambiguous\n' +
+      'LINE 1: select status from app.grade_record g join app.registration ...\n' +
+      '               ^\n'
+  ],
+  pid: 4918,
+  stdout: '',
+  stderr: 'ERROR:  column reference "status" is ambiguous\n' +
+    'LINE 1: select status from app.grade_record g join app.registration ...\n' +
+    '               ^\n'
+}
+
+Node.js v22.22.2

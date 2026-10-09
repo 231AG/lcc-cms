@@ -1,0 +1,135 @@
+export default {
+  file: "Student-Guide",
+  title: "Student Guide",
+  subtitle: "Step by step: sign in, plan your courses, see and print your grades and your transcript.",
+  role: "For students",
+  roleIcon: "GraduationCap",
+  menu: [
+    {
+      label: "Always on the left",
+      items: [
+        ["Dashboard", "LayoutDashboard"],
+        ["Course offerings", "BookOpen"],
+        ["Course planning", "ClipboardList"],
+        ["My grades", "GraduationCap"],
+        ["My transcript", "FileText"],
+        ["Grading policy", "Scale"],
+      ],
+    },
+  ],
+  facts: [
+    { icon: "Clock", text: "You are signed out automatically after **1 hour** without activity. Sign in again." },
+    { icon: "KeyRound", text: "Never share your password. If you forget it, the **Admin office** gives you a new temporary one." },
+    { icon: "Printer", text: "**Print or save as PDF** is one button: pick a printer or “Save as PDF” in the print window." },
+    { icon: "Eye", text: "You can only see **your own** plan, grades and transcript." },
+  ],
+  tasks: [
+    {
+      title: "Sign in for the first time",
+      goal: "Use the temporary password from the Admin office, then choose your own.",
+      path: ["Login page"],
+      when: "Once, on your first visit",
+      steps: [
+        { icon: "UserRound", title: "Enter your details", body: ["In {{Student ID or Username}} type your Student ID.", "In {{Password}} type the temporary password you were given."] },
+        { icon: "LogIn", title: "Sign in", body: ["Click [[Sign in]].", "A wrong ID or password shows the same message, so check both carefully."] },
+        { icon: "KeyRound", title: "Choose a new password", body: ["You are taken to **Change your password** automatically.", "Fill {{New password}} and {{Confirm new password}}, then click [[Set password]]."] },
+        { icon: "LayoutDashboard", title: "You are in", body: ["You land on the **Dashboard**.", "From now on sign in with your new password."], finish: true },
+      ],
+      notes: [
+        { kind: "tip", text: "Your new password needs **at least 6 characters, with at least one number and one lowercase letter**, for example `lion7bridge`." },
+        { kind: "warn", text: "The temporary password works **once**. Until you set a new password you cannot open any other page." },
+      ],
+    },
+    {
+      title: "Plan your courses for a semester",
+      goal: "Build your course plan and send it to the Registrar for approval.",
+      path: ["Course planning"],
+      pathIcon: "ClipboardList",
+      when: "While the semester is Open",
+      steps: [
+        { icon: "BookOpen", title: "Browse the catalogue", body: ["Open **Course offerings** to see what is available. It is for reading only: you add courses in the next steps."] },
+        { icon: "ClipboardList", title: "Open Course planning", body: ["Pick the semester marked **— open for planning** and click ((Show)).", "If you see “Course planning is not currently open”, planning has not started yet."] },
+        { icon: "Play", title: "Start your plan", body: ["Click [[Start building your plan]]. An empty plan called **Your plan** appears."] },
+        { icon: "Search", title: "Search and add courses", body: ["Type a code, title or instructor in {{Code, title or instructor}} and click ((Search)).", "Click ((Add)) beside each course. Your **courses and Cr/Hrs total** update at once. ((Remove)) takes a course back out."] },
+        { icon: "Send", title: "Submit the plan", body: ["Click [[Submit plan]].", "The banner says **Your plan is with the Registrar**."] },
+        { icon: "CircleCheckBig", title: "Wait for the decision", body: ["Approved courses are **registered** and shown as Locked.", "A turned-down course shows the reason. Replace it and click [[Resubmit plan]]."], finish: true },
+      ],
+      flow: {
+        title: "What happens to your plan",
+        nodes: [
+          { label: "Draft", sub: "You are building it", tone: "grey" },
+          { label: "Submitted", sub: "With the Registrar", tone: "wait" },
+          [
+            { label: "Approved", sub: "All courses registered", tone: "ok" },
+            { label: "Some approved", sub: "Replace the others", tone: "wait" },
+            { label: "Returned", sub: "Change it, submit again", tone: "bad" },
+          ],
+        ],
+      },
+      notes: [
+        { kind: "tip", text: "Changed your mind after submitting? You can still edit a plan nobody has decided on. It leaves the queue, so click [[Resubmit plan]] when you are ready. ((Delete plan)) is available while it is still a draft." },
+        { kind: "warn", text: "When the semester moves to **In Progress**, planning closes: “Planning is closed for this semester. You can look at your plan, but not change it.”" },
+      ],
+    },
+    {
+      title: "See your grades",
+      goal: "Check your results and your GPA after the Admin office has approved them.",
+      path: ["My grades"],
+      pathIcon: "GraduationCap",
+      when: "Whenever results are published",
+      steps: [
+        { icon: "GraduationCap", title: "Open My grades", body: ["Click **My grades** in the menu.", "If it says “No results have been published for you yet”, the grades are still waiting for approval."] },
+        { icon: "Award", title: "Read your record", body: ["**Cumulative record** shows your **CGPA** and your credit hours (Total, Completed, Remaining).", "**Semester by semester** shows each term."] },
+        { icon: "PieChart", title: "Open one semester", body: ["In **Semester results**, choose the {{Academic year}} and the {{Semester}}.", "Your courses, grades and Cr/Hrs are listed, with the semester GPA under the table."] },
+        { icon: "Repeat", title: "Check repeats", body: ["If a card called **Outstanding repeats** appears, those are courses you still need to repeat."], finish: true },
+      ],
+      notes: [{ kind: "tip", text: "Grades appear only after the **Super Admin approves** them, so a result you expect may not be there yet." }],
+    },
+    {
+      title: "Print or save a semester grade sheet",
+      goal: "Get the College’s own grade sheet for one semester, on paper or as a PDF.",
+      path: ["My grades", "Semester results"],
+      pathIcon: "Printer",
+      when: "Any time after the grades are published",
+      steps: [
+        { icon: "GraduationCap", title: "Open My grades", body: ["Choose the {{Academic year}} and {{Semester}} you want."] },
+        { icon: "Printer", title: "Click the printer icon", body: ["It is at the top right of **Semester results**. Its name is **Print or save as PDF**."] },
+        { icon: "FileText", title: "The grade sheet opens", body: ["You see the College letterhead sheet (A4, landscape) and the **print window opens by itself**."] },
+        { icon: "MonitorCheck", title: "Choose where it goes", body: ["Under **Destination** pick your printer, or **Save as PDF** to keep a file.", "Then click **Print** or **Save**."], finish: true },
+      ],
+      notes: [
+        { kind: "tip", text: "Click ((Back)) on the grade-sheet page to return to My grades." },
+        { kind: "warn", text: "Every print is recorded by the College for security. Print only what you need." },
+      ],
+    },
+    {
+      title: "Print your unofficial transcript",
+      goal: "Download a full copy of your record for your own use.",
+      path: ["My transcript"],
+      pathIcon: "FileText",
+      when: "Whenever you need a personal copy",
+      steps: [
+        { icon: "FileText", title: "Open My transcript", body: ["Your full academic record appears on the page, semester by semester."] },
+        { icon: "ScanSearch", title: "Check it", body: ["Look at your details and your courses. If a yellow message says your past records are still being entered, some old results are missing for now."] },
+        { icon: "Printer", title: "Print or save as PDF", body: ["Click [[Print or save as PDF]], then choose a printer or **Save as PDF**."], finish: true },
+      ],
+      notes: [
+        { kind: "no", text: "Your copy carries an **UNOFFICIAL** watermark and is not accepted as an official transcript. Ask the Registrar’s office for the official one." },
+      ],
+    },
+    {
+      title: "Change your password later",
+      goal: "Choose a new password at any time, for example if someone else might know it.",
+      path: ["Top right", "Change password"],
+      pathIcon: "KeyRound",
+      when: "Any time",
+      steps: [
+        { icon: "KeyRound", title: "Open Change password", body: ["Click **Change password** in the top bar."] },
+        { icon: "PenLine", title: "Fill in three boxes", body: ["{{Current password}}, then {{New password}}, then {{Confirm new password}}."] },
+        { icon: "ShieldCheck", title: "Save it", body: ["Click [[Set password]].", "Use the new password the next time you sign in."], finish: true },
+      ],
+      notes: [{ kind: "tip", text: "Rule: **at least 6 characters, one number, one lowercase letter**. Choose something only you would know." }],
+    },
+  ],
+  help: "**Stuck?** Visit the **Admin office**. They can reset your password and fix a missing grade. Bring your Student ID.",
+};

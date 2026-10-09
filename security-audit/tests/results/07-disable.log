@@ -1,0 +1,6 @@
+PASS  B4  Disabled admin's already-open session is cut off at once
+        before: true, after shows 'Please sign in': true, action status 500, college created: 0
+FAIL  B5  Disabling an account also disables its Supabase Auth login / revokes its tokens
+        Supabase Auth still issues a session to the disabled user directly: HTTP 200 (token issued). Only the app's status check blocks them; DB RLS helper app.current_user_role() ignores status.
+PASS  B6  Disable is audit-logged
+        USER_DISABLED,SUPER_ADMIN

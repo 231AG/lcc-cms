@@ -1,0 +1,345 @@
+[
+ {
+  "path": "/",
+  "anonymous": "307->/login",
+  "student": "307->/login",
+  "admin": "307->/login",
+  "super_admin": "307->/login"
+ },
+ {
+  "path": "/login",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/access-denied",
+  "anonymous": "200 [denied-page]",
+  "student": "200 [denied-page]",
+  "admin": "200 [denied-page]",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/portal",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/portal/grades",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200 [denied-page]",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/portal/transcript",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/portal/grade-sheet/48551f18-3170-46dd-ad3b-d07f4b30a125",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/planning",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200 [denied-page]",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/grading-policy",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/change-password",
+  "anonymous": "307->/login",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/students",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/students/0465f219-581c-47ef-83ce-12135d0f2127",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/students/0465f219-581c-47ef-83ce-12135d0f2127/grade-sheet/48551f18-3170-46dd-ad3b-d07f4b30a125",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/students/print",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/accounts",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200 [denied-page]",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/audit",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200 [denied-page]",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/calendar",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/export",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/export/48551f18-3170-46dd-ad3b-d07f4b30a125/print",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/grade-corrections",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/grade-review",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200 [denied-page]",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/grade-review/00000000-0000-4000-8000-000000000000",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200 [denied-page]",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/grades",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/historical",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/historical/import",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/login-slips",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/no-grades",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/offerings",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/offerings/print",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/planning",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/planning/070c388f-18f6-463b-b794-ba536c87682d",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/planning/070c388f-18f6-463b-b794-ba536c87682d/control-sheet",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/registrations",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/structure",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/structure/import",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/student-grades",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/student-plan",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200 [denied-page]"
+ },
+ {
+  "path": "/admin/transcripts",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/transcripts?studentId=0465f219-581c-47ef-83ce-12135d0f2127",
+  "anonymous": "200",
+  "student": "200 [denied-page]",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/admin/historical/progress",
+  "anonymous": "404",
+  "student": "404",
+  "admin": "404",
+  "super_admin": "404"
+ },
+ {
+  "path": "/api/health",
+  "anonymous": "200",
+  "student": "200",
+  "admin": "200",
+  "super_admin": "200"
+ },
+ {
+  "path": "/api/session/ping",
+  "anonymous": "405",
+  "student": "405",
+  "admin": "405",
+  "super_admin": "405"
+ },
+ {
+  "path": "/api/students/3d7ecb58-af1e-4751-9876-16dcc49c8690/photo",
+  "anonymous": "401",
+  "student": "404",
+  "admin": "404",
+  "super_admin": "404"
+ },
+ {
+  "path": "/api/students/0465f219-581c-47ef-83ce-12135d0f2127/photo",
+  "anonymous": "401",
+  "student": "404",
+  "admin": "404",
+  "super_admin": "404"
+ },
+ {
+  "path": "/api/students/36495405-759b-427e-9095-dd8405ff60b1/photo",
+  "anonymous": "401",
+  "student": "404",
+  "admin": "200 [IMAGE]",
+  "super_admin": "200 [IMAGE]"
+ },
+ {
+  "path": "/admin/export/48551f18-3170-46dd-ad3b-d07f4b30a125",
+  "anonymous": "500",
+  "student": "403 [denied-page]",
+  "admin": "200 [CSV 1150B]",
+  "super_admin": "200 [CSV 1150B]"
+ },
+ {
+  "path": "/admin/export/48551f18-3170-46dd-ad3b-d07f4b30a125/results",
+  "anonymous": "500",
+  "student": "403 [denied-page]",
+  "admin": "200 [CSV 315B]",
+  "super_admin": "200 [CSV 315B]"
+ },
+ {
+  "path": "/admin/offerings/export",
+  "anonymous": "500",
+  "student": "403 [denied-page]",
+  "admin": "400",
+  "super_admin": "400"
+ },
+ {
+  "path": "/admin/students/export",
+  "anonymous": "500",
+  "student": "403 [denied-page]",
+  "admin": "200 [CSV 9207B]",
+  "super_admin": "200 [CSV 9207B]"
+ }
+]
