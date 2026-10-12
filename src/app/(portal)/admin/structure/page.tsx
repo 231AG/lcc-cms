@@ -12,6 +12,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { Label, Input, Select } from "@/components/ui/Form";
+import { CourseRowActions } from "./CourseRowActions";
 import { Table, Thead, Th, Tr, Td, SortableTh, type SortDirection } from "@/components/ui/Table";
 import {
   createCollegeAction,
@@ -19,7 +20,6 @@ import {
   createDepartmentAction,
   toggleDepartmentActiveAction,
   createCourseAction,
-  toggleCourseActiveAction,
   addPrerequisiteAction,
   removePrerequisiteAction,
 } from "./actions";
@@ -434,7 +434,7 @@ export default async function AcademicStructurePage({
           <Table>
             <Thead>
               <tr>
-                <SortableTh label="Code" column="code" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
+                <SortableTh label="Course Code" column="code" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
                 <SortableTh label="Title" column="title" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
                 <SortableTh label="Department" column="department" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
                 <SortableTh label="Cr/Hrs" column="credits" activeColumn={courseSortColumn} direction={courseDirection} hrefFor={courseSortHref} />
@@ -453,13 +453,14 @@ export default async function AcademicStructurePage({
                     <Badge tone={c.isActive ? "success" : "neutral"}>{c.isActive ? "ACTIVE" : "INACTIVE"}</Badge>
                   </Td>
                   <Td>
-                    <form action={toggleCourseActiveAction}>
-                      <input type="hidden" name="courseId" value={c.id} />
-                      <input type="hidden" name="isActive" value={(!c.isActive).toString()} />
-                      <SubmitTextButton className="font-medium text-brand-fg hover:underline">
-                        {c.isActive ? "Deactivate" : "Reactivate"}
-                      </SubmitTextButton>
-                    </form>
+                    <CourseRowActions
+                      courseId={c.id}
+                      code={c.code}
+                      title={c.title}
+                      creditHours={c.creditHours}
+                      departmentName={departmentName(c.departmentId)}
+                      isActive={c.isActive}
+                    />
                   </Td>
                 </Tr>
               ))}
