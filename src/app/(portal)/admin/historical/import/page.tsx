@@ -255,6 +255,7 @@ async function ManualEntry({ actor, studentId }: { actor: Actor; studentId: stri
           inCalendar: Boolean(sem),
           ended: sem ? new Date(sem.endDate) < now : null,
           grades: sem ? (countBySemester.get(sem.id) ?? 0) : 0,
+          semesterId: sem?.id ?? null,
         };
       }),
     };

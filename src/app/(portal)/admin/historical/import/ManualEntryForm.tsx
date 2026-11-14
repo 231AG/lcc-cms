@@ -29,7 +29,7 @@ export interface ManualEntryFormProps {
   years: Array<{
     label: string;
     inCalendar: boolean;
-    semesters: Array<{ sequence: 1 | 2; inCalendar: boolean; ended: boolean | null; grades: number }>;
+    semesters: Array<{ sequence: 1 | 2; inCalendar: boolean; ended: boolean | null; grades: number; semesterId: string | null }>;
   }>;
   courses: Array<{ code: string; title: string; creditHours: number }>;
   departments: Array<{ id: string; name: string; isActive: boolean; collegeName: string }>;
@@ -314,6 +314,17 @@ export default function ManualEntryForm({ student, years, courses, departments, 
         <Alert tone="warning">
           {yearLabel} — Semester {sequence === 1 ? "I" : "II"} has not ended yet. Past grades go only into semesters that are over;
           grades for a current class are entered on Grade entry.
+        </Alert>
+      )}
+
+      {semInfo && semInfo.grades > 0 && semInfo.semesterId && (
+        <Alert tone="info">
+          This student already has {semInfo.grades} grade{semInfo.grades === 1 ? "" : "s"} in {yearLabel} — Semester {sequence === 1 ? "I" : "II"}. To change,
+          remove or add courses there,{" "}
+          <Link href={`/admin/historical/semester/${student.id}/${semInfo.semesterId}`} className="font-semibold underline">
+            edit that semester
+          </Link>
+          . Rows entered below are added to it.
         </Alert>
       )}
 

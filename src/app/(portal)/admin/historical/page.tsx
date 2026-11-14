@@ -94,6 +94,20 @@ export default async function HistoricalEntryPage({
 
   const yearLabel = (id: string) => academicYears.find((y) => y.id === id)?.label ?? id;
 
+  // Each semester that has grades, oldest first, for the "Edit a past semester" list.
+  const semestersWithGrades = [...new Set(history.map((r) => r.semesterId))]
+    .map((id) => {
+      const sem = semesters.find((s) => s.id === id);
+      const year = sem ? academicYears.find((y) => y.id === sem.academicYearId) : undefined;
+      return {
+        id,
+        label: sem ? `${year?.label ?? ""} — ${semesterDisplayName(sem)}` : id,
+        count: history.filter((r) => r.semesterId === id).length,
+        sort: `${year?.startDate ?? ""}-${sem?.sequence ?? 0}`,
+      };
+    })
+    .sort((a, b) => a.sort.localeCompare(b.sort));
+
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 outline-none">
       <PageHeader
@@ -163,6 +177,35 @@ export default async function HistoricalEntryPage({
             <Link href={`/admin/historical/import?tab=hand&studentId=${studentId}`} className={buttonClasses("primary", "sm")}>
               Add past grades
             </Link>
+          </CardBody>
+        </Card>
+      )}
+
+      {isAdmin && history.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Edit a past semester</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <p className="mb-3 text-sm text-fg-secondary">
+              Open a whole semester to change grades or credit hours, remove a course, add a course, or add one to the catalogue, and save it
+              all at once.
+            </p>
+            <ul className="divide-y divide-line">
+              {semestersWithGrades.map(({ id, label, count }) => (
+                <li key={id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span>
+                    <strong className="text-fg">{label}</strong>{" "}
+                    <span className="text-fg-muted">
+                      — {count} grade{count === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <Link href={`/admin/historical/semester/${studentId}/${id}`} className={buttonClasses("secondary", "sm")}>
+                    Edit semester
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </CardBody>
         </Card>
       )}
