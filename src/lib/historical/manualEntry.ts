@@ -96,6 +96,8 @@ export interface ManualEntryResult {
   semester: string;
   createdSemester: string | null;
   createdCourses: string[];
+  /** The stored codes of those courses, for linking to them in the catalogue. */
+  createdCourseCodes: string[];
 }
 
 function round2(n: number): number {
@@ -237,7 +239,9 @@ async function analyse(actor: Actor, input: ManualEntryInput): Promise<Plan> {
         title = nc.title.trim();
         const dept = departmentById.get(nc.departmentId);
         if (!title) rowProblems.push(`Give ${shown} its title to add it to the catalogue.`);
-        if (!dept || !dept.isActive) rowProblems.push(`Choose the department ${shown} belongs to.`);
+        // An inactive department is fine: older curriculum often belongs to a
+        // department that no longer runs, and that is exactly when this is used.
+        if (!dept) rowProblems.push(`Choose the department ${shown} belongs to.`);
         if (hoursOk && !Number.isInteger(h))
           rowProblems.push(`The catalogue holds whole credit hours only, so a ${fmt(h)}-hour course can't be added to it. Record it as printed instead.`);
         addToCatalogue = { title, departmentId: nc.departmentId, creditHours: h };
@@ -356,6 +360,7 @@ export async function saveManualEntry(actor: Actor, input: ManualEntryInput): Pr
   }
 
   const createdCourses: string[] = [];
+  const createdCourseCodes: string[] = [];
   for (const s of save) {
     if (!s.addToCatalogue) continue;
     // Added now, so the grade below is linked to its catalogue course.
@@ -364,6 +369,8 @@ export async function saveManualEntry(actor: Actor, input: ManualEntryInput): Pr
     if (already) continue;
     await createCourse(actor, { departmentId: s.addToCatalogue.departmentId, code: s.code, title: s.addToCatalogue.title, creditHours: s.addToCatalogue.creditHours });
     const dept = await db.query.department.findFirst({ where: eq(department.id, s.addToCatalogue.departmentId) });
+    createdCourseCodes.push(s.code);
+    createdCourseCodes.push(s.code);
     createdCourses.push(`${formatCourseCode(s.code)} ${s.addToCatalogue.title} (${s.addToCatalogue.creditHours} hrs, ${dept?.name ?? "department"})`);
   }
 
@@ -399,5 +406,6 @@ export async function saveManualEntry(actor: Actor, input: ManualEntryInput): Pr
     semester: check.semester.label,
     createdSemester: plan ? check.semester.willCreate : null,
     createdCourses,
+    createdCourseCodes,
   };
 }

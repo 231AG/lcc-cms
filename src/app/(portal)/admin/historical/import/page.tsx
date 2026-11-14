@@ -210,9 +210,10 @@ async function ManualEntry({ actor, studentId }: { actor: Actor; studentId: stri
     throw err;
   }
 
-  const [departments, courses, years, semesters, records, scale] = await asUser(actor.userId, (tx) =>
+  const [departments, colleges, courses, years, semesters, records, scale] = await asUser(actor.userId, (tx) =>
     Promise.all([
-      tx.query.department.findMany({ columns: { id: true, name: true, isActive: true } }),
+      tx.query.department.findMany({ columns: { id: true, name: true, isActive: true, collegeId: true } }),
+      tx.query.college.findMany({ columns: { id: true, name: true } }),
       tx.query.course.findMany({ columns: { code: true, title: true, creditHours: true } }),
       tx.query.academicYear.findMany(),
       tx.query.semester.findMany(),
@@ -254,6 +255,7 @@ async function ManualEntry({ actor, studentId }: { actor: Actor; studentId: stri
           inCalendar: Boolean(sem),
           ended: sem ? new Date(sem.endDate) < now : null,
           grades: sem ? (countBySemester.get(sem.id) ?? 0) : 0,
+          semesterId: sem?.id ?? null,
         };
       }),
     };
@@ -274,7 +276,14 @@ async function ManualEntry({ actor, studentId }: { actor: Actor; studentId: stri
       }}
       years={yearOptions}
       courses={courses.map((c) => ({ code: c.code, title: c.title, creditHours: c.creditHours }))}
-      departments={departments.filter((d) => d.isActive).map((d) => ({ id: d.id, name: d.name })).sort((a, b) => a.name.localeCompare(b.name))}
+      departments={departments
+        .map((d) => ({
+          id: d.id,
+          name: d.name,
+          isActive: d.isActive,
+          collegeName: colleges.find((c) => c.id === d.collegeId)?.name ?? "Other",
+        }))
+        .sort((a, b) => a.collegeName.localeCompare(b.collegeName) || a.name.localeCompare(b.name))}
       grades={grades}
     />
   );

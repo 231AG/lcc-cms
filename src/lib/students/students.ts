@@ -178,6 +178,14 @@ export interface UpdateStudentProfileInput {
    * it. Dates are "YYYY-MM-DD".
    */
   details?: Partial<StudentDetails>;
+  /**
+   * Only meaningful together with a changed `departmentId`. A genuine change
+   * of major leaves past grades as they were (the "major" flag is frozen at
+   * the time, by design). When the old department was simply a mistake, this
+   * re-derives that flag on the student's IMPORTED, non-void records from
+   * the new department.
+   */
+  recalculateMajorFlags?: boolean;
 }
 
 /** The optional transcript details on a student record (migration 0034). */
@@ -352,6 +360,7 @@ export async function updateStudentProfile(
   actor: Actor,
   studentId: string,
   input: UpdateStudentProfileInput,
+  options: { onMajorFlagsRecalculated?: (changed: number) => void } = {},
 ) {
   await assertCan(actor, "identity.updateStudentProfile");
 
@@ -432,7 +441,8 @@ export async function updateStudentProfile(
   }
 
   const oldValue = Object.fromEntries(changedFields.map(([key, oldV]) => [key, oldV]));
-  const newValue = Object.fromEntries(changedFields.map(([key, , newV]) => [key, newV]));
+  const newValue: Record<string, unknown> = Object.fromEntries(changedFields.map(([key, , newV]) => [key, newV]));
+  const recalcMajor = !!input.recalculateMajorFlags && newDepartmentId !== existing.departmentId;
   const nameChanged =
     newFirstName !== existing.firstName || newMiddleName !== existing.middleName || newLastName !== existing.lastName;
 
@@ -453,6 +463,23 @@ export async function updateStudentProfile(
       })
       .where(eq(student.id, studentId))
       .returning();
+
+    if (recalcMajor) {
+      // Imported records only: published (SYSTEM) records keep the flag they
+      // were given when the grade was published.
+      const changed = await tx.execute(sql`
+        update app.academic_record r
+           set was_major_at_record = coalesce(
+                 (select c.department_id = ${newDepartmentId}::uuid from app.course c where c.id = r.course_id), false)
+         where r.student_id = ${studentId}::uuid
+           and r.origin = 'IMPORTED'
+           and not r.is_void
+           and r.was_major_at_record is distinct from coalesce(
+                 (select c.department_id = ${newDepartmentId}::uuid from app.course c where c.id = r.course_id), false)
+        returning r.id`);
+      newValue.majorFlagsRecalculated = changed.length;
+      options.onMajorFlagsRecalculated?.(changed.length);
+    }
 
     if (nameChanged) {
       await tx
