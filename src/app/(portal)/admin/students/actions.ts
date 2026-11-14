@@ -82,6 +82,7 @@ export async function updateStudentProfileAction(formData: FormData): Promise<vo
   const enrolmentYearRaw = String(formData.get("enrolmentYear") ?? "").trim();
   const contactPhoneRaw = String(formData.get("contactPhone") ?? "").trim();
   const genderRaw = String(formData.get("gender") ?? "").trim();
+  let majorFlagsChanged: number | null = null;
   try {
     await updateStudentProfile(actor, studentId, {
       studentNumber: String(formData.get("studentNumber") ?? ""),
@@ -107,12 +108,21 @@ export async function updateStudentProfileAction(formData: FormData): Promise<vo
           .filter((field) => formData.has(field))
           .map((field) => [field, String(formData.get(field) ?? "")]),
       ),
-    });
+      recalculateMajorFlags: formData.get("recalculateMajorFlags") === "1",
+    }, { onMajorFlagsRecalculated: (n) => (majorFlagsChanged = n) });
   } catch (err) {
     if (err instanceof AppError) {
       redirect(`/admin/students/${studentId}?error=${encodeURIComponent(err.message)}`);
     }
     throw err;
+  }
+  if (majorFlagsChanged !== null) {
+    const n = majorFlagsChanged as number;
+    redirect(
+      `/admin/students/${studentId}?notice=${encodeURIComponent(
+        `Saved. ${n} imported past grade${n === 1 ? "" : "s"} had the major status recalculated.`,
+      )}`,
+    );
   }
   redirect(`/admin/students/${studentId}`);
 }

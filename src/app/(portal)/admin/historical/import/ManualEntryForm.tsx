@@ -32,7 +32,7 @@ export interface ManualEntryFormProps {
     semesters: Array<{ sequence: 1 | 2; inCalendar: boolean; ended: boolean | null; grades: number }>;
   }>;
   courses: Array<{ code: string; title: string; creditHours: number }>;
-  departments: Array<{ id: string; name: string }>;
+  departments: Array<{ id: string; name: string; isActive: boolean; collegeName: string }>;
   grades: Array<{ letter: string; gradePoint: number | null; countsInGpa: boolean; legacy: boolean }>;
 }
 
@@ -78,6 +78,11 @@ export default function ManualEntryForm({ student, years, courses, departments, 
   const [pending, startTransition] = useTransition();
 
   const catalogue = useMemo(() => new Map(courses.map((c) => [courseCodeKey(c.code), c])), [courses]);
+  const collegeGroups = useMemo(() => {
+    const groups = new Map<string, typeof departments>();
+    for (const d of departments) groups.set(d.collegeName, [...(groups.get(d.collegeName) ?? []), d]);
+    return [...groups];
+  }, [departments]);
   const gradeByLetter = useMemo(() => new Map(grades.map((g) => [g.letter.toUpperCase(), g])), [grades]);
   const year = years.find((y) => y.label === yearLabel);
 
@@ -202,7 +207,18 @@ export default function ManualEntryForm({ student, years, courses, departments, 
               Saved {saved.saved} grade{saved.saved === 1 ? "" : "s"} for {student.name} ({student.studentNumber}), {saved.semester}.
             </p>
             {saved.createdSemester && <p className="mt-1">{saved.createdSemester.replace("will be created", "was created")}</p>}
-            {saved.createdCourses.length > 0 && <p className="mt-1">Added to the catalogue: {saved.createdCourses.join("; ")}.</p>}
+            {saved.createdCourses.length > 0 && (
+              <p className="mt-1">
+                Added to the catalogue: {saved.createdCourses.join("; ")}.{" "}
+                <Link
+                  href={`/admin/structure?courseQ=${encodeURIComponent(saved.createdCourseCodes[0] ?? "")}#courses`}
+                  className="font-medium underline"
+                >
+                  See {saved.createdCourses.length === 1 ? "it" : "them"} in Academic structure
+                </Link>
+                {saved.createdCourses.length > 1 ? " (search shows the first)" : ""}.
+              </p>
+            )}
           </Alert>
           <div className="flex flex-wrap gap-2">
             <Button onClick={startAnother}>Enter another semester</Button>
@@ -461,10 +477,15 @@ export default function ManualEntryForm({ student, years, courses, departments, 
                               Department
                             </Label>
                             <Select id={`me-dept-${r.key}`} value={r.newDept} onChange={(e) => update(r.key, { newDept: e.target.value })}>
-                              {departments.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                  {d.name}
-                                </option>
+                              {collegeGroups.map(([college, list]) => (
+                                <optgroup key={college} label={college}>
+                                  {list.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      {d.name}
+                                      {d.isActive ? "" : " (inactive)"}
+                                    </option>
+                                  ))}
+                                </optgroup>
                               ))}
                             </Select>
                           </div>

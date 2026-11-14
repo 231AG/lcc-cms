@@ -49,6 +49,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge, type Tone } from "@/components/ui/Badge";
 import { buttonClasses } from "@/components/ui/Button";
 import { Label, Input, Select, Required } from "@/components/ui/Form";
+import { StudentAffiliationFields } from "../StudentAffiliationFields";
 import { SubmitButton, SubmitTextButton } from "@/components/ui/SubmitButton";
 import { GENDER_LABEL } from "@/lib/students/gender";
 import { enrollmentLabel } from "@/lib/students/enrollment";
@@ -195,11 +196,11 @@ export default async function StudentDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; mode?: string; year?: string; semesterId?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; mode?: string; year?: string; semesterId?: string }>;
 }) {
   const actor = await getCurrentActor();
   const { id } = await params;
-  const { error, mode, year: requestedYearId, semesterId: requestedSemesterId } = await searchParams;
+  const { error, notice, mode, year: requestedYearId, semesterId: requestedSemesterId } = await searchParams;
 
   if (!actor)
     return (
@@ -442,6 +443,11 @@ export default async function StudentDetailPage({
           {error}
         </Alert>
       )}
+      {notice && !error && (
+        <Alert tone="success" className="mb-6">
+          {notice}
+        </Alert>
+      )}
 
       {/* The academic figures, promoted out of a definition list: these are
           what an admin opens this page to read. */}
@@ -569,30 +575,23 @@ export default async function StudentDetailPage({
                       <option value="FEMALE">Female</option>
                     </Select>
                   </div>
-                  <div>
-                    <Label htmlFor="departmentId" className="text-xs">
-                      Department
-                      <Required />
-                    </Label>
-                    <Select id="departmentId" name="departmentId" defaultValue={record.departmentId}>
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.code} — {d.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
+                  <StudentAffiliationFields
+                    departments={departments.map((d) => ({
+                      id: d.id,
+                      code: d.code,
+                      name: d.name,
+                      isActive: d.isActive,
+                      collegeId: d.collegeId,
+                      collegeName: colleges.find((c) => c.id === d.collegeId)?.name ?? "—",
+                    }))}
+                    currentDepartmentId={record.departmentId}
+                    currentMinor={record.minor}
+                  />
                   <div>
                     <Label htmlFor="enrolmentYear" className="text-xs">
                       Enrolment year
                     </Label>
                     <Input id="enrolmentYear" name="enrolmentYear" type="number" defaultValue={record.enrolmentYear} className="w-32" />
-                  </div>
-                  <div>
-                    <Label htmlFor="minor" className="text-xs">
-                      Minor
-                    </Label>
-                    <Input id="minor" name="minor" defaultValue={record.minor ?? ""} placeholder="None" className="max-w-xs" />
                   </div>
                   <div>
                     <Label htmlFor="contactPhone" className="text-xs">

@@ -135,6 +135,20 @@ describe("past grades entered by hand", () => {
     expect(half.problems[0]).toMatch(/whole credit hours only/);
   });
 
+  it("lets a course be added to the catalogue under an inactive department", async () => {
+    await db.update(departmentTable).set({ isActive: false }).where(eq(departmentTable.id, DEPT));
+    try {
+      const c = await checkManualEntry(
+        admin,
+        base({ rows: [{ code: NEW_CODE, creditHours: 3, letter: "B", newCourse: { mode: "catalogue", title: "Old Seminar", departmentId: DEPT } }] }),
+      );
+      expect(c.problems).toEqual([]);
+      expect(c.rows[0].catalogue).toBe("adding");
+    } finally {
+      await db.update(departmentTable).set({ isActive: true }).where(eq(departmentTable.id, DEPT));
+    }
+  });
+
   it("saves a semester: catalogue course, a course added to the catalogue, and one recorded as printed", async () => {
     const r = await saveManualEntry(
       admin,
